@@ -332,9 +332,7 @@ export const supabaseDb = {
       const { data, error } = await supabase.auth.signUp({
         email,
         password,
-        options: {
-          emailRedirectTo: redirectUrl,
-        },
+        ...(redirectUrl ? { options: { emailRedirectTo: redirectUrl } } : {}),
       });
 
       if (error) return { error: error.message };

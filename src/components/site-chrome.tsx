@@ -261,7 +261,7 @@ export function SiteHeader() {
               </Link>
 
               <Link
-                to="/business/register"
+                to="/business/signup"
                 onClick={closeMenu}
                 className="flex items-center gap-3 rounded-xl bg-background ring-1 ring-border px-4 py-3 text-sm font-semibold hover:bg-secondary transition-colors"
               >

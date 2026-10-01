@@ -5,7 +5,7 @@ import { useAppState } from "@/lib/app-state";
 import { Building2, ArrowRight } from "lucide-react";
 
 export const Route = createFileRoute("/business/login")({
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string | undefined } => ({
     redirect: typeof search["redirect"] === "string" ? search["redirect"] : undefined,
   }),
   head: () => ({

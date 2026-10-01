@@ -4,7 +4,7 @@ import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-
 import { useAppState } from "@/lib/app-state";
 
 export const Route = createFileRoute("/business/signup")({
-  validateSearch: (search: Record<string, unknown>): { redirect?: string } => ({
+  validateSearch: (search: Record<string, unknown>): { redirect?: string | undefined } => ({
     redirect: typeof search["redirect"] === "string" ? search["redirect"] : undefined,
   }),
   head: () => ({
