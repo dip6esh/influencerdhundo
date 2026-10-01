@@ -1,0 +1,403 @@
+import { createFileRoute } from "@tanstack/react-router";
+import { useState } from "react";
+import { CreatorCard } from "@/components/creator-card";
+import {
+  Button,
+  Chip,
+  DropdownSelect,
+  Field,
+  Label,
+  SectionEyebrow,
+  TextInput,
+} from "@/components/ui-kit";
+import { Slider } from "@/components/ui/slider";
+import { useAppState } from "@/lib/app-state";
+import {
+  BUDGET_BANDS,
+  CATEGORIES,
+  CITIES,
+  COLLAB_TYPES,
+  CONTENT_TYPES,
+  EMPTY_FILTERS,
+  LANGUAGES,
+  filterCreators,
+  formatFollowers,
+  type Filters,
+} from "@/lib/directory-data";
+
+export const Route = createFileRoute("/discover")({
+  head: () => ({
+    meta: [
+      { title: "Find local creators — influencer Dhundo" },
+      {
+        name: "description",
+        content:
+          "Search local creators by city, locality, category, follower size, budget, content type, language and collaboration preferences.",
+      },
+      { property: "og:title", content: "Find local creators — influencer Dhundo" },
+      {
+        property: "og:description",
+        content: "Tell us what you're looking for and see matching local creators.",
+      },
+    ],
+  }),
+  component: Discover,
+});
+
+function Discover() {
+  const { creators } = useAppState();
+  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [showMore, setShowMore] = useState(false);
+  const [results, setResults] = useState<ReturnType<typeof filterCreators> | null>(null);
+
+  const toggleContentType = (type: string) => {
+    setFilters((f) => ({
+      ...f,
+      contentTypes: f.contentTypes.includes(type)
+        ? f.contentTypes.filter((v) => v !== type)
+        : [...f.contentTypes, type],
+    }));
+  };
+
+  const search = () => setResults(filterCreators(creators, filters));
+
+  const hasActiveFilters =
+    Boolean(filters.city) ||
+    Boolean(filters.locality) ||
+    Boolean(filters.pincode) ||
+    Boolean(filters.category) ||
+    Boolean(filters.otherCategory) ||
+    filters.followerRange[0] > 1000 ||
+    filters.followerRange[1] < 50000 ||
+    Boolean(filters.budget) ||
+    filters.contentTypes.length > 0 ||
+    Boolean(filters.collabType) ||
+    Boolean(filters.language) ||
+    Boolean(filters.travel) ||
+    Boolean(filters.products);
+
+  return (
+    <div className="min-h-screen bg-secondary/50 pb-16">
+      {/* HERO SECTION */}
+      <section className="relative overflow-hidden pt-10 pb-6 md:pt-14 md:pb-8">
+        <div className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-primary/15 blur-2xl" />
+        <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
+
+        {/* CONTAINER ALIGNED EXACTLY WITH SITE HEADER / LOGO */}
+        <div className="relative mx-auto max-w-5xl px-5">
+          <div className="max-w-2xl">
+            <SectionEyebrow>Discovery</SectionEyebrow>
+            <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
+              Find Local Creators
+            </h1>
+            <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">
+              Tell us what you're looking for and explore verified creators near your business.
+            </p>
+          </div>
+
+          {/* HERO SEARCH BOX (ALIGNED FLUSH WITH CONTAINER) */}
+          <div className="mt-8">
+            <div className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
+              <div className="space-y-6">
+                
+                {/* SECTION 1: 2x2 CLEAN DROPDOWN / INPUT GRID */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                  <Field label="City">
+                    <DropdownSelect
+                      value={filters.city}
+                      onChange={(val) => setFilters({ ...filters, city: val })}
+                      placeholder="Any city"
+                      options={CITIES}
+                    />
+                  </Field>
+
+                  <Field label="Pincode">
+                    <TextInput
+                      placeholder="e.g. 400601"
+                      inputMode="numeric"
+                      maxLength={6}
+                      value={filters.pincode}
+                      onChange={(e) =>
+                        setFilters({ ...filters, pincode: e.target.value })
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Category">
+                    <DropdownSelect
+                      value={filters.category}
+                      onChange={(val) =>
+                        setFilters({
+                          ...filters,
+                          category: val,
+                          otherCategory: val === "Other" ? (filters.otherCategory ?? "") : "",
+                        })
+                      }
+                      placeholder="All categories"
+                      options={CATEGORIES.map((cat) => ({
+                        label: cat === "Other" ? "Other (Custom...)" : cat,
+                        value: cat,
+                      }))}
+                    />
+                  </Field>
+
+                  <Field label="Budget">
+                    <DropdownSelect
+                      value={filters.budget}
+                      onChange={(val) => setFilters({ ...filters, budget: val })}
+                      placeholder="Any budget"
+                      options={BUDGET_BANDS.map((b) => ({
+                        label: b.label,
+                        value: b.label,
+                      }))}
+                    />
+                  </Field>
+                </div>
+
+                {/* CUSTOM CATEGORY INPUT (When 'Other' selected in dropdown) */}
+                {filters.category === "Other" && (
+                  <div className="rounded-xl bg-background/50 p-4 border border-border animate-in fade-in duration-200">
+                    <Field
+                      label="Specify custom category"
+                      hint="Type niche keyword (e.g. Handmade pottery, AI Tools, Pet care, Yoga...)"
+                    >
+                      <TextInput
+                        placeholder="e.g. Handmade crafts, Pottery, AI & Tech..."
+                        value={filters.otherCategory ?? ""}
+                        onChange={(e) =>
+                          setFilters({ ...filters, otherCategory: e.target.value })
+                        }
+                        autoFocus
+                      />
+                    </Field>
+                  </div>
+                )}
+
+                {/* SECTION 2: CREATOR SIZE RANGE SLIDER */}
+                <div className="rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60">
+                  <div className="flex items-center justify-between mb-3">
+                    <Label>Creator size (Follower range)</Label>
+                    <span className="text-xs font-semibold text-saffrondeep px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+                      {filters.followerRange[0] === 1000 && filters.followerRange[1] >= 50000
+                        ? "Any size (1K – 50K+)"
+                        : filters.followerRange[1] >= 50000
+                          ? `${formatFollowers(filters.followerRange[0])} – 50K+`
+                          : `${formatFollowers(filters.followerRange[0])} – ${formatFollowers(filters.followerRange[1])}`}
+                    </span>
+                  </div>
+                  <div className="pt-2 pb-1 px-1">
+                    <Slider
+                      value={filters.followerRange}
+                      onValueChange={(val) =>
+                        setFilters({
+                          ...filters,
+                          followerRange: [val[0] ?? 1000, val[1] ?? 50000],
+                        })
+                      }
+                      min={1000}
+                      max={50000}
+                      step={1000}
+                      minStepsBetweenThumbs={1}
+                    />
+                    <div className="flex justify-between text-[11px] text-muted-foreground mt-2 font-medium">
+                      <span>1K</span>
+                      <span>10K</span>
+                      <span>20K</span>
+                      <span>30K</span>
+                      <span>40K</span>
+                      <span>50K+</span>
+                    </div>
+                  </div>
+                </div>
+
+                {/* SECTION 3: COLLABORATION TYPE (SELECTABLE BUTTONS) */}
+                <div>
+                  <Label>Collaboration type</Label>
+                  <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { label: "Any type", value: "" },
+                      ...COLLAB_TYPES.map((c) => ({ label: c, value: c })),
+                    ].map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setFilters({ ...filters, collabType: item.value })}
+                        className={`rounded-xl py-2.5 px-3 text-xs font-semibold transition-all border text-center cursor-pointer ${
+                          filters.collabType === item.value
+                            ? "bg-primary text-primary-foreground border-saffrondeep shadow-sm"
+                            : "bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SECTION 4: CONTENT FORMATS (SELECTABLE BUTTONS) */}
+                <div>
+                  <Label>Content format (Select one or more)</Label>
+                  <div className="mt-2.5 flex flex-wrap gap-2">
+                    {CONTENT_TYPES.map((c) => (
+                      <Chip
+                        key={c}
+                        label={c}
+                        tone="accent"
+                        selected={filters.contentTypes.includes(c)}
+                        onClick={() => toggleContentType(c)}
+                      />
+                    ))}
+                  </div>
+                </div>
+
+                {/* ADVANCED / MORE FILTERS (CLEAN 2-COLUMN GRID) */}
+                {showMore && (
+                  <div className="space-y-5 border-t border-border pt-6 animate-in fade-in duration-200">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                      <Field label="Locality / Area">
+                        <TextInput
+                          placeholder="e.g. Thane West, Bandra, Indiranagar"
+                          value={filters.locality}
+                          onChange={(e) =>
+                            setFilters({ ...filters, locality: e.target.value })
+                          }
+                        />
+                      </Field>
+
+                      <Field label="Language">
+                        <DropdownSelect
+                          value={filters.language}
+                          onChange={(val) =>
+                            setFilters({ ...filters, language: val })
+                          }
+                          placeholder="Any language"
+                          options={LANGUAGES}
+                        />
+                      </Field>
+
+                      <Field label="Travel preference">
+                        <DropdownSelect
+                          value={filters.travel}
+                          onChange={(val) =>
+                            setFilters({ ...filters, travel: val })
+                          }
+                          placeholder="Any travel preference"
+                          options={[
+                            "Travels for collaborations",
+                            "Does not travel",
+                          ]}
+                        />
+                      </Field>
+
+                      <Field label="Product collaborations">
+                        <DropdownSelect
+                          value={filters.products}
+                          onChange={(val) =>
+                            setFilters({ ...filters, products: val })
+                          }
+                          placeholder="Any product policy"
+                          options={[
+                            "Accepts products",
+                            "Doesn't accept products",
+                            "Depends",
+                          ]}
+                        />
+                      </Field>
+                    </div>
+                  </div>
+                )}
+
+                {/* TOGGLE MORE FILTERS BUTTON */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  className="w-full text-xs font-medium cursor-pointer"
+                  onClick={() => setShowMore((s) => !s)}
+                >
+                  {showMore ? "▲ Fewer filters" : "▼ More filters (Locality, Language, Travel, Products)"}
+                </Button>
+              </div>
+
+              {/* ACTION BUTTONS */}
+              <div className="mt-6 flex flex-col sm:flex-row gap-3 items-center">
+                <Button
+                  variant="primary"
+                  className="w-full py-4 text-base sm:text-lg font-semibold flex-1 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                  onClick={search}
+                >
+                  Find Creators
+                </Button>
+                {(results !== null || hasActiveFilters) && (
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters(EMPTY_FILTERS);
+                      setResults(null);
+                    }}
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4 px-3 py-2 cursor-pointer"
+                  >
+                    Clear all
+                  </button>
+                )}
+              </div>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      {/* RESULTS SECTION */}
+      <div className="mx-auto mt-10 max-w-5xl px-5">
+        {results === null ? (
+          <div className="glass-card rounded-2xl p-8 text-center max-w-xl mx-auto">
+            <h2 className="text-xl font-display font-semibold">Ready to explore?</h2>
+            <p className="mt-2 text-sm text-muted-foreground">
+              Select your preferred city, category, follower range, or budget above and tap{" "}
+              <span className="font-semibold text-foreground">Find Creators</span> to discover matching creators.
+            </p>
+          </div>
+        ) : (
+          <div>
+            <div className="flex items-center justify-between border-b border-border pb-4">
+              <p className="text-sm font-medium text-foreground">
+                <span className="font-semibold text-saffrondeep">{results.length}</span> creator
+                {results.length === 1 ? "" : "s"} found
+                {filters.city ? ` in ${filters.city}` : ""}
+                {filters.pincode ? ` (${filters.pincode})` : ""}
+                {filters.category
+                  ? ` • ${filters.category === "Other" && filters.otherCategory ? filters.otherCategory : filters.category}`
+                  : ""}
+                {filters.collabType ? ` • ${filters.collabType}` : ""}
+              </p>
+              <span className="text-xs text-muted-foreground">Sorted by fit</span>
+            </div>
+
+            {results.length === 0 ? (
+              <div className="glass-card mt-6 rounded-2xl p-10 text-center max-w-xl mx-auto">
+                <h2 className="text-lg font-semibold">No creators match yet</h2>
+                <p className="mt-2 text-sm text-muted-foreground">
+                  Try adjusting your follower range slider, selecting a different city/pincode, or widening your budget range.
+                </p>
+                <Button
+                  variant="ghost"
+                  className="mt-4"
+                  onClick={() => {
+                    setFilters(EMPTY_FILTERS);
+                    setResults(null);
+                  }}
+                >
+                  Reset filters
+                </Button>
+              </div>
+            ) : (
+              <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {results.map((c, i) => (
+                  <CreatorCard key={c.id} creator={c} index={i} />
+                ))}
+              </div>
+            )}
+          </div>
+        )}
+      </div>
+    </div>
+  );
+}

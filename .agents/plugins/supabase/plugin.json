@@ -1,0 +1,4 @@
+{
+  "name": "supabase",
+  "description": "Supabase integration plugin for querying, creating, updating, and managing Supabase database records and schema."
+}
