@@ -291,6 +291,8 @@ function Register() {
     }
     if (step === 1) {
       if (!form.name.trim()) return "Please enter your name.";
+      if (!form.mobile.trim() || form.mobile.replace(/\D/g, "").length < 10)
+        return "Please enter a valid 10-digit mobile number.";
       if (!form.city) return "Select your city.";
       if (!form.locality.trim()) return "Enter your locality.";
       if (wordCount(form.about) > 300) return "About must be 300 words or less.";

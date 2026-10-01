@@ -158,20 +158,90 @@ function CreatorProfile() {
         {/* CONTACT */}
         {business ? (
           <Card className="glass-card mt-6 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
-            <h2 className="text-xl font-display font-semibold">Contact {creator.name.split(" ")[0]}</h2>
-            <p className="mt-1 text-sm text-muted-foreground">
-              Reach out directly — the collaboration is between you and the creator.
-            </p>
-            <div className="mt-4 grid gap-3 sm:grid-cols-3 text-sm font-medium">
-              <p className="rounded-xl bg-background px-4 py-3 ring-1 ring-border shadow-sm">
-                Phone · {creator.contact.phone}
-              </p>
-              <p className="rounded-xl bg-background px-4 py-3 ring-1 ring-border shadow-sm">
-                WhatsApp · {creator.contact.whatsapp}
-              </p>
-              <p className="rounded-xl bg-background px-4 py-3 ring-1 ring-border shadow-sm">
-                Email · {creator.contact.email}
-              </p>
+            <div className="flex items-center justify-between">
+              <div>
+                <h2 className="text-xl font-display font-semibold">
+                  Contact {creator.name.split(" ")[0]}
+                </h2>
+                <p className="mt-1 text-sm text-muted-foreground">
+                  Reach out directly — the collaboration is between you and the creator.
+                </p>
+              </div>
+              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                ✓ Verified Business Access
+              </span>
+            </div>
+
+            <div className="mt-5 grid gap-3 sm:grid-cols-3 text-sm">
+              {creator.contact.phone ? (
+                <a
+                  href={`tel:${creator.contact.phone.replace(/\s/g, "")}`}
+                  className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-primary hover:bg-secondary/40 transition-all flex flex-col justify-between gap-2 group"
+                >
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Phone Call
+                  </span>
+                  <span className="font-semibold text-foreground text-base group-hover:text-primary">
+                    {creator.contact.phone}
+                  </span>
+                  <span className="text-xs text-primary font-medium">Click to call →</span>
+                </a>
+              ) : (
+                <div className="rounded-2xl bg-secondary/50 p-4 ring-1 ring-border text-muted-foreground">
+                  <span className="text-xs font-semibold uppercase tracking-wider block mb-1">
+                    Phone Call
+                  </span>
+                  <span>Not provided</span>
+                </div>
+              )}
+
+              {creator.contact.whatsapp || creator.contact.phone ? (
+                <a
+                  href={`https://wa.me/${(creator.contact.whatsapp || creator.contact.phone).replace(/\D/g, "")}`}
+                  target="_blank"
+                  rel="noreferrer"
+                  className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-emerald-500 hover:bg-emerald-500/5 transition-all flex flex-col justify-between gap-2 group"
+                >
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    WhatsApp Chat
+                  </span>
+                  <span className="font-semibold text-foreground text-base group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                    {creator.contact.whatsapp || creator.contact.phone}
+                  </span>
+                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                    Open WhatsApp →
+                  </span>
+                </a>
+              ) : (
+                <div className="rounded-2xl bg-secondary/50 p-4 ring-1 ring-border text-muted-foreground">
+                  <span className="text-xs font-semibold uppercase tracking-wider block mb-1">
+                    WhatsApp
+                  </span>
+                  <span>Not provided</span>
+                </div>
+              )}
+
+              {creator.contact.email ? (
+                <a
+                  href={`mailto:${creator.contact.email}`}
+                  className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-primary hover:bg-secondary/40 transition-all flex flex-col justify-between gap-2 group"
+                >
+                  <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
+                    Email Address
+                  </span>
+                  <span className="font-semibold text-foreground text-base truncate group-hover:text-primary">
+                    {creator.contact.email}
+                  </span>
+                  <span className="text-xs text-primary font-medium">Send email →</span>
+                </a>
+              ) : (
+                <div className="rounded-2xl bg-secondary/50 p-4 ring-1 ring-border text-muted-foreground">
+                  <span className="text-xs font-semibold uppercase tracking-wider block mb-1">
+                    Email
+                  </span>
+                  <span>Not provided</span>
+                </div>
+              )}
             </div>
           </Card>
         ) : (
