@@ -62,10 +62,10 @@ function BusinessLogin() {
         <div className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-primary/15 blur-2xl" />
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
-        <div className="relative mx-auto max-w-5xl px-5">
-          <div className="max-w-2xl">
+        <div className="relative mx-auto max-w-5xl px-5 flex flex-col items-center text-center">
+          <div className="max-w-xl w-full">
             <SectionEyebrow>Business Portal</SectionEyebrow>
-            <div className="mt-2 flex items-center gap-3">
+            <div className="mt-2 flex items-center justify-center gap-3">
               <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
                 <Building2 className="size-5" />
               </div>
@@ -78,8 +78,8 @@ function BusinessLogin() {
             </p>
           </div>
 
-          <div className="mt-8 max-w-md">
-            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
+          <div className="mt-8 max-w-md w-full">
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 text-left">
               <div className="space-y-4">
                 <Field
                   label="Registered Mobile or Email"
