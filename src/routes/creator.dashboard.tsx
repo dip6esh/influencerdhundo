@@ -2,9 +2,15 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
-import { formatFollowers, formatPrice } from "@/lib/directory-data";
+import {
+  formatFollowers,
+  formatPrice,
+  formatTimeRemaining,
+  getSubscriptionExpiry,
+  isSubscriptionActive,
+} from "@/lib/directory-data";
 import { supabaseDb } from "@/lib/supabase";
-import { Loader2 } from "lucide-react";
+import { AlertCircle, Clock, Loader2, Sparkles, Zap } from "lucide-react";
 
 export const Route = createFileRoute("/creator/dashboard")({
   head: () => ({
@@ -28,17 +34,18 @@ export const Route = createFileRoute("/creator/dashboard")({
 const STATUS_NOTE: Record<string, string> = {
   Draft: "Your profile is still being created.",
   Inactive: "Profile complete, but not visible to businesses until you activate a plan.",
-  Active: "Your profile is live and visible in the directory.",
-  Expired: "Your subscription has ended — your profile is hidden until renewed.",
+  Active: "Your profile is live and visible in the public directory.",
+  Expired: "Your subscription or trial has ended — your profile is hidden until renewed.",
   Suspended: "Your profile has been temporarily removed by the platform.",
 };
 
 function Dashboard() {
-  const { creators, myCreatorId, subscriptions, upsertCreator } = useAppState();
+  const { creators, myCreatorId, subscriptions, upsertCreator, setCreatorStatus } = useAppState();
   const [loading, setLoading] = useState(!myCreatorId);
   const mine = creators.find((c) => c.id === myCreatorId);
   const sub = subscriptions.find((s) => s.creatorId === myCreatorId);
 
+  // Auto-fetch profile from Supabase on mount
   useEffect(() => {
     let mounted = true;
     async function checkAuthUser() {
@@ -61,6 +68,20 @@ function Dashboard() {
       mounted = false;
     };
   }, [mine, upsertCreator]);
+
+  // Subscription expiration check
+  const subActive = isSubscriptionActive(sub);
+  const subExpiry = sub ? getSubscriptionExpiry(sub) : null;
+  const isTrial = sub?.planId === "trial-3d" || sub?.duration?.toLowerCase().includes("3 day");
+
+  useEffect(() => {
+    if (mine && sub) {
+      if (!subActive && mine.status === "Active") {
+        // Subscription / trial expired: mark as Expired
+        setCreatorStatus(mine.id, "Expired");
+      }
+    }
+  }, [mine, sub, subActive, setCreatorStatus]);
 
   if (loading) {
     return (
@@ -99,6 +120,59 @@ function Dashboard() {
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
         <div className="relative mx-auto max-w-5xl px-5">
+          {/* TRIAL BANNER / EXPIRED BANNER */}
+          {sub && isTrial && subActive && subExpiry ? (
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/15 via-emerald-500/15 to-primary/10 border border-primary/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+                  <Sparkles className="size-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <span>3-Day Free Trial Active</span>
+                    <span className="rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-bold">
+                      {formatTimeRemaining(subExpiry)}
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Your profile is live in the public directory until {subExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/creator/plans"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-all"
+              >
+                <Zap className="size-3.5 text-primary" />
+                Upgrade Plan
+              </Link>
+            </div>
+          ) : null}
+
+          {sub && !subActive ? (
+            <div className="mb-6 rounded-2xl bg-rose/10 border border-rose/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rose text-white">
+                  <AlertCircle className="size-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-rose">
+                    {isTrial ? "3-Day Free Trial Ended" : "Subscription Expired"}
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Your profile is currently hidden from businesses. Activate a paid plan to restore directory visibility.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/creator/plans"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-rose px-4 py-2 text-xs font-semibold text-white hover:bg-rose/90 transition-all"
+              >
+                Activate Plan
+              </Link>
+            </div>
+          ) : null}
+
           <div className="max-w-2xl">
             <SectionEyebrow>Creator dashboard</SectionEyebrow>
             <div className="mt-2 flex flex-wrap items-center gap-3">
@@ -160,12 +234,26 @@ function Dashboard() {
             <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
               <h2 className="text-xl font-display font-semibold">Subscription</h2>
               {sub ? (
-                <div className="mt-4 space-y-2 text-sm text-muted-foreground">
-                  <p className="text-lg font-semibold text-foreground">{sub.duration} Plan</p>
-                  <p className="font-medium text-saffrondeep">{formatPrice(sub.price)}</p>
-                  <p className="text-xs">
-                    Started on {new Date(sub.startedAt).toLocaleDateString("en-IN")}
-                  </p>
+                <div className="mt-4 space-y-3 text-sm">
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan</span>
+                    <p className="text-lg font-semibold text-foreground">{sub.duration}</p>
+                  </div>
+                  <div>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount</span>
+                    <p className="font-medium text-saffrondeep">{formatPrice(sub.price)}</p>
+                  </div>
+                  <div className="border-t border-border pt-2.5 text-xs text-muted-foreground space-y-1">
+                    <p>
+                      Started: {new Date(sub.startedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
+                    </p>
+                    {subExpiry ? (
+                      <p className="flex items-center gap-1 font-medium text-foreground">
+                        <Clock className="size-3.5 text-primary" />
+                        {subActive ? `Ends: ${subExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} (${formatTimeRemaining(subExpiry)})` : "Ended"}
+                      </p>
+                    ) : null}
+                  </div>
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">

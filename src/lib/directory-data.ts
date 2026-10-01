@@ -103,6 +103,54 @@ export const PLANS = [
   { id: "1y", duration: "1 Year", price: 7996, note: "Best value" },
 ] as const;
 
+export const PROMO_CODE_3DAYS = "TRYFREE3DAYS";
+
+export function getSubscriptionExpiry(sub: {
+  planId?: string;
+  duration?: string;
+  startedAt: string;
+}): Date {
+  const started = new Date(sub.startedAt).getTime();
+  if (sub.planId === "trial-3d" || sub.duration?.toLowerCase().includes("3 day")) {
+    return new Date(started + 3 * 24 * 60 * 60 * 1000);
+  }
+  if (sub.planId === "1m" || sub.duration?.toLowerCase().includes("1 month")) {
+    return new Date(started + 30 * 24 * 60 * 60 * 1000);
+  }
+  if (sub.planId === "3m" || sub.duration?.toLowerCase().includes("3 month")) {
+    return new Date(started + 90 * 24 * 60 * 60 * 1000);
+  }
+  if (sub.planId === "6m" || sub.duration?.toLowerCase().includes("6 month")) {
+    return new Date(started + 180 * 24 * 60 * 60 * 1000);
+  }
+  if (sub.planId === "1y" || sub.duration?.toLowerCase().includes("1 year")) {
+    return new Date(started + 365 * 24 * 60 * 60 * 1000);
+  }
+  // Default fallback: 30 days
+  return new Date(started + 30 * 24 * 60 * 60 * 1000);
+}
+
+export function isSubscriptionActive(sub?: {
+  planId?: string;
+  duration?: string;
+  startedAt: string;
+}): boolean {
+  if (!sub || !sub.startedAt) return false;
+  return new Date() < getSubscriptionExpiry(sub);
+}
+
+export function formatTimeRemaining(expiry: Date): string {
+  const diff = expiry.getTime() - Date.now();
+  if (diff <= 0) return "Expired";
+  const days = Math.floor(diff / (24 * 60 * 60 * 1000));
+  const hours = Math.floor((diff % (24 * 60 * 60 * 1000)) / (60 * 60 * 1000));
+  if (days > 0) {
+    return `${days}d ${hours}h left`;
+  }
+  const mins = Math.floor((diff % (60 * 60 * 1000)) / (60 * 1000));
+  return `${hours}h ${mins}m left`;
+}
+
 export const REPORT_REASONS = [
   "Fake profile",
   "Incorrect information",
