@@ -1,95 +1,303 @@
+import { useState, useEffect } from "react";
 import { Link } from "@tanstack/react-router";
 import { useAppState } from "@/lib/app-state";
-import { Building2, Sparkles, User, LogOut, Compass } from "lucide-react";
+import {
+  Building2,
+  Sparkles,
+  User,
+  LogOut,
+  Compass,
+  Menu,
+  X,
+} from "lucide-react";
 
 export function SiteHeader() {
-  const { business, signOutBusiness, myCreatorId, creators, signOutCreator } = useAppState();
+  const { business, signOutBusiness, myCreatorId, creators, signOutCreator } =
+    useAppState();
   const myCreator = creators.find((c) => c.id === myCreatorId);
+  const isLoggedIn = !!(business || myCreator);
+
+  const [menuOpen, setMenuOpen] = useState(false);
+
+  // Close menu on route change / ESC
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  // Prevent body scroll when menu is open
+  useEffect(() => {
+    document.body.style.overflow = menuOpen ? "hidden" : "";
+    return () => {
+      document.body.style.overflow = "";
+    };
+  }, [menuOpen]);
+
+  const closeMenu = () => setMenuOpen(false);
 
   return (
-    <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
-      <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
-        {/* LOGO */}
-        <Link to="/" className="flex items-center gap-2">
-          <img src="/logo.png" alt="influencer Dhundo logo" className="size-8 rounded-full" />
-          <span className="font-display text-lg font-semibold tracking-tight">
-            Influencer <span className="text-saffrondeep">Dhundo</span>
-          </span>
-        </Link>
-
-        {/* RIGHT ACTIONS */}
-        <div className="flex items-center gap-2 sm:gap-3">
-          <Link
-            to="/discover"
-            className="hidden sm:inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2.5 py-1.5 transition-colors"
-          >
-            <Compass className="size-3.5" />
-            <span>Find creators</span>
+    <>
+      <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
+        <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
+          {/* LOGO */}
+          <Link to="/" className="flex items-center gap-2" onClick={closeMenu}>
+            <img
+              src="/logo.png"
+              alt="Influencer Dhundo logo"
+              className="size-8 rounded-full"
+            />
+            <span className="font-display text-lg font-semibold tracking-tight whitespace-nowrap">
+              Influencer <span className="text-saffrondeep">Dhundo</span>
+            </span>
           </Link>
 
-          {/* LOGGED IN AS BUSINESS */}
+          {/* RIGHT ACTIONS — desktop */}
+          <div className="hidden sm:flex items-center gap-2 sm:gap-3">
+            <Link
+              to="/discover"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2.5 py-1.5 transition-colors"
+            >
+              <Compass className="size-3.5" />
+              <span>Find creators</span>
+            </Link>
+
+            {/* Logged in as Business */}
+            {business ? (
+              <div className="flex items-center gap-2">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                  <Building2 className="size-3" />
+                  <span className="max-w-[120px] truncate sm:max-w-[160px]">
+                    {business.businessName}
+                  </span>
+                </span>
+                <button
+                  onClick={signOutBusiness}
+                  title="Sign out of business account"
+                  className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border hover:bg-secondary transition-colors"
+                >
+                  <LogOut className="size-3" />
+                  <span className="hidden sm:inline">Sign out</span>
+                </button>
+              </div>
+            ) : null}
+
+            {/* Logged in as Creator */}
+            {!business && myCreator ? (
+              <div className="flex items-center gap-2">
+                <Link
+                  to="/creator/dashboard"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-saffrondeep/10 px-3 py-1 text-xs font-semibold text-saffrondeep hover:bg-saffrondeep/20 transition-colors"
+                >
+                  <Sparkles className="size-3" />
+                  <span className="max-w-[120px] truncate sm:max-w-[160px]">
+                    {myCreator.name.split(" ")[0]}
+                  </span>
+                </Link>
+                <button
+                  onClick={signOutCreator}
+                  title="Sign out of creator profile"
+                  className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border hover:bg-secondary transition-colors"
+                >
+                  <LogOut className="size-3" />
+                  <span className="hidden sm:inline">Sign out</span>
+                </button>
+              </div>
+            ) : null}
+
+            {/* Not logged in */}
+            {!business && !myCreator ? (
+              <div className="flex items-center gap-1.5 sm:gap-2">
+                <Link
+                  to="/business/login"
+                  className="inline-flex items-center gap-1 rounded-xl bg-background px-2.5 sm:px-3 py-1.5 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
+                >
+                  <Building2 className="size-3 text-primary shrink-0" />
+                  <span>Business Login</span>
+                </Link>
+                <Link
+                  to="/creator/login"
+                  className="inline-flex items-center gap-1 rounded-xl bg-foreground px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors"
+                >
+                  <Sparkles className="size-3 text-saffron shrink-0" />
+                  <span>Creator Login</span>
+                </Link>
+              </div>
+            ) : null}
+          </div>
+
+          {/* MOBILE: hamburger / close icon */}
+          <button
+            className="sm:hidden inline-flex items-center justify-center size-9 rounded-xl ring-1 ring-border bg-background hover:bg-secondary transition-colors"
+            aria-label={menuOpen ? "Close menu" : "Open menu"}
+            onClick={() => setMenuOpen((prev) => !prev)}
+          >
+            {menuOpen ? <X className="size-4" /> : <Menu className="size-4" />}
+          </button>
+        </div>
+      </header>
+
+      {/* ── MOBILE SLIDE-OUT DRAWER ── */}
+      {/* Backdrop */}
+      <div
+        className={`fixed inset-0 z-40 bg-black/50 backdrop-blur-sm transition-opacity duration-300 sm:hidden ${
+          menuOpen ? "opacity-100 pointer-events-auto" : "opacity-0 pointer-events-none"
+        }`}
+        onClick={closeMenu}
+        aria-hidden="true"
+      />
+
+      {/* Drawer panel */}
+      <aside
+        className={`fixed top-0 right-0 z-50 h-full w-72 max-w-[85vw] bg-background border-l border-border shadow-2xl flex flex-col transition-transform duration-300 ease-in-out sm:hidden ${
+          menuOpen ? "translate-x-0" : "translate-x-full"
+        }`}
+        aria-label="Mobile navigation"
+      >
+        {/* Drawer header */}
+        <div className="flex items-center justify-between px-5 py-4 border-b border-border">
+          <Link
+            to="/"
+            onClick={closeMenu}
+            className="flex items-center gap-2"
+          >
+            <img
+              src="/logo.png"
+              alt="Influencer Dhundo logo"
+              className="size-7 rounded-full"
+            />
+            <span className="font-display text-base font-semibold tracking-tight">
+              Influencer <span className="text-saffrondeep">Dhundo</span>
+            </span>
+          </Link>
+          <button
+            onClick={closeMenu}
+            className="size-8 inline-flex items-center justify-center rounded-lg hover:bg-secondary transition-colors"
+            aria-label="Close menu"
+          >
+            <X className="size-4 text-muted-foreground" />
+          </button>
+        </div>
+
+        {/* Drawer body */}
+        <nav className="flex flex-col gap-3 p-5 flex-1 overflow-y-auto">
+          {/* Find creators link */}
+          <Link
+            to="/discover"
+            onClick={closeMenu}
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <Compass className="size-4 shrink-0" />
+            Find Creators
+          </Link>
+
+          <div className="h-px bg-border my-1" />
+
+          {/* ── Logged in as Business ── */}
           {business ? (
-            <div className="flex items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
-                <Building2 className="size-3" />
-                <span className="max-w-[120px] truncate sm:max-w-[160px]">{business.businessName}</span>
-              </span>
+            <>
+              <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-3">
+                <Building2 className="size-4 text-primary shrink-0" />
+                <span className="text-sm font-semibold text-primary truncate">
+                  {business.businessName}
+                </span>
+              </div>
               <button
-                onClick={signOutBusiness}
-                title="Sign out of business account"
-                className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border hover:bg-secondary transition-colors"
+                onClick={() => {
+                  signOutBusiness();
+                  closeMenu();
+                }}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
-                <LogOut className="size-3" />
-                <span className="hidden sm:inline">Sign out</span>
+                <LogOut className="size-4 shrink-0" />
+                Sign Out
               </button>
-            </div>
+            </>
           ) : null}
 
-          {/* LOGGED IN AS CREATOR */}
+          {/* ── Logged in as Creator ── */}
           {!business && myCreator ? (
-            <div className="flex items-center gap-2">
+            <>
               <Link
                 to="/creator/dashboard"
-                className="inline-flex items-center gap-1.5 rounded-full bg-saffrondeep/10 px-3 py-1 text-xs font-semibold text-saffrondeep hover:bg-saffrondeep/20 transition-colors"
+                onClick={closeMenu}
+                className="flex items-center gap-2 rounded-xl bg-saffrondeep/10 px-4 py-3"
               >
-                <Sparkles className="size-3" />
-                <span className="max-w-[120px] truncate sm:max-w-[160px]">
+                <Sparkles className="size-4 text-saffrondeep shrink-0" />
+                <span className="text-sm font-semibold text-saffrondeep truncate">
                   {myCreator.name.split(" ")[0]}
                 </span>
+                <span className="ml-auto text-xs text-muted-foreground">Dashboard →</span>
               </Link>
               <button
-                onClick={signOutCreator}
-                title="Sign out of creator profile"
-                className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border hover:bg-secondary transition-colors"
+                onClick={() => {
+                  signOutCreator();
+                  closeMenu();
+                }}
+                className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               >
-                <LogOut className="size-3" />
-                <span className="hidden sm:inline">Sign out</span>
+                <LogOut className="size-4 shrink-0" />
+                Sign Out
               </button>
-            </div>
+            </>
           ) : null}
 
-          {/* NOT LOGGED IN: SHOW BOTH BUSINESS AND CREATOR LOGIN */}
+          {/* ── Not logged in ── */}
           {!business && !myCreator ? (
-            <div className="flex items-center gap-1.5 sm:gap-2">
+            <div className="flex flex-col gap-3">
+              <p className="text-xs font-medium text-muted-foreground px-1">
+                Sign in / Sign up
+              </p>
+
               <Link
                 to="/business/login"
-                className="inline-flex items-center gap-1 rounded-xl bg-background px-2.5 sm:px-3 py-1.5 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
+                onClick={closeMenu}
+                className="flex items-center gap-3 rounded-xl bg-background ring-1 ring-border px-4 py-3 text-sm font-semibold hover:bg-secondary transition-colors"
               >
-                <Building2 className="size-3 text-primary shrink-0" />
-                <span>Business Login</span>
+                <Building2 className="size-4 text-primary shrink-0" />
+                Business Login
               </Link>
+
+              <Link
+                to="/business/register"
+                onClick={closeMenu}
+                className="flex items-center gap-3 rounded-xl bg-background ring-1 ring-border px-4 py-3 text-sm font-semibold hover:bg-secondary transition-colors"
+              >
+                <Building2 className="size-4 text-primary shrink-0" />
+                Business Sign Up
+              </Link>
+
+              <div className="h-px bg-border my-1" />
+
               <Link
                 to="/creator/login"
-                className="inline-flex items-center gap-1 rounded-xl bg-foreground px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors"
+                onClick={closeMenu}
+                className="flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
               >
-                <Sparkles className="size-3 text-saffron shrink-0" />
-                <span>Creator Login</span>
+                <Sparkles className="size-4 text-saffron shrink-0" />
+                Creator Login
+              </Link>
+
+              <Link
+                to="/creator/register"
+                onClick={closeMenu}
+                className="flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
+              >
+                <Sparkles className="size-4 text-saffron shrink-0" />
+                Creator Sign Up
               </Link>
             </div>
           ) : null}
+        </nav>
+
+        {/* Drawer footer */}
+        <div className="px-5 py-4 border-t border-border text-xs text-muted-foreground">
+          Influencer Dhundo — a directory, not an agency.
         </div>
-      </div>
-    </header>
+      </aside>
+    </>
   );
 }
 
