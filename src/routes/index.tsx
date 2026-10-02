@@ -469,7 +469,6 @@ function PricingSection() {
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => {
             const isPopular = plan.id === "3m";
-            const isBestValue = plan.id === "1y";
 
             return (
               <div
@@ -477,9 +476,7 @@ function PricingSection() {
                 className={`glass-card relative flex flex-col rounded-3xl p-6 transition-all hover:translate-y-[-2px] hover:shadow-lg ${
                   isPopular
                     ? "border-2 border-primary ring-4 ring-primary/10 shadow-md bg-background"
-                    : isBestValue
-                      ? "border border-tealdeep/40 shadow-sm"
-                      : "border border-border/80"
+                    : "border border-border/80"
                 }`}
               >
                 {/* Popular Badge */}
