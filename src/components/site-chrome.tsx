@@ -9,6 +9,7 @@ import {
   Compass,
   Menu,
   X,
+  Gift,
 } from "lucide-react";
 
 export function SiteHeader() {
@@ -63,6 +64,14 @@ export function SiteHeader() {
               <Compass className="size-3.5" />
               <span>Find creators</span>
             </Link>
+
+            <a
+              href="/#pricing"
+              className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2.5 py-1.5 transition-colors"
+            >
+              <Gift className="size-3.5 text-saffrondeep" />
+              <span>Pricing &amp; Trial</span>
+            </a>
 
             {/* Logged in as Business */}
             {business ? (
@@ -193,6 +202,15 @@ export function SiteHeader() {
             Find Creators
           </Link>
 
+          <a
+            href="/#pricing"
+            onClick={closeMenu}
+            className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+          >
+            <Gift className="size-4 text-saffrondeep shrink-0" />
+            Pricing &amp; Free Trial
+          </a>
+
           <div className="h-px bg-border my-1" />
 
           {/* ── Logged in as Business ── */}
@@ -310,6 +328,9 @@ export function SiteFooter() {
           <Link to="/discover" className="hover:text-foreground">
             Find creators
           </Link>
+          <a href="/#pricing" className="hover:text-foreground">
+            Pricing &amp; Plans
+          </a>
           <Link to="/business/login" className="hover:text-foreground">
             For businesses
           </Link>

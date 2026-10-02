@@ -1,5 +1,18 @@
+import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SectionEyebrow } from "@/components/ui-kit";
+import { PLANS, PROMO_CODE_3DAYS, formatPrice } from "@/lib/directory-data";
+import {
+  Check,
+  Sparkles,
+  Gift,
+  Zap,
+  ShieldCheck,
+  Copy,
+  CheckCheck,
+  ArrowRight,
+  Building2,
+} from "lucide-react";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -69,7 +82,24 @@ function Landing() {
         <div className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-primary/15 blur-2xl" />
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
-        <div className="relative mx-auto max-w-5xl px-5 pt-12 pb-14 md:pt-20 md:pb-20">
+        <div className="relative mx-auto max-w-5xl px-5 pt-10 pb-14 md:pt-16 md:pb-20">
+          {/* PROMOTIONAL PILL */}
+          <div className="mb-6 inline-block">
+            <a
+              href="#pricing"
+              className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-4 py-1.5 text-xs font-semibold text-saffrondeep border border-primary/25 shadow-xs hover:bg-primary/20 transition-all active:scale-98"
+            >
+              <Gift className="size-3.5 text-saffrondeep" />
+              <span>
+                3-Day Free Trial available with code{" "}
+                <strong className="font-mono underline underline-offset-2">
+                  {PROMO_CODE_3DAYS}
+                </strong>
+              </span>
+              <span className="text-muted-foreground ml-1">→</span>
+            </a>
+          </div>
+
           <h1 className="max-w-[22ch] text-[2.8rem] leading-[0.95] text-balance font-display font-semibold tracking-tight md:text-[4.5rem]">
             Where small influencers meet small businesses to make it big.
           </h1>
@@ -298,6 +328,9 @@ function Landing() {
         </div>
       </section>
 
+      {/* PRICING & FREE TRIAL SECTION */}
+      <PricingSection />
+
       {/* FINAL CTA */}
       <section className="relative overflow-hidden border-t border-border bg-foreground">
         <div className="pointer-events-none absolute -top-20 right-0 size-80 rounded-full bg-primary/20 blur-3xl" />
@@ -328,3 +361,230 @@ function Landing() {
     </div>
   );
 }
+
+function PricingSection() {
+  const [copied, setCopied] = useState(false);
+
+  const handleCopyCode = () => {
+    navigator.clipboard.writeText(PROMO_CODE_3DAYS);
+    setCopied(true);
+    setTimeout(() => setCopied(false), 2500);
+  };
+
+  const planPerMonth: Record<string, string> = {
+    "1m": "₹799/mo",
+    "3m": "₹666/mo",
+    "6m": "₹566/mo",
+    "1y": "₹666/mo",
+  };
+
+  return (
+    <section id="pricing" className="border-t border-border bg-secondary/40 py-16 md:py-24 scroll-mt-14">
+      <div className="mx-auto max-w-5xl px-5">
+        {/* SECTION HEADER */}
+        <div className="max-w-2xl">
+          <SectionEyebrow>Transparent Pricing &amp; Free Trial</SectionEyebrow>
+          <h2 className="mt-3 text-3xl font-display font-semibold leading-tight text-balance md:text-5xl">
+            Simple, honest plans for creators.
+          </h2>
+          <p className="mt-4 text-base text-pretty text-muted-foreground md:text-lg">
+            No commissions on your brand deals. Keep 100% of what you earn. Choose a plan or start with our 3-day free trial.
+          </p>
+        </div>
+
+        {/* ── FEATURED TRIAL BANNER ── */}
+        <div className="mt-10 relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/20 via-background to-accent/20 p-7 md:p-9 border-2 border-primary/40 shadow-xl">
+          <div className="pointer-events-none absolute -top-12 -right-12 size-48 rounded-full bg-primary/25 blur-2xl" />
+          <div className="pointer-events-none absolute bottom-0 -left-12 size-48 rounded-full bg-accent/25 blur-2xl" />
+
+          <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-6">
+            <div className="space-y-3 max-w-xl">
+              <div className="inline-flex items-center gap-2 rounded-full bg-primary/20 px-3.5 py-1 text-xs font-bold text-saffrondeep border border-primary/30">
+                <Gift className="size-3.5" />
+                <span>LIMITED TIME LAUNCH OFFER</span>
+              </div>
+              <h3 className="text-2xl font-display font-bold md:text-3xl text-foreground">
+                Try Influencer Dhundo Free for 3 Days
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Test the directory with zero risk. Get your profile verified and unlocked immediately so local businesses around you can find and contact you directly.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
+                {[
+                  "Full directory visibility at ₹0",
+                  "Direct contact on WhatsApp & Call",
+                  "0% commission on all deals",
+                  "No credit card required upfront",
+                ].map((perk) => (
+                  <div key={perk} className="flex items-center gap-2 text-xs font-medium text-foreground">
+                    <Check className="size-4 text-tealdeep shrink-0 font-bold" />
+                    <span>{perk}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Trial Promo Code & CTA Box */}
+            <div className="w-full lg:w-auto shrink-0 flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-3 bg-background/80 backdrop-blur-md rounded-2xl p-5 border border-border/80 shadow-md">
+              <div className="text-left sm:text-right lg:text-right">
+                <span className="text-xs text-muted-foreground block">Special Promo Code</span>
+                <div className="mt-1 inline-flex items-center gap-2 rounded-xl bg-secondary px-3 py-1.5 border border-border">
+                  <span className="font-mono text-sm font-bold tracking-wider text-foreground">
+                    {PROMO_CODE_3DAYS}
+                  </span>
+                  <button
+                    type="button"
+                    onClick={handleCopyCode}
+                    title="Copy coupon code"
+                    className="inline-flex items-center gap-1 rounded-lg bg-background px-2 py-1 text-[11px] font-semibold text-primary shadow-xs ring-1 ring-border hover:bg-secondary transition-colors"
+                  >
+                    {copied ? (
+                      <>
+                        <CheckCheck className="size-3 text-emerald-600" />
+                        <span className="text-emerald-600">Copied!</span>
+                      </>
+                    ) : (
+                      <>
+                        <Copy className="size-3" />
+                        <span>Copy</span>
+                      </>
+                    )}
+                  </button>
+                </div>
+              </div>
+
+              <Link
+                to="/creator/register"
+                className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-6 py-3.5 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98"
+              >
+                <span>Claim 3-Day Free Trial</span>
+                <ArrowRight className="size-4" />
+              </Link>
+            </div>
+          </div>
+        </div>
+
+        {/* ── PLANS GRID ── */}
+        <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
+          {PLANS.map((plan) => {
+            const isPopular = plan.id === "3m";
+            const isBestValue = plan.id === "1y";
+
+            return (
+              <div
+                key={plan.id}
+                className={`glass-card relative flex flex-col rounded-3xl p-6 transition-all hover:translate-y-[-2px] hover:shadow-lg ${
+                  isPopular
+                    ? "border-2 border-primary ring-4 ring-primary/10 shadow-md bg-background"
+                    : isBestValue
+                      ? "border border-tealdeep/40 shadow-sm"
+                      : "border border-border/80"
+                }`}
+              >
+                {/* Popular / Value Badge */}
+                {isPopular ? (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[11px] font-bold text-primary-foreground shadow-sm uppercase tracking-wide">
+                    ★ Most Popular
+                  </div>
+                ) : null}
+
+                {isBestValue ? (
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-tealdeep px-3 py-0.5 text-[11px] font-bold text-white shadow-sm uppercase tracking-wide">
+                    Best Value (Save 50%)
+                  </div>
+                ) : null}
+
+                <div className="pt-2">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      {plan.duration}
+                    </span>
+                    <span className="text-[11px] font-medium text-tealdeep bg-accent/10 px-2 py-0.5 rounded-full">
+                      {plan.note}
+                    </span>
+                  </div>
+
+                  <div className="mt-4 flex items-baseline gap-1.5">
+                    <span className="font-display text-3xl font-bold tracking-tight text-foreground">
+                      {formatPrice(plan.price)}
+                    </span>
+                  </div>
+
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    Effective rate: <span className="font-semibold text-foreground">{planPerMonth[plan.id]}</span>
+                  </p>
+                </div>
+
+                <div className="my-5 h-px bg-border/80" />
+
+                {/* Features list */}
+                <ul className="space-y-2.5 text-xs text-muted-foreground flex-1">
+                  <li className="flex items-start gap-2">
+                    <Check className="size-3.5 text-tealdeep shrink-0 mt-0.5 font-bold" />
+                    <span>Active public directory listing</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="size-3.5 text-tealdeep shrink-0 mt-0.5 font-bold" />
+                    <span>Direct WhatsApp &amp; Phone inquiries</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="size-3.5 text-tealdeep shrink-0 mt-0.5 font-bold" />
+                    <span>City &amp; locality filter discovery</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="size-3.5 text-tealdeep shrink-0 mt-0.5 font-bold" />
+                    <span>0% commission on all earnings</span>
+                  </li>
+                  <li className="flex items-start gap-2">
+                    <Check className="size-3.5 text-tealdeep shrink-0 mt-0.5 font-bold" />
+                    <span>Unlimited profile &amp; pricing updates</span>
+                  </li>
+                </ul>
+
+                <div className="mt-6 pt-2">
+                  <Link
+                    to="/creator/register"
+                    className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                      isPopular
+                        ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                        : "bg-foreground text-background hover:bg-foreground/90"
+                    }`}
+                  >
+                    <span>Choose {plan.duration}</span>
+                    <ArrowRight className="size-3" />
+                  </Link>
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        {/* ── FOR BUSINESSES CALLOUT ── */}
+        <div className="mt-8 rounded-2xl bg-secondary/80 p-5 border border-border flex flex-col sm:flex-row items-center justify-between gap-4">
+          <div className="flex items-center gap-3">
+            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
+              <Building2 className="size-5" />
+            </div>
+            <div>
+              <p className="text-sm font-semibold text-foreground">
+                Are you a business looking to hire creators?
+              </p>
+              <p className="text-xs text-muted-foreground">
+                Browsing, filtering and contacting creators in your locality is 100% free with no agency commissions.
+              </p>
+            </div>
+          </div>
+          <Link
+            to="/discover"
+            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-background px-4 py-2 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
+          >
+            <span>Explore Creators</span>
+            <ArrowRight className="size-3" />
+          </Link>
+        </div>
+      </div>
+    </section>
+  );
+}
+
