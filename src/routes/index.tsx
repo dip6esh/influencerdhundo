@@ -482,16 +482,10 @@ function PricingSection() {
                       : "border border-border/80"
                 }`}
               >
-                {/* Popular / Value Badge */}
+                {/* Popular Badge */}
                 {isPopular ? (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[11px] font-bold text-primary-foreground shadow-sm uppercase tracking-wide">
                     ★ Most Popular
-                  </div>
-                ) : null}
-
-                {isBestValue ? (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-tealdeep px-3 py-0.5 text-[11px] font-bold text-white shadow-sm uppercase tracking-wide">
-                    Best Value (Save 50%)
                   </div>
                 ) : null}
 
