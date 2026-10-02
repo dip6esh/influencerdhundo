@@ -20,6 +20,9 @@ export const Route = createFileRoute("/creators/$creatorId")({
       },
     ],
   }),
+  validateSearch: (search: Record<string, unknown>) => ({
+    preview: search.preview === true || search.preview === "true",
+  }),
   component: CreatorProfile,
 });
 
@@ -34,6 +37,7 @@ function Detail({ label, value }: { label: string; value: string }) {
 
 function CreatorProfile() {
   const { creatorId } = Route.useParams();
+  const { preview } = Route.useSearch();
   const navigate = useNavigate();
   const { creators, business, addReport } = useAppState();
   const creator = creators.find((c) => c.id === creatorId);
@@ -64,12 +68,36 @@ function CreatorProfile() {
   return (
     <div className="min-h-screen bg-secondary/50 pb-28">
       <div className="mx-auto max-w-5xl px-5 py-8">
-        <Link
-          to="/discover"
-          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
-        >
-          ← Back to results
-        </Link>
+
+        {/* PREVIEW MODE BANNER */}
+        {preview ? (
+          <div className="mb-5 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/10 to-primary/10 border border-primary/25 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3">
+            <div className="flex items-center gap-3">
+              <div className="flex size-8 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground text-xs font-bold">
+                👁
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">Profile preview</p>
+                <p className="text-xs text-muted-foreground">
+                  This is how your profile looks to businesses in the public directory.
+                </p>
+              </div>
+            </div>
+            <Link
+              to="/creator/dashboard"
+              className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-all"
+            >
+              ← Back to dashboard
+            </Link>
+          </div>
+        ) : (
+          <Link
+            to="/discover"
+            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          >
+            ← Back to results
+          </Link>
+        )}
 
         <Card className="glass-card mt-6 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
           <div className="flex flex-col sm:flex-row gap-5">
@@ -261,59 +289,61 @@ function CreatorProfile() {
           </div>
         )}
 
-        {/* REPORT */}
-        <div className="mt-6">
-          {reported ? (
-            <p className="text-sm font-medium text-tealdeep">
-              Thanks — this profile has been reported for review.
-            </p>
-          ) : reportOpen ? (
-            <Card>
-              <h2 className="text-lg">Report this profile</h2>
-              <div className="mt-4 space-y-4">
-                <Field label="Reason">
-                  <Select value={reason} onChange={(e) => setReason(e.target.value)}>
-                    {REPORT_REASONS.map((r) => (
-                      <option key={r} value={r}>
-                        {r}
-                      </option>
-                    ))}
-                  </Select>
-                </Field>
-                <Field label="Details (optional)">
-                  <TextArea
-                    maxLength={500}
-                    value={details}
-                    onChange={(e) => setDetails(e.target.value)}
-                    placeholder="Tell us what's wrong with this profile"
-                  />
-                </Field>
-                <div className="flex gap-2">
-                  <Button
-                    variant="ink"
-                    onClick={() => {
-                      addReport({ creatorId: creator.id, reason, details });
-                      setReportOpen(false);
-                      setReported(true);
-                    }}
-                  >
-                    Submit report
-                  </Button>
-                  <Button variant="ghost" onClick={() => setReportOpen(false)}>
-                    Cancel
-                  </Button>
+        {/* REPORT — hidden in preview mode */}
+        {!preview && (
+          <div className="mt-6">
+            {reported ? (
+              <p className="text-sm font-medium text-tealdeep">
+                Thanks — this profile has been reported for review.
+              </p>
+            ) : reportOpen ? (
+              <Card>
+                <h2 className="text-lg">Report this profile</h2>
+                <div className="mt-4 space-y-4">
+                  <Field label="Reason">
+                    <Select value={reason} onChange={(e) => setReason(e.target.value)}>
+                      {REPORT_REASONS.map((r) => (
+                        <option key={r} value={r}>
+                          {r}
+                        </option>
+                      ))}
+                    </Select>
+                  </Field>
+                  <Field label="Details (optional)">
+                    <TextArea
+                      maxLength={500}
+                      value={details}
+                      onChange={(e) => setDetails(e.target.value)}
+                      placeholder="Tell us what's wrong with this profile"
+                    />
+                  </Field>
+                  <div className="flex gap-2">
+                    <Button
+                      variant="ink"
+                      onClick={() => {
+                        addReport({ creatorId: creator.id, reason, details });
+                        setReportOpen(false);
+                        setReported(true);
+                      }}
+                    >
+                      Submit report
+                    </Button>
+                    <Button variant="ghost" onClick={() => setReportOpen(false)}>
+                      Cancel
+                    </Button>
+                  </div>
                 </div>
-              </div>
-            </Card>
-          ) : (
-            <button
-              onClick={() => setReportOpen(true)}
-              className="text-xs font-medium text-muted-foreground underline underline-offset-4"
-            >
-              Report this profile
-            </button>
-          )}
-        </div>
+              </Card>
+            ) : (
+              <button
+                onClick={() => setReportOpen(true)}
+                className="text-xs font-medium text-muted-foreground underline underline-offset-4"
+              >
+                Report this profile
+              </button>
+            )}
+          </div>
+        )}
       </div>
 
       {/* STICKY BAR */}
@@ -326,7 +356,14 @@ function CreatorProfile() {
                 {formatPrice(creator.startingPrice)}
               </p>
             </div>
-            {business ? (
+            {preview ? (
+              <Link
+                to="/creator/register"
+                className="rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
+              >
+                Edit profile
+              </Link>
+            ) : business ? (
               <a
                 href={`tel:${creator.contact.phone.replace(/\s/g, "")}`}
                 className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"

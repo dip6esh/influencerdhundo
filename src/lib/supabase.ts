@@ -217,6 +217,29 @@ export const supabaseDb = {
     }
   },
 
+  /** Fetch all subscriptions for a creator from Supabase, ordered by most recent first. */
+  async fetchSubscriptionsForCreator(creatorId: string): Promise<Subscription[]> {
+    try {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .eq("creator_id", creatorId)
+        .order("created_at", { ascending: false });
+
+      if (error || !data) return [];
+      return data.map((row) => ({
+        creatorId: row.creator_id,
+        planId: row.plan_id,
+        duration: row.duration,
+        price: Number(row.price),
+        startedAt: row.started_at,
+      }));
+    } catch (e) {
+      console.warn("Supabase fetchSubscriptionsForCreator error:", e);
+      return [];
+    }
+  },
+
   async saveBusinessAccount(
     business: BusinessAccount,
     authUserId?: string | null,

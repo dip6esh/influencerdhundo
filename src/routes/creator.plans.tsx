@@ -43,8 +43,11 @@ type PaymentMethod = "upi" | "card" | "netbanking";
 
 function Plans() {
   const navigate = useNavigate();
-  const { myCreatorId, creators, activateSubscription } = useAppState();
+  const { myCreatorId, creators, activateSubscription, hasUsedTrial } = useAppState();
   const mine = creators.find((c) => c.id === myCreatorId);
+
+  // One-time trial enforcement
+  const trialAlreadyUsed = myCreatorId ? hasUsedTrial(myCreatorId) : false;
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>("3m");
   const [promoCodeInput, setPromoCodeInput] = useState("");
@@ -71,6 +74,12 @@ function Plans() {
     }
 
     if (cleaned === PROMO_CODE_3DAYS) {
+      if (trialAlreadyUsed) {
+        setPromoError(
+          "You have already used the TRYFREE3DAYS trial. This code can only be used once per creator account. Please choose a paid plan to continue.",
+        );
+        return;
+      }
       setAppliedPromo(PROMO_CODE_3DAYS);
       setPromoCodeInput("");
     } else {
@@ -135,8 +144,8 @@ function Plans() {
             </p>
           </div>
 
-          {/* QUICK PROMO NOTICE BANNER */}
-          {!appliedPromo ? (
+          {/* QUICK PROMO NOTICE BANNER — only shown if trial not yet used */}
+          {!appliedPromo && !trialAlreadyUsed ? (
             <div className="mt-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 p-4 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -162,6 +171,24 @@ function Plans() {
                 <Zap className="size-3.5" />
                 Apply 3-Day Free Code
               </button>
+            </div>
+          ) : null}
+
+          {/* TRIAL ALREADY USED NOTICE */}
+          {trialAlreadyUsed ? (
+            <div className="mt-6 rounded-2xl bg-secondary/80 border border-border p-4 flex items-start gap-3 shadow-sm">
+              <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted-foreground/10 text-muted-foreground">
+                <ShieldCheck className="size-5" />
+              </div>
+              <div>
+                <p className="text-sm font-semibold text-foreground">
+                  Free trial already used
+                </p>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  The 3-day free trial can only be used once per creator account. Your profile is
+                  safely saved — choose a paid plan below to make it visible in the directory again.
+                </p>
+              </div>
             </div>
           ) : null}
 
@@ -258,7 +285,7 @@ function Plans() {
                         value={promoCodeInput}
                         onChange={(e) => setPromoCodeInput(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
-                        placeholder="e.g. TRYFREE3DAYS"
+                        placeholder={trialAlreadyUsed ? "Enter promo code" : "e.g. TRYFREE3DAYS"}
                         className="font-mono uppercase tracking-wider"
                       />
                       <Button
@@ -272,9 +299,13 @@ function Plans() {
 
                     {promoError ? (
                       <p className="text-xs font-medium text-rose">{promoError}</p>
-                    ) : (
+                    ) : !trialAlreadyUsed ? (
                       <p className="text-xs text-muted-foreground">
                         Try code <button type="button" onClick={() => { setPromoCodeInput("TRYFREE3DAYS"); }} className="font-mono font-semibold text-foreground underline underline-offset-2 hover:text-primary">TRYFREE3DAYS</button> to unlock 3 days free trial.
+                      </p>
+                    ) : (
+                      <p className="text-xs text-muted-foreground">
+                        Enter a valid promo code if you have one.
                       </p>
                     )}
                   </div>

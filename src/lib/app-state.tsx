@@ -33,6 +33,8 @@ type AppState = {
   myCreatorId: string | null;
   reports: Report[];
   subscriptions: Subscription[];
+  /** Returns true if the creator has ever used the free 3-day trial */
+  hasUsedTrial: (creatorId: string) => boolean;
   signUpBusiness: (b: BusinessAccount, authUserId?: string | null) => void;
   setBusiness: (b: BusinessAccount | null) => void;
   signOutBusiness: () => void;
@@ -109,6 +111,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             prev.some((x) => x.id === creatorProfile.id) ? prev : [creatorProfile, ...prev],
           );
           setMyCreatorId(creatorProfile.id);
+
+          // Fetch this creator's subscriptions from Supabase and merge into state
+          const remoteSubs = await supabaseDb.fetchSubscriptionsForCreator(creatorProfile.id);
+          if (remoteSubs.length > 0 && isMounted) {
+            setSubscriptions((prev) => {
+              // Remote is source of truth — drop local dupes and sort newest first
+              const localOnly = prev.filter(
+                (s) =>
+                  s.creatorId === creatorProfile.id
+                    ? false // replace all local subs for this creator with remote
+                    : true, // keep subs for other creators (e.g. in dev/admin scenarios)
+              );
+              return [...remoteSubs, ...localOnly].sort(
+                (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
+              );
+            });
+          }
         }
 
         const businessProfile = await supabaseDb.getBusinessProfileForAuthUser(uid);
@@ -151,6 +170,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       reports,
       subscriptions,
       refreshFromSupabase,
+      hasUsedTrial: (creatorId: string) =>
+        subscriptions.some(
+          (s) =>
+            s.creatorId === creatorId &&
+            (s.planId === "trial-3d" || s.duration?.toLowerCase().includes("3 day")),
+        ),
       signUpBusiness: (b, authUserId) => {
         setBusiness(b);
         supabaseDb.saveBusinessAccount(b, authUserId);

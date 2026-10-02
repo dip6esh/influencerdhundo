@@ -168,8 +168,9 @@ function Dashboard() {
                     {isTrial ? "3-Day Free Trial Ended" : "Subscription Expired"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your profile is currently hidden from businesses. Activate a paid plan to
-                    restore directory visibility.
+                    {isTrial
+                      ? "Your free trial has ended. Your profile is safely saved and will not be deleted — activate a paid plan anytime to make it visible again."
+                      : "Your subscription has expired. Your profile is safely saved and will not be deleted — renew anytime to restore directory visibility."}
                   </p>
                 </div>
               </div>
@@ -177,7 +178,7 @@ function Dashboard() {
                 to="/creator/plans"
                 className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-rose px-4 py-2 text-xs font-semibold text-white hover:bg-rose/90 transition-all"
               >
-                Activate Plan
+                {isTrial ? "Upgrade to Paid Plan" : "Renew Plan"}
               </Link>
             </div>
           ) : null}
@@ -234,6 +235,7 @@ function Dashboard() {
                 <Link
                   to="/creators/$creatorId"
                   params={{ creatorId: mine.id }}
+                  search={{ preview: true }}
                   className="rounded-xl bg-background px-4 py-3 text-center text-sm font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
                 >
                   View public profile
