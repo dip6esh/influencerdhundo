@@ -67,7 +67,7 @@ function Discover() {
     Boolean(filters.pincode) ||
     Boolean(filters.category) ||
     Boolean(filters.otherCategory) ||
-    filters.followerRange[0] > 1000 ||
+    filters.followerRange[0] > 500 ||
     filters.followerRange[1] < 50000 ||
     Boolean(filters.budget) ||
     filters.contentTypes.length > 0 ||
@@ -176,10 +176,10 @@ function Discover() {
                 {/* SECTION 2: CREATOR SIZE RANGE SLIDER */}
                 <div className="rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60">
                   <div className="flex items-center justify-between mb-3">
-                    <Label>Creator size (Follower range)</Label>
+                    <Label>Follower Size</Label>
                     <span className="text-xs font-semibold text-saffrondeep px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-                      {filters.followerRange[0] === 1000 && filters.followerRange[1] >= 50000
-                        ? "Any size (1K – 50K+)"
+                      {filters.followerRange[0] === 500 && filters.followerRange[1] >= 50000
+                        ? "Any size (500 – 50K+)"
                         : filters.followerRange[1] >= 50000
                           ? `${formatFollowers(filters.followerRange[0])} – 50K+`
                           : `${formatFollowers(filters.followerRange[0])} – ${formatFollowers(filters.followerRange[1])}`}
@@ -191,16 +191,16 @@ function Discover() {
                       onValueChange={(val) =>
                         setFilters({
                           ...filters,
-                          followerRange: [val[0] ?? 1000, val[1] ?? 50000],
+                          followerRange: [val[0] ?? 500, val[1] ?? 50000],
                         })
                       }
-                      min={1000}
+                      min={500}
                       max={50000}
-                      step={1000}
+                      step={500}
                       minStepsBetweenThumbs={1}
                     />
                     <div className="flex justify-between text-[11px] text-muted-foreground mt-2 font-medium">
-                      <span>1K</span>
+                      <span>500</span>
                       <span>10K</span>
                       <span>20K</span>
                       <span>30K</span>

@@ -479,7 +479,7 @@ export const EMPTY_FILTERS: Filters = {
   pincode: "",
   category: "",
   otherCategory: "",
-  followerRange: [1000, 50000],
+  followerRange: [500, 50000],
   budget: "",
   contentTypes: [],
   collabType: "",
