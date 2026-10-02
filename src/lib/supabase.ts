@@ -43,6 +43,7 @@ export interface CreatorRow {
   turnaround: string;
   status: CreatorStatus;
   featured: boolean;
+  birth_date?: string | null;
   contact: { phone: string; whatsapp: string; email: string };
   created_at?: string;
   updated_at?: string;
@@ -75,6 +76,7 @@ export function creatorToRow(c: Creator, authUserId?: string): CreatorRow {
     turnaround: c.turnaround || "3–5 days",
     status: c.status || "Active",
     featured: !!c.featured,
+    birth_date: c.birthDate || null,
     contact: c.contact || { phone: "", whatsapp: "", email: "" },
   };
 }
@@ -105,6 +107,7 @@ export function rowToCreator(row: CreatorRow): Creator {
     turnaround: row.turnaround || "3–5 days",
     status: row.status || "Active",
     featured: Boolean(row.featured),
+    birthDate: row.birth_date ?? undefined,
     contact: row.contact || { phone: "", whatsapp: "", email: "" },
   };
 }
@@ -180,7 +183,9 @@ export const supabaseDb = {
     }
   },
 
-  async addReport(report: Omit<Report, "id" | "at"> & { id: string; at: string }): Promise<boolean> {
+  async addReport(
+    report: Omit<Report, "id" | "at"> & { id: string; at: string },
+  ): Promise<boolean> {
     try {
       const { error } = await supabase.from("reports").insert({
         id: report.id,
@@ -212,18 +217,29 @@ export const supabaseDb = {
     }
   },
 
-  async saveBusinessAccount(business: BusinessAccount): Promise<boolean> {
+  async saveBusinessAccount(
+    business: BusinessAccount,
+    authUserId?: string | null,
+  ): Promise<boolean> {
     try {
-      const { error } = await supabase.from("business_accounts").upsert(
-        {
-          name: business.name,
-          business_name: business.businessName,
-          mobile: business.mobile,
-          email: business.email,
-        },
-        { onConflict: "mobile" },
-      );
-      return !error;
+      const payload: Record<string, unknown> = {
+        name: business.name,
+        business_name: business.businessName,
+        mobile: business.mobile,
+        email: business.email,
+        updated_at: new Date().toISOString(),
+      };
+      if (authUserId || business.authUserId) {
+        payload["auth_user_id"] = authUserId || business.authUserId;
+      }
+      const { error } = await supabase
+        .from("business_accounts")
+        .upsert(payload, { onConflict: "mobile" });
+      if (error) {
+        console.warn("Supabase saveBusinessAccount error:", error.message);
+        return false;
+      }
+      return true;
     } catch (e) {
       console.warn("Supabase saveBusinessAccount error:", e);
       return false;
@@ -269,6 +285,8 @@ export const supabaseDb = {
       if (error || !data || data.length === 0) return null;
       const row = data[0];
       return {
+        id: row.id,
+        authUserId: row.auth_user_id ?? undefined,
         name: row.name,
         businessName: row.business_name,
         mobile: row.mobile,
@@ -276,6 +294,184 @@ export const supabaseDb = {
       };
     } catch (e) {
       console.warn("Supabase findBusinessAccount error:", e);
+      return null;
+    }
+  },
+
+  // ── Business Auth ─────────────────────────────────────────────────────────
+
+  /** Sign up a new business user with email + password via Supabase Auth */
+  async signUpBusiness(
+    email: string,
+    password: string,
+    businessData: { name: string; businessName: string; mobile: string },
+  ): Promise<{ userId: string; hasSession: boolean } | { error: string }> {
+    try {
+      const redirectUrl =
+        typeof window !== "undefined" ? `${window.location.origin}/business/signup` : undefined;
+
+      const { data, error } = await supabase.auth.signUp({
+        email,
+        password,
+        options: {
+          data: {
+            role: "business",
+            name: businessData.name,
+            business_name: businessData.businessName,
+            mobile: businessData.mobile,
+          },
+          ...(redirectUrl ? { emailRedirectTo: redirectUrl } : {}),
+        },
+      });
+
+      if (error) return { error: error.message };
+      if (!data.user) return { error: "Sign-up failed. Please try again." };
+
+      // Save into business_accounts table
+      await this.saveBusinessAccount(
+        {
+          name: businessData.name,
+          businessName: businessData.businessName,
+          mobile: businessData.mobile,
+          email: email,
+          authUserId: data.user.id,
+        },
+        data.user.id,
+      );
+
+      return {
+        userId: data.user.id,
+        hasSession: !!data.session,
+      };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  },
+
+  /** Sign in an existing business user with email + password */
+  async signInBusiness(
+    email: string,
+    password: string,
+  ): Promise<BusinessAccount | { error: string }> {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({ email, password });
+      if (error) return { error: error.message };
+      if (!data.user) return { error: "Login failed. Please try again." };
+
+      // Look up business account by auth_user_id
+      const { data: rows, error: dbErr } = await supabase
+        .from("business_accounts")
+        .select("*")
+        .eq("auth_user_id", data.user.id)
+        .limit(1);
+
+      if (!dbErr && rows && rows.length > 0) {
+        const row = rows[0];
+        return {
+          id: row.id,
+          authUserId: row.auth_user_id ?? undefined,
+          name: row.name,
+          businessName: row.business_name,
+          mobile: row.mobile,
+          email: row.email,
+        };
+      }
+
+      // Fallback: match by email
+      const { data: byEmail } = await supabase
+        .from("business_accounts")
+        .select("*")
+        .ilike("email", email)
+        .limit(1);
+
+      if (byEmail && byEmail.length > 0) {
+        const row = byEmail[0];
+        // Link auth_user_id if not linked
+        if (!row.auth_user_id) {
+          await supabase
+            .from("business_accounts")
+            .update({ auth_user_id: data.user.id, updated_at: new Date().toISOString() })
+            .eq("id", row.id);
+        }
+        return {
+          id: row.id,
+          authUserId: data.user.id,
+          name: row.name,
+          businessName: row.business_name,
+          mobile: row.mobile,
+          email: row.email,
+        };
+      }
+
+      // Check user metadata if not in business_accounts table yet
+      const userMeta = (data.user.user_metadata || {}) as Record<string, unknown>;
+      const newBiz: BusinessAccount = {
+        name:
+          typeof userMeta["name"] === "string"
+            ? userMeta["name"]
+            : (email.split("@")[0] ?? "Business"),
+        businessName:
+          typeof userMeta["business_name"] === "string" ? userMeta["business_name"] : "My Business",
+        mobile: typeof userMeta["mobile"] === "string" ? userMeta["mobile"] : "",
+        email: email,
+        authUserId: data.user.id,
+      };
+      await this.saveBusinessAccount(newBiz, data.user.id);
+      return newBiz;
+    } catch (e) {
+      return { error: String(e) };
+    }
+  },
+
+  /** Sign out business user */
+  async signOutBusiness(): Promise<void> {
+    await supabase.auth.signOut();
+  },
+
+  /** Get business profile for current auth user id or email */
+  async getBusinessProfileForAuthUser(
+    authUserId?: string,
+    email?: string,
+  ): Promise<BusinessAccount | null> {
+    try {
+      if (authUserId) {
+        const { data } = await supabase
+          .from("business_accounts")
+          .select("*")
+          .eq("auth_user_id", authUserId)
+          .limit(1);
+        if (data && data.length > 0) {
+          const row = data[0];
+          return {
+            id: row.id,
+            authUserId: row.auth_user_id ?? undefined,
+            name: row.name,
+            businessName: row.business_name,
+            mobile: row.mobile,
+            email: row.email,
+          };
+        }
+      }
+      if (email) {
+        const { data } = await supabase
+          .from("business_accounts")
+          .select("*")
+          .ilike("email", email)
+          .limit(1);
+        if (data && data.length > 0) {
+          const row = data[0];
+          return {
+            id: row.id,
+            authUserId: row.auth_user_id ?? undefined,
+            name: row.name,
+            businessName: row.business_name,
+            mobile: row.mobile,
+            email: row.email,
+          };
+        }
+      }
+      return null;
+    } catch {
       return null;
     }
   },
@@ -325,9 +521,7 @@ export const supabaseDb = {
   ): Promise<{ userId: string; hasSession: boolean } | { error: string }> {
     try {
       const redirectUrl =
-        typeof window !== "undefined"
-          ? `${window.location.origin}/creator/register`
-          : undefined;
+        typeof window !== "undefined" ? `${window.location.origin}/creator/register` : undefined;
 
       const { data, error } = await supabase.auth.signUp({
         email,
@@ -348,10 +542,7 @@ export const supabaseDb = {
   },
 
   /** Sign in an existing creator with email + password. Returns their creator row. */
-  async signInCreator(
-    email: string,
-    password: string,
-  ): Promise<Creator | { error: string }> {
+  async signInCreator(email: string, password: string): Promise<Creator | { error: string }> {
     try {
       const { data, error } = await supabase.auth.signInWithPassword({ email, password });
       if (error) return { error: error.message };
@@ -372,7 +563,9 @@ export const supabaseDb = {
           .filter("contact->>email", "ilike", email)
           .limit(1);
         if (byEmail && byEmail.length > 0) return rowToCreator(byEmail[0] as CreatorRow);
-        return { error: "No creator profile found for this account. Please complete your profile." };
+        return {
+          error: "No creator profile found for this account. Please complete your profile.",
+        };
       }
       return rowToCreator(rows[0] as CreatorRow);
     } catch (e) {

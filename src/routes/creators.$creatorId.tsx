@@ -1,19 +1,8 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
-import {
-  Button,
-  Card,
-  Field,
-  Select,
-  Tag,
-  TextArea,
-} from "@/components/ui-kit";
+import { Button, Card, Field, Select, Tag, TextArea } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
-import {
-  REPORT_REASONS,
-  formatFollowers,
-  formatPrice,
-} from "@/lib/directory-data";
+import { REPORT_REASONS, calculateAge, formatFollowers, formatPrice } from "@/lib/directory-data";
 
 export const Route = createFileRoute("/creators/$creatorId")({
   head: () => ({
@@ -70,10 +59,15 @@ function CreatorProfile() {
     );
   }
 
+  const age = calculateAge(creator.birthDate);
+
   return (
     <div className="min-h-screen bg-secondary/50 pb-28">
       <div className="mx-auto max-w-5xl px-5 py-8">
-        <Link to="/discover" className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors">
+        <Link
+          to="/discover"
+          className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+        >
           ← Back to results
         </Link>
 
@@ -90,6 +84,7 @@ function CreatorProfile() {
               <h1 className="text-3xl font-display font-semibold tracking-tight">{creator.name}</h1>
               <p className="mt-1 text-sm text-muted-foreground">
                 📍 {creator.locality}, {creator.state}
+                {age !== null ? ` · ${age} yrs old` : ""}
               </p>
               <p className="mt-1 text-sm font-semibold text-tealdeep">
                 {formatFollowers(creator.followers)} Instagram followers
@@ -109,6 +104,7 @@ function CreatorProfile() {
           <p className="mt-5 text-base text-pretty text-muted-foreground">{creator.about}</p>
 
           <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
+            {age !== null ? <Detail label="Age" value={`${age} years old`} /> : null}
             <Detail label="Creates" value={creator.contentTypes.join(" · ")} />
             <Detail label="Collaboration" value={creator.collabType} />
             <Detail
@@ -246,9 +242,7 @@ function CreatorProfile() {
           </Card>
         ) : (
           <div className="mt-6 rounded-2xl sm:rounded-3xl bg-foreground p-6 sm:p-8 text-background shadow-xl">
-            <p className="font-display text-xl font-semibold">
-              Want to contact this creator?
-            </p>
+            <p className="font-display text-xl font-semibold">Want to contact this creator?</p>
             <p className="mt-1 text-sm text-background/70">
               Create a free account to view their contact details.
             </p>
@@ -256,70 +250,70 @@ function CreatorProfile() {
               variant="primary"
               className="mt-5 py-3.5 px-8 font-semibold text-base"
               onClick={() =>
-              navigate({
-                to: "/business/signup",
-                search: { redirect: `/creators/${creator.id}` },
-              })
-            }
-          >
-            Contact Creator
-          </Button>
-        </div>
-      )}
-
-      {/* REPORT */}
-      <div className="mt-6">
-        {reported ? (
-          <p className="text-sm font-medium text-tealdeep">
-            Thanks — this profile has been reported for review.
-          </p>
-        ) : reportOpen ? (
-          <Card>
-            <h2 className="text-lg">Report this profile</h2>
-            <div className="mt-4 space-y-4">
-              <Field label="Reason">
-                <Select value={reason} onChange={(e) => setReason(e.target.value)}>
-                  {REPORT_REASONS.map((r) => (
-                    <option key={r} value={r}>
-                      {r}
-                    </option>
-                  ))}
-                </Select>
-              </Field>
-              <Field label="Details (optional)">
-                <TextArea
-                  maxLength={500}
-                  value={details}
-                  onChange={(e) => setDetails(e.target.value)}
-                  placeholder="Tell us what's wrong with this profile"
-                />
-              </Field>
-              <div className="flex gap-2">
-                <Button
-                  variant="ink"
-                  onClick={() => {
-                    addReport({ creatorId: creator.id, reason, details });
-                    setReportOpen(false);
-                    setReported(true);
-                  }}
-                >
-                  Submit report
-                </Button>
-                <Button variant="ghost" onClick={() => setReportOpen(false)}>
-                  Cancel
-                </Button>
-              </div>
-            </div>
-          </Card>
-        ) : (
-          <button
-            onClick={() => setReportOpen(true)}
-            className="text-xs font-medium text-muted-foreground underline underline-offset-4"
-          >
-            Report this profile
-          </button>
+                navigate({
+                  to: "/business/signup",
+                  search: { redirect: `/creators/${creator.id}` },
+                })
+              }
+            >
+              Contact Creator
+            </Button>
+          </div>
         )}
-      </div>
+
+        {/* REPORT */}
+        <div className="mt-6">
+          {reported ? (
+            <p className="text-sm font-medium text-tealdeep">
+              Thanks — this profile has been reported for review.
+            </p>
+          ) : reportOpen ? (
+            <Card>
+              <h2 className="text-lg">Report this profile</h2>
+              <div className="mt-4 space-y-4">
+                <Field label="Reason">
+                  <Select value={reason} onChange={(e) => setReason(e.target.value)}>
+                    {REPORT_REASONS.map((r) => (
+                      <option key={r} value={r}>
+                        {r}
+                      </option>
+                    ))}
+                  </Select>
+                </Field>
+                <Field label="Details (optional)">
+                  <TextArea
+                    maxLength={500}
+                    value={details}
+                    onChange={(e) => setDetails(e.target.value)}
+                    placeholder="Tell us what's wrong with this profile"
+                  />
+                </Field>
+                <div className="flex gap-2">
+                  <Button
+                    variant="ink"
+                    onClick={() => {
+                      addReport({ creatorId: creator.id, reason, details });
+                      setReportOpen(false);
+                      setReported(true);
+                    }}
+                  >
+                    Submit report
+                  </Button>
+                  <Button variant="ghost" onClick={() => setReportOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              </div>
+            </Card>
+          ) : (
+            <button
+              onClick={() => setReportOpen(true)}
+              className="text-xs font-medium text-muted-foreground underline underline-offset-4"
+            >
+              Report this profile
+            </button>
+          )}
+        </div>
       </div>
 
       {/* STICKY BAR */}

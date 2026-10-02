@@ -61,13 +61,7 @@ export const TRAVEL_RANGES = [
   "Anywhere within my city",
 ] as const;
 
-export const TURNAROUNDS = [
-  "Same day",
-  "1–2 days",
-  "3–5 days",
-  "5–7 days",
-  "7+ days",
-] as const;
+export const TURNAROUNDS = ["Same day", "1–2 days", "3–5 days", "5–7 days", "7+ days"] as const;
 
 export const CITIES = [
   "Mumbai",
@@ -151,6 +145,19 @@ export function formatTimeRemaining(expiry: Date): string {
   return `${hours}h ${mins}m left`;
 }
 
+export function calculateAge(birthDate?: string | null): number | null {
+  if (!birthDate) return null;
+  const birth = new Date(birthDate);
+  if (isNaN(birth.getTime())) return null;
+  const today = new Date();
+  let age = today.getFullYear() - birth.getFullYear();
+  const monthDiff = today.getMonth() - birth.getMonth();
+  if (monthDiff < 0 || (monthDiff === 0 && today.getDate() < birth.getDate())) {
+    age--;
+  }
+  return age >= 0 ? age : null;
+}
+
 export const REPORT_REASONS = [
   "Fake profile",
   "Incorrect information",
@@ -160,12 +167,7 @@ export const REPORT_REASONS = [
   "Other",
 ] as const;
 
-export type CreatorStatus =
-  | "Draft"
-  | "Inactive"
-  | "Active"
-  | "Expired"
-  | "Suspended";
+export type CreatorStatus = "Draft" | "Inactive" | "Active" | "Expired" | "Suspended";
 
 export type Creator = {
   id: string;
@@ -192,6 +194,7 @@ export type Creator = {
   turnaround: string;
   status: CreatorStatus;
   featured?: boolean | undefined;
+  birthDate?: string | undefined;
   contact: { phone: string; whatsapp: string; email: string };
 };
 
@@ -221,6 +224,7 @@ export const CREATORS: Creator[] = [
     turnaround: "3–5 days",
     status: "Active",
     featured: true,
+    birthDate: "2000-05-14",
     contact: {
       phone: "+91 98200 11223",
       whatsapp: "+91 98200 11223",
@@ -251,6 +255,7 @@ export const CREATORS: Creator[] = [
     acceptsProducts: "Yes",
     turnaround: "1–2 days",
     status: "Active",
+    birthDate: "1998-11-20",
     contact: {
       phone: "+91 98670 44551",
       whatsapp: "+91 98670 44551",
@@ -280,6 +285,7 @@ export const CREATORS: Creator[] = [
     acceptsProducts: "Yes",
     turnaround: "3–5 days",
     status: "Active",
+    birthDate: "2002-08-09",
     contact: {
       phone: "+91 90040 87612",
       whatsapp: "+91 90040 87612",
@@ -314,6 +320,7 @@ export const CREATORS: Creator[] = [
     turnaround: "5–7 days",
     status: "Active",
     featured: true,
+    birthDate: "1996-03-25",
     contact: {
       phone: "+91 94140 23098",
       whatsapp: "+91 94140 23098",
@@ -485,10 +492,7 @@ export function filterCreators(creators: Creator[], f: Filters) {
   return creators.filter((c) => {
     if (c.status !== "Active") return false;
     if (f.city && c.city !== f.city) return false;
-    if (
-      f.locality &&
-      !c.locality.toLowerCase().includes(f.locality.trim().toLowerCase())
-    )
+    if (f.locality && !c.locality.toLowerCase().includes(f.locality.trim().toLowerCase()))
       return false;
     if (f.pincode && !c.pincode.startsWith(f.pincode.trim())) return false;
     if (f.category) {
@@ -509,8 +513,7 @@ export function filterCreators(creators: Creator[], f: Filters) {
     }
     if (f.contentTypes.length && !f.contentTypes.some((x) => c.contentTypes.includes(x)))
       return false;
-    if (f.language && !c.languages.includes(f.language))
-      return false;
+    if (f.language && !c.languages.includes(f.language)) return false;
     if (f.followerRange) {
       const [min, max] = f.followerRange;
       if (c.followers < min) return false;
@@ -521,14 +524,17 @@ export function filterCreators(creators: Creator[], f: Filters) {
       if (band && c.startingPrice > band.max) return false;
     }
     if (f.collabType) {
-      if (f.collabType === "Both" ? c.collabType !== "Both" : !(c.collabType === f.collabType || c.collabType === "Both"))
+      if (
+        f.collabType === "Both"
+          ? c.collabType !== "Both"
+          : !(c.collabType === f.collabType || c.collabType === "Both")
+      )
         return false;
     }
     if (f.travel === "Travels for collaborations" && !c.travels) return false;
     if (f.travel === "Does not travel" && c.travels) return false;
     if (f.products === "Accepts products" && c.acceptsProducts !== "Yes") return false;
-    if (f.products === "Doesn't accept products" && c.acceptsProducts !== "No")
-      return false;
+    if (f.products === "Doesn't accept products" && c.acceptsProducts !== "No") return false;
     if (f.products === "Depends" && c.acceptsProducts !== "Depends") return false;
     return true;
   });

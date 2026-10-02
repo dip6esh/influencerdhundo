@@ -1,7 +1,9 @@
 import { Link } from "@tanstack/react-router";
-import { formatFollowers, formatPrice, type Creator } from "@/lib/directory-data";
+import { calculateAge, formatFollowers, formatPrice, type Creator } from "@/lib/directory-data";
 
 export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: number }) {
+  const age = calculateAge(creator.birthDate);
+
   return (
     <article
       className="glass-card animate-fade-up flex flex-col overflow-hidden rounded-2xl transition-transform duration-300 hover:-translate-y-1"
@@ -31,21 +33,20 @@ export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: 
           {formatFollowers(creator.followers)} followers
         </span>
 
-        {/* Name + location — pinned to bottom of photo */}
+        {/* Name + location + age — pinned to bottom of photo */}
         <div className="absolute bottom-0 left-0 right-0 px-4 pb-4 pt-8">
           <h3 className="truncate font-display text-base font-semibold leading-tight text-white">
             {creator.name}
           </h3>
           <p className="mt-0.5 truncate text-xs text-white/80">
             {[creator.locality, creator.city].filter(Boolean).join(", ")}
-            {creator.pincode ? ` · ${creator.pincode}` : ""}
+            {age !== null ? ` · ${age} yrs` : ""}
           </p>
         </div>
       </div>
 
       {/* ── CARD BODY ── */}
       <div className="flex flex-1 flex-col gap-3 p-4">
-
         {/* Category + content type pills */}
         <div className="flex flex-wrap gap-1.5">
           {creator.categories.map((cat) => (

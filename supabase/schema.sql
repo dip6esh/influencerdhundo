@@ -27,6 +27,7 @@ CREATE TABLE IF NOT EXISTS public.creators (
   turnaround TEXT NOT NULL DEFAULT '3–5 days',
   status TEXT NOT NULL DEFAULT 'Active',
   featured BOOLEAN NOT NULL DEFAULT FALSE,
+  birth_date DATE,
   contact JSONB NOT NULL DEFAULT '{"phone":"","whatsapp":"","email":""}'::jsonb,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
@@ -35,11 +36,13 @@ CREATE TABLE IF NOT EXISTS public.creators (
 -- 2. BUSINESS ACCOUNTS TABLE
 CREATE TABLE IF NOT EXISTS public.business_accounts (
   id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  auth_user_id UUID REFERENCES auth.users(id) ON DELETE SET NULL,
   name TEXT NOT NULL,
   business_name TEXT NOT NULL,
   mobile TEXT NOT NULL UNIQUE,
   email TEXT NOT NULL,
-  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
 -- 3. REPORTS TABLE

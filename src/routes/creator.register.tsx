@@ -23,6 +23,7 @@ import {
   LANGUAGES,
   TRAVEL_RANGES,
   TURNAROUNDS,
+  calculateAge,
   formatFollowers,
   formatPrice,
   type Creator,
@@ -60,6 +61,7 @@ type Form = {
   // ── Basics step ───────────────────────────
   name: string;
   displayName: string;
+  birthDate: string;
   email: string;
   mobile: string;
   city: string;
@@ -93,6 +95,7 @@ const initialForm: Form = {
   confirmPassword: "",
   name: "",
   displayName: "",
+  birthDate: "",
   email: "",
   mobile: "",
   city: "",
@@ -147,6 +150,7 @@ function Register() {
         ...initialForm,
         name: existing.name,
         displayName: existing.displayName,
+        birthDate: existing.birthDate ?? "",
         email: existing.contact.email,
         mobile: existing.contact.phone,
         city: existing.city,
@@ -226,18 +230,14 @@ function Register() {
   const toggle = (key: "categories" | "contentTypes" | "languages", value: string) =>
     setForm((f) => ({
       ...f,
-      [key]: f[key].includes(value)
-        ? f[key].filter((v) => v !== value)
-        : [...f[key], value],
+      [key]: f[key].includes(value) ? f[key].filter((v) => v !== value) : [...f[key], value],
     }));
 
   const draft: Creator = useMemo(
     () => ({
       id:
         existing?.id ??
-        (form.displayName || form.name || "my-profile")
-          .toLowerCase()
-          .replace(/[^a-z0-9]+/g, "-"),
+        (form.displayName || form.name || "my-profile").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       name: form.name || "Your name",
       displayName: form.displayName || form.name,
       photo: form.photo || defaultPhoto,
@@ -271,6 +271,7 @@ function Register() {
           : undefined,
       turnaround: form.turnaround || "3–5 days",
       status: existing?.status ?? "Inactive",
+      birthDate: form.birthDate || undefined,
       contact: {
         phone: form.mobile,
         whatsapp: form.mobile,
@@ -291,6 +292,11 @@ function Register() {
     }
     if (step === 1) {
       if (!form.name.trim()) return "Please enter your name.";
+      if (!form.birthDate) return "Please enter your date of birth.";
+      const age = calculateAge(form.birthDate);
+      if (age === null || isNaN(age)) return "Please enter a valid date of birth.";
+      if (age < 13) return "Creators must be at least 13 years old.";
+      if (age > 100) return "Please enter a valid date of birth.";
       if (!form.mobile.trim() || form.mobile.replace(/\D/g, "").length < 10)
         return "Please enter a valid 10-digit mobile number.";
       if (!form.city) return "Select your city.";
@@ -431,7 +437,8 @@ function Register() {
 
       if (!result.success) {
         setSaveError(
-          result.error || "Failed to save profile to database. Please check your connection and retry.",
+          result.error ||
+            "Failed to save profile to database. Please check your connection and retry.",
         );
         return;
       }
@@ -481,8 +488,8 @@ function Register() {
             </h2>
             <p className="mt-2 text-sm text-muted-foreground">
               We sent a confirmation link to{" "}
-              <span className="font-semibold text-foreground">{form.email}</span>.
-              Click that link to verify your email, and this page will automatically continue.
+              <span className="font-semibold text-foreground">{form.email}</span>. Click that link
+              to verify your email, and this page will automatically continue.
             </p>
 
             <div className="mt-5 rounded-xl bg-secondary/80 p-4 text-left text-xs text-muted-foreground space-y-1.5">
@@ -559,20 +566,24 @@ function Register() {
 
           {/* STEP RAIL */}
           <div className="mt-8 flex flex-wrap gap-2">
-            {STEPS.map((s, i) => (
-              <span
-                key={s}
-                className={
-                  i === step
-                    ? "rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background shadow-sm"
-                    : i < step
-                      ? "rounded-full bg-accent/15 px-3.5 py-1.5 text-xs font-semibold text-tealdeep"
-                      : "rounded-full bg-background px-3.5 py-1.5 text-xs font-medium text-muted-foreground ring-1 ring-border"
-                }
-              >
-                {i + 1}. {s}
-              </span>
-            ))}
+            {STEPS.filter((_, i) => !(existing && i === 0)).map((s, i) => {
+              // When editing, skip index 0 (Account), so visual index shifts by -1
+              const actualIndex = existing ? i + 1 : i;
+              return (
+                <span
+                  key={s}
+                  className={
+                    actualIndex === step
+                      ? "rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background shadow-sm"
+                      : actualIndex < step
+                        ? "rounded-full bg-accent/15 px-3.5 py-1.5 text-xs font-semibold text-tealdeep"
+                        : "rounded-full bg-background px-3.5 py-1.5 text-xs font-medium text-muted-foreground ring-1 ring-border"
+                  }
+                >
+                  {i + 1}. {s}
+                </span>
+              );
+            })}
           </div>
 
           {/* FORM CARD (ALIGNED FLUSH WITH CONTAINER) */}
@@ -582,7 +593,9 @@ function Register() {
               {step === 0 && !existing ? (
                 <div className="space-y-5">
                   <div className="rounded-xl bg-primary/5 border border-primary/15 p-4">
-                    <p className="text-sm font-semibold text-foreground">Create your account first</p>
+                    <p className="text-sm font-semibold text-foreground">
+                      Create your account first
+                    </p>
                     <p className="mt-1 text-xs text-muted-foreground">
                       You'll use these credentials to log in and edit your profile any time.
                     </p>
@@ -634,7 +647,11 @@ function Register() {
                         className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         aria-label={showConfirmPwd ? "Hide password" : "Show password"}
                       >
-                        {showConfirmPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                        {showConfirmPwd ? (
+                          <EyeOff className="size-4" />
+                        ) : (
+                          <Eye className="size-4" />
+                        )}
                       </button>
                     </div>
                   </Field>
@@ -743,6 +760,21 @@ function Register() {
                       />
                     </Field>
                   </div>
+                  <Field
+                    label="Date of birth"
+                    hint={
+                      form.birthDate && calculateAge(form.birthDate) !== null
+                        ? `Age: ${calculateAge(form.birthDate)} years old (auto-updated every year)`
+                        : "Required to calculate your age accurately for brand listings"
+                    }
+                  >
+                    <TextInput
+                      type="date"
+                      value={form.birthDate}
+                      max={new Date().toISOString().split("T")[0]}
+                      onChange={(e) => set("birthDate", e.target.value)}
+                    />
+                  </Field>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <Field label="City">
                       <DropdownSelect
@@ -1034,6 +1066,14 @@ function Register() {
                       <p className="mt-4 text-sm text-muted-foreground">{draft.about}</p>
                     ) : null}
                     <dl className="mt-5 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-4 gap-y-4 text-sm">
+                      {draft.birthDate && calculateAge(draft.birthDate) !== null ? (
+                        <div>
+                          <dt className="label-caps">Age</dt>
+                          <dd className="mt-1 font-medium">
+                            {calculateAge(draft.birthDate)} years old
+                          </dd>
+                        </div>
+                      ) : null}
                       <div>
                         <dt className="label-caps">Creates</dt>
                         <dd className="mt-1 font-medium">{draft.contentTypes.join(" · ")}</dd>
@@ -1068,18 +1108,32 @@ function Register() {
                         </dd>
                       </div>
                     </dl>
-                    <p className="mt-4 text-sm font-medium text-muted-foreground">{draft.instagram}</p>
+                    <p className="mt-4 text-sm font-medium text-muted-foreground">
+                      {draft.instagram}
+                    </p>
                   </div>
 
-                  <div className="mt-5 rounded-2xl bg-foreground p-5 text-background shadow-md">
-                    <p className="font-display text-lg font-semibold">
-                      Your profile is saved, but hidden
-                    </p>
-                    <p className="mt-1 text-sm text-background/70">
-                      An unpaid profile is not visible in the public directory. You can activate a
-                      plan now or come back later.
-                    </p>
-                  </div>
+                  {existing ? (
+                    <div className="mt-5 rounded-2xl bg-accent/15 border border-accent/25 p-5 text-tealdeep shadow-sm">
+                      <p className="font-display text-lg font-semibold">
+                        ✓ Review your changes
+                      </p>
+                      <p className="mt-1 text-sm text-tealdeep/80">
+                        Click "Save changes" to update your profile. Your current plan and visibility
+                        status will remain unchanged.
+                      </p>
+                    </div>
+                  ) : (
+                    <div className="mt-5 rounded-2xl bg-foreground p-5 text-background shadow-md">
+                      <p className="font-display text-lg font-semibold">
+                        Your profile is saved, but hidden
+                      </p>
+                      <p className="mt-1 text-sm text-background/70">
+                        An unpaid profile is not visible in the public directory. You can activate a
+                        plan now or come back later.
+                      </p>
+                    </div>
+                  )}
                 </div>
               ) : null}
 
@@ -1097,39 +1151,87 @@ function Register() {
                     Back
                   </Button>
                 ) : null}
-                {step < STEPS.length - 1 ? (
-                  <Button
-                    variant="primary"
-                    className="flex-1"
-                    disabled={signingUp}
-                    onClick={next}
-                  >
-                    {signingUp ? "Creating account..." : "Continue"}
-                  </Button>
-                ) : (
+
+                {/* For existing creators: show Save on every step, plus Continue (except Preview) */}
+                {existing ? (
                   <>
-                    <Button
-                      variant="ink"
-                      className="flex-1 justify-center gap-2"
-                      disabled={saving}
-                      onClick={() => handleFinalSave("/creator/plans")}
-                    >
-                      {saving ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          Saving profile...
-                        </>
-                      ) : (
-                        "Save & choose a plan"
-                      )}
-                    </Button>
-                    <Button
-                      variant="ghost"
-                      disabled={saving}
-                      onClick={() => handleFinalSave("/creator/dashboard")}
-                    >
-                      Save for later
-                    </Button>
+                    {step < STEPS.length - 1 ? (
+                      <Button
+                        variant="ghost"
+                        className="justify-center gap-2 border border-border"
+                        disabled={saving}
+                        onClick={async () => {
+                          const err = validateStep();
+                          if (err) { setError(err); return; }
+                          setError("");
+                          await handleFinalSave("/creator/dashboard");
+                        }}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Saving...
+                          </>
+                        ) : (
+                          "Save changes"
+                        )}
+                      </Button>
+                    ) : null}
+                    {step < STEPS.length - 1 ? (
+                      <Button variant="primary" className="flex-1" onClick={next}>
+                        Continue →
+                      </Button>
+                    ) : (
+                      <Button
+                        variant="ink"
+                        className="flex-1 justify-center gap-2"
+                        disabled={saving}
+                        onClick={() => handleFinalSave("/creator/dashboard")}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Saving changes...
+                          </>
+                        ) : (
+                          "Save changes"
+                        )}
+                      </Button>
+                    )}
+                  </>
+                ) : (
+                  /* New creator: standard Continue / Save & plan flow */
+                  <>
+                    {step < STEPS.length - 1 ? (
+                      <Button variant="primary" className="flex-1" disabled={signingUp} onClick={next}>
+                        {signingUp ? "Creating account..." : "Continue"}
+                      </Button>
+                    ) : (
+                      <>
+                        <Button
+                          variant="ink"
+                          className="flex-1 justify-center gap-2"
+                          disabled={saving}
+                          onClick={() => handleFinalSave("/creator/plans")}
+                        >
+                          {saving ? (
+                            <>
+                              <Loader2 className="size-4 animate-spin" />
+                              Saving profile...
+                            </>
+                          ) : (
+                            "Save & choose a plan"
+                          )}
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          disabled={saving}
+                          onClick={() => handleFinalSave("/creator/dashboard")}
+                        >
+                          Save for later
+                        </Button>
+                      </>
+                    )}
                   </>
                 )}
               </div>
@@ -1137,7 +1239,10 @@ function Register() {
 
             <p className="mt-6 text-center text-xs text-muted-foreground">
               Already created a profile?{" "}
-              <Link to="/creator/dashboard" className="underline underline-offset-4 font-medium text-foreground hover:text-primary">
+              <Link
+                to="/creator/dashboard"
+                className="underline underline-offset-4 font-medium text-foreground hover:text-primary"
+              >
                 Go to your dashboard
               </Link>
             </p>

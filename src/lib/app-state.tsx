@@ -1,15 +1,10 @@
-import {
-  createContext,
-  useContext,
-  useEffect,
-  useMemo,
-  useState,
-  type ReactNode,
-} from "react";
+import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { CREATORS, type Creator, type CreatorStatus } from "./directory-data";
 import { supabaseDb } from "./supabase";
 
 export type BusinessAccount = {
+  id?: string;
+  authUserId?: string;
   name: string;
   businessName: string;
   mobile: string;
@@ -38,14 +33,18 @@ type AppState = {
   myCreatorId: string | null;
   reports: Report[];
   subscriptions: Subscription[];
-  signUpBusiness: (b: BusinessAccount) => void;
+  signUpBusiness: (b: BusinessAccount, authUserId?: string | null) => void;
+  setBusiness: (b: BusinessAccount | null) => void;
   signOutBusiness: () => void;
   loginCreator: (id: string) => void;
   signOutCreator: () => void;
   findBusinessByContact: (contact: string) => Promise<BusinessAccount | null>;
   findCreatorByContact: (contact: string) => Promise<Creator | null>;
   upsertCreator: (c: Creator, mine?: boolean) => void;
-  upsertCreatorWithAuth: (c: Creator, authUserId?: string | null) => Promise<{ success: boolean; error?: string }>;
+  upsertCreatorWithAuth: (
+    c: Creator,
+    authUserId?: string | null,
+  ) => Promise<{ success: boolean; error?: string }>;
   setCreatorStatus: (id: string, status: CreatorStatus) => void;
   removeCreator: (id: string) => void;
   toggleFeatured: (id: string) => void;
@@ -101,15 +100,20 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setCreators(remoteCreators);
       }
 
-      // If user has active Supabase session, look up their creator profile
+      // If user has active Supabase session, look up their creator or business profile
       const uid = await supabaseDb.getCreatorSession();
       if (uid && isMounted) {
-        const profile = await supabaseDb.getCreatorProfileForAuthUser(uid);
-        if (profile && isMounted) {
+        const creatorProfile = await supabaseDb.getCreatorProfileForAuthUser(uid);
+        if (creatorProfile && isMounted) {
           setCreators((prev) =>
-            prev.some((x) => x.id === profile.id) ? prev : [profile, ...prev],
+            prev.some((x) => x.id === creatorProfile.id) ? prev : [creatorProfile, ...prev],
           );
-          setMyCreatorId(profile.id);
+          setMyCreatorId(creatorProfile.id);
+        }
+
+        const businessProfile = await supabaseDb.getBusinessProfileForAuthUser(uid);
+        if (businessProfile && isMounted) {
+          setBusiness(businessProfile);
         }
       }
     }
@@ -147,11 +151,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       reports,
       subscriptions,
       refreshFromSupabase,
-      signUpBusiness: (b) => {
+      signUpBusiness: (b, authUserId) => {
         setBusiness(b);
-        supabaseDb.saveBusinessAccount(b);
+        supabaseDb.saveBusinessAccount(b, authUserId);
       },
-      signOutBusiness: () => setBusiness(null),
+      setBusiness: (b) => setBusiness(b),
+      signOutBusiness: () => {
+        setBusiness(null);
+        supabaseDb.signOutBusiness();
+      },
       loginCreator: (id: string) => setMyCreatorId(id),
       signOutCreator: () => {
         setMyCreatorId(null);
@@ -213,9 +221,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return await supabaseDb.upsertCreatorWithAuth(c, authUserId);
       },
       setCreatorStatus: (id, status) => {
-        setCreators((prev) =>
-          prev.map((c) => (c.id === id ? { ...c, status } : c)),
-        );
+        setCreators((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
         supabaseDb.updateCreatorStatus(id, status);
       },
       removeCreator: (id) => {
@@ -228,9 +234,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           if (target) {
             supabaseDb.toggleFeatured(id, !target.featured);
           }
-          return prev.map((c) =>
-            c.id === id ? { ...c, featured: !c.featured } : c,
-          );
+          return prev.map((c) => (c.id === id ? { ...c, featured: !c.featured } : c));
         });
       },
       addReport: (r) => {
@@ -258,9 +262,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     [creators, business, myCreatorId, reports, subscriptions],
   );
 
-  return (
-    <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>
-  );
+  return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;
 }
 
 export function useAppState() {

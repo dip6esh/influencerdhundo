@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import {
+  calculateAge,
   formatFollowers,
   formatPrice,
   formatTimeRemaining,
@@ -135,7 +136,14 @@ function Dashboard() {
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your profile is live in the public directory until {subExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })}.
+                    Your profile is live in the public directory until{" "}
+                    {subExpiry.toLocaleDateString("en-IN", {
+                      month: "short",
+                      day: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}
+                    .
                   </p>
                 </div>
               </div>
@@ -160,7 +168,8 @@ function Dashboard() {
                     {isTrial ? "3-Day Free Trial Ended" : "Subscription Expired"}
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your profile is currently hidden from businesses. Activate a paid plan to restore directory visibility.
+                    Your profile is currently hidden from businesses. Activate a paid plan to
+                    restore directory visibility.
                   </p>
                 </div>
               </div>
@@ -176,10 +185,14 @@ function Dashboard() {
           <div className="max-w-2xl">
             <SectionEyebrow>Creator dashboard</SectionEyebrow>
             <div className="mt-2 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">{mine.name}</h1>
+              <h1 className="text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
+                {mine.name}
+              </h1>
               <StatusPill status={mine.status} />
             </div>
-            <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">{STATUS_NOTE[mine.status]}</p>
+            <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">
+              {STATUS_NOTE[mine.status]}
+            </p>
           </div>
 
           <div className="mt-8 grid gap-6 md:grid-cols-3">
@@ -196,8 +209,11 @@ function Dashboard() {
                 <div className="min-w-0 text-sm space-y-1">
                   <p className="font-semibold text-lg">{mine.instagram}</p>
                   <p className="text-tealdeep font-medium">
-                    {formatFollowers(mine.followers)} followers · 📍 {[mine.locality, mine.city].filter(Boolean).join(", ")}
-                    {mine.pincode ? ` · ${mine.pincode}` : ""}
+                    {formatFollowers(mine.followers)} followers · 📍{" "}
+                    {[mine.locality, mine.city].filter(Boolean).join(", ")}
+                    {calculateAge(mine.birthDate) !== null
+                      ? ` · ${calculateAge(mine.birthDate)} yrs old`
+                      : ""}
                   </p>
                   <p className="text-muted-foreground">
                     {mine.categories.join(" · ") || "No categories yet"}
@@ -236,21 +252,32 @@ function Dashboard() {
               {sub ? (
                 <div className="mt-4 space-y-3 text-sm">
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Plan</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Plan
+                    </span>
                     <p className="text-lg font-semibold text-foreground">{sub.duration}</p>
                   </div>
                   <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">Amount</span>
+                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Amount
+                    </span>
                     <p className="font-medium text-saffrondeep">{formatPrice(sub.price)}</p>
                   </div>
                   <div className="border-t border-border pt-2.5 text-xs text-muted-foreground space-y-1">
                     <p>
-                      Started: {new Date(sub.startedAt).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
+                      Started:{" "}
+                      {new Date(sub.startedAt).toLocaleDateString("en-IN", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
                     </p>
                     {subExpiry ? (
                       <p className="flex items-center gap-1 font-medium text-foreground">
                         <Clock className="size-3.5 text-primary" />
-                        {subActive ? `Ends: ${subExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} (${formatTimeRemaining(subExpiry)})` : "Ended"}
+                        {subActive
+                          ? `Ends: ${subExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} (${formatTimeRemaining(subExpiry)})`
+                          : "Ended"}
                       </p>
                     ) : null}
                   </div>
@@ -258,7 +285,8 @@ function Dashboard() {
               ) : (
                 <div className="mt-4 space-y-3">
                   <p className="text-sm text-muted-foreground">
-                    No active subscription. Your profile stays hidden from businesses until you activate a plan.
+                    No active subscription. Your profile stays hidden from businesses until you
+                    activate a plan.
                   </p>
                   <Link
                     to="/creator/plans"

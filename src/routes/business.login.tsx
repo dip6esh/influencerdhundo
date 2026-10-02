@@ -2,7 +2,8 @@ import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
-import { Building2, ArrowRight } from "lucide-react";
+import { supabaseDb } from "@/lib/supabase";
+import { Building2, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/business/login")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string | undefined } => ({
@@ -24,16 +25,18 @@ function BusinessLogin() {
   const router = useRouter();
   const { redirect } = Route.useSearch();
   const targetUrl = redirect || "/discover";
-  const { findBusinessByContact } = useAppState();
+  const { setBusiness } = useAppState();
 
-  const [contact, setContact] = useState("");
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
 
   const handleLogin = async () => {
-    const clean = contact.trim();
-    if (!clean) {
-      setError("Please enter your registered mobile number or email.");
+    const cleanEmail = email.trim();
+    if (!cleanEmail || !password) {
+      setError("Please enter your email and password.");
       return;
     }
 
@@ -41,14 +44,13 @@ function BusinessLogin() {
     setError("");
 
     try {
-      const account = await findBusinessByContact(clean);
-      if (account) {
-        router.history.push(targetUrl);
-      } else {
-        setError(
-          "No business account found with this mobile or email. Please check your details or create a free account below.",
-        );
+      const result = await supabaseDb.signInBusiness(cleanEmail, password);
+      if ("error" in result) {
+        setError(result.error);
+        return;
       }
+      setBusiness(result);
+      router.history.push(targetUrl);
     } catch {
       setError("An error occurred while logging in. Please try again.");
     } finally {
@@ -74,24 +76,44 @@ function BusinessLogin() {
               </h1>
             </div>
             <p className="mt-3 text-base text-pretty text-muted-foreground">
-              Enter your registered mobile number or email to unlock creator contact details instantly.
+              Enter your business email and password to access direct creator contacts and
+              collaboration features.
             </p>
           </div>
 
           <div className="mt-8 max-w-md w-full">
             <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 text-left">
               <div className="space-y-4">
-                <Field
-                  label="Registered Mobile or Email"
-                  hint="The 10-digit number or email you signed up with"
-                >
+                <Field label="Email address">
                   <TextInput
-                    value={contact}
-                    onChange={(e) => setContact(e.target.value)}
+                    type="email"
+                    value={email}
+                    onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={(e) => e.key === "Enter" && handleLogin()}
-                    placeholder="9820011223 or rahul@company.com"
+                    placeholder="rahul@cafemocha.com"
                     autoFocus
                   />
+                </Field>
+
+                <Field label="Password">
+                  <div className="relative">
+                    <TextInput
+                      type={showPwd ? "text" : "password"}
+                      value={password}
+                      onChange={(e) => setPassword(e.target.value)}
+                      onKeyDown={(e) => e.key === "Enter" && handleLogin()}
+                      placeholder="Your password"
+                      className="pr-10"
+                    />
+                    <button
+                      type="button"
+                      onClick={() => setShowPwd((v) => !v)}
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      aria-label={showPwd ? "Hide password" : "Show password"}
+                    >
+                      {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                    </button>
+                  </div>
                 </Field>
 
                 {error ? (
@@ -106,7 +128,14 @@ function BusinessLogin() {
                   disabled={loading}
                   onClick={handleLogin}
                 >
-                  {loading ? "Checking..." : "Log in to Business Account"}
+                  {loading ? (
+                    <span className="inline-flex items-center gap-2">
+                      <Loader2 className="size-4 animate-spin" />
+                      Signing in...
+                    </span>
+                  ) : (
+                    "Log in to Business Account"
+                  )}
                 </Button>
               </div>
 
@@ -124,7 +153,7 @@ function BusinessLogin() {
 
             <div className="mt-6 text-center">
               <Link
-                to="/login"
+                to="/creator/login"
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
                 <span>← Are you a creator? Switch to Creator Login</span>
