@@ -256,11 +256,11 @@ function Plans() {
                 </div>
 
                 {appliedPromo ? (
-                  <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-4 flex items-center justify-between gap-3">
+                  <div className="rounded-xl bg-accent/10 border border-accent/30 p-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
-                      <CheckCircle2 className="size-5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <CheckCircle2 className="size-5 text-tealdeep shrink-0" />
                       <div>
-                        <p className="text-xs font-bold text-emerald-700 dark:text-emerald-300 font-mono tracking-wide">
+                        <p className="text-xs font-bold text-tealdeep font-mono tracking-wide">
                           {appliedPromo} APPLIED
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
@@ -375,9 +375,9 @@ function Plans() {
                   </div>
 
                   {isTrialApplied ? (
-                    <div className="flex justify-between text-emerald-600 dark:text-emerald-400">
+                    <div className="flex justify-between text-tealdeep font-medium">
                       <span className="flex items-center gap-1">
-                        <Gift className="size-3.5" /> Promo (TRYFREE3DAYS)
+                        <Gift className="size-3.5 text-primary" /> Promo (TRYFREE3DAYS)
                       </span>
                       <span className="font-semibold">
                         - {formatPrice(discountAmount)}
@@ -392,7 +392,7 @@ function Plans() {
                       Total Payable
                     </p>
                     {isTrialApplied ? (
-                      <span className="inline-block mt-0.5 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400">
+                      <span className="inline-block mt-0.5 text-[11px] font-semibold text-tealdeep">
                         100% Free · No card required
                       </span>
                     ) : null}
@@ -404,9 +404,9 @@ function Plans() {
 
                 {/* SUCCESS NOTIFICATION */}
                 {success ? (
-                  <div className="mt-6 rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-4 text-center">
-                    <CheckCircle2 className="size-6 text-emerald-600 dark:text-emerald-400 mx-auto" />
-                    <p className="mt-2 text-sm font-semibold text-emerald-700 dark:text-emerald-300">
+                  <div className="mt-6 rounded-xl bg-accent/15 border border-accent/30 p-4 text-center">
+                    <CheckCircle2 className="size-6 text-tealdeep mx-auto" />
+                    <p className="mt-2 text-sm font-semibold text-tealdeep">
                       {isTrialApplied
                         ? "🎉 3-Day Free Trial Activated!"
                         : "🎉 Payment Successful & Profile Active!"}

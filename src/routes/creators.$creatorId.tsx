@@ -20,8 +20,13 @@ export const Route = createFileRoute("/creators/$creatorId")({
       },
     ],
   }),
-  validateSearch: (search: Record<string, unknown>) => ({
-    preview: search.preview === true || search.preview === "true",
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { preview?: boolean | undefined } => ({
+    preview:
+      search["preview"] === true || search["preview"] === "true"
+        ? true
+        : undefined,
   }),
   component: CreatorProfile,
 });
@@ -191,7 +196,7 @@ function CreatorProfile() {
                   Reach out directly — the collaboration is between you and the creator.
                 </p>
               </div>
-              <span className="rounded-full bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+              <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-tealdeep border border-accent/25">
                 ✓ Verified Business Access
               </span>
             </div>
@@ -224,15 +229,15 @@ function CreatorProfile() {
                   href={`https://wa.me/${(creator.contact.whatsapp || creator.contact.phone).replace(/\D/g, "")}`}
                   target="_blank"
                   rel="noreferrer"
-                  className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-emerald-500 hover:bg-emerald-500/5 transition-all flex flex-col justify-between gap-2 group"
+                  className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-primary hover:bg-secondary/40 transition-all flex flex-col justify-between gap-2 group"
                 >
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
                     WhatsApp Chat
                   </span>
-                  <span className="font-semibold text-foreground text-base group-hover:text-emerald-600 dark:group-hover:text-emerald-400">
+                  <span className="font-semibold text-foreground text-base group-hover:text-primary">
                     {creator.contact.whatsapp || creator.contact.phone}
                   </span>
-                  <span className="text-xs text-emerald-600 dark:text-emerald-400 font-medium">
+                  <span className="text-xs text-tealdeep font-medium">
                     Open WhatsApp →
                   </span>
                 </a>

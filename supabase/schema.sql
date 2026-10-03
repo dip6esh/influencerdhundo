@@ -29,6 +29,12 @@ CREATE TABLE IF NOT EXISTS public.creators (
   featured BOOLEAN NOT NULL DEFAULT FALSE,
   birth_date DATE,
   contact JSONB NOT NULL DEFAULT '{"phone":"","whatsapp":"","email":""}'::jsonb,
+  -- Referral system fields
+  referral_code TEXT UNIQUE,
+  referred_by TEXT,  -- creator id of who referred this creator
+  trial_started_at TIMESTAMPTZ,
+  subscription_expires_at TIMESTAMPTZ,
+  referral_bonus_days INTEGER NOT NULL DEFAULT 0,
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
@@ -63,6 +69,22 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   duration TEXT NOT NULL,
   price INTEGER NOT NULL,
   started_at TEXT NOT NULL,
+  expires_at TIMESTAMPTZ,
+  is_trial BOOLEAN NOT NULL DEFAULT FALSE,
+  referral_code_used TEXT,  -- code used at signup
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+-- 5. REFERRAL EVENTS TABLE
+-- Tracks every time a referral reward is earned or reversed
+CREATE TABLE IF NOT EXISTS public.referral_events (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  referrer_id TEXT NOT NULL,          -- creator who made the referral
+  referred_creator_id TEXT NOT NULL,  -- creator who was referred
+  referred_sub_id TEXT,               -- subscription id that triggered this event
+  days_delta INTEGER NOT NULL,        -- +3 for earned, -3 for reversed
+  event_type TEXT NOT NULL,           -- 'earned' | 'reversed'
+  note TEXT NOT NULL DEFAULT '',      -- human-readable explanation
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -71,6 +93,7 @@ ALTER TABLE public.creators ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.business_accounts ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.reports ENABLE ROW LEVEL SECURITY;
 ALTER TABLE public.subscriptions ENABLE ROW LEVEL SECURITY;
+ALTER TABLE public.referral_events ENABLE ROW LEVEL SECURITY;
 
 -- Creators policies
 CREATE POLICY "Public can view creators" 
@@ -97,7 +120,11 @@ CREATE POLICY "Public can insert and view reports"
 CREATE POLICY "Public can manage subscriptions" 
   ON public.subscriptions FOR ALL USING (true) WITH CHECK (true);
 
--- 5. STORAGE BUCKET FOR CREATOR PROFILE PHOTOS
+-- Referral events policies
+CREATE POLICY "Public can manage referral events"
+  ON public.referral_events FOR ALL USING (true) WITH CHECK (true);
+
+-- 6. STORAGE BUCKET FOR CREATOR PROFILE PHOTOS
 INSERT INTO storage.buckets (id, name, public)
 VALUES ('creator-photos', 'creator-photos', true)
 ON CONFLICT (id) DO NOTHING;
@@ -131,3 +158,30 @@ DO $$ BEGIN
   END IF;
 END $$;
 
+-- MIGRATION: Add referral columns to existing tables if they don't exist
+DO $$ BEGIN
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='creators' AND column_name='referral_code') THEN
+    ALTER TABLE public.creators ADD COLUMN referral_code TEXT UNIQUE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='creators' AND column_name='referred_by') THEN
+    ALTER TABLE public.creators ADD COLUMN referred_by TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='creators' AND column_name='trial_started_at') THEN
+    ALTER TABLE public.creators ADD COLUMN trial_started_at TIMESTAMPTZ;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='creators' AND column_name='subscription_expires_at') THEN
+    ALTER TABLE public.creators ADD COLUMN subscription_expires_at TIMESTAMPTZ;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='creators' AND column_name='referral_bonus_days') THEN
+    ALTER TABLE public.creators ADD COLUMN referral_bonus_days INTEGER NOT NULL DEFAULT 0;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='expires_at') THEN
+    ALTER TABLE public.subscriptions ADD COLUMN expires_at TIMESTAMPTZ;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='is_trial') THEN
+    ALTER TABLE public.subscriptions ADD COLUMN is_trial BOOLEAN NOT NULL DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='referral_code_used') THEN
+    ALTER TABLE public.subscriptions ADD COLUMN referral_code_used TEXT;
+  END IF;
+END $$;

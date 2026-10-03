@@ -4,6 +4,7 @@ import {
   Button,
   Card,
   Chip,
+  DatePicker,
   DropdownSelect,
   Field,
   Label,
@@ -127,7 +128,8 @@ function wordCount(s: string) {
 
 function Register() {
   const navigate = useNavigate();
-  const { creators, myCreatorId, upsertCreatorWithAuth, loginCreator } = useAppState();
+  const { creators, myCreatorId, upsertCreatorWithAuth, loginCreator, startFreeTrial, hasUsedTrial } =
+    useAppState();
   const existing = creators.find((c) => c.id === myCreatorId);
 
   const [step, setStep] = useState(existing ? 1 : 0);
@@ -142,6 +144,47 @@ function Register() {
   const [signingUp, setSigningUp] = useState(false);
   const [error, setError] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
+
+  // Referral code from URL param or manual input
+  const [referralCode, setReferralCode] = useState(() => {
+    if (typeof window !== "undefined") {
+      const params = new URLSearchParams(window.location.search);
+      return (params.get("ref") || "").trim().toUpperCase();
+    }
+    return "";
+  });
+  const [referrerInfo, setReferrerInfo] = useState<{ id: string; name: string } | null>(null);
+  const [referralStatus, setReferralStatus] = useState<string>("");
+
+  useEffect(() => {
+    async function checkReferral() {
+      if (!referralCode || referralCode.trim().length < 4) {
+        setReferrerInfo(null);
+        setReferralStatus("");
+        return;
+      }
+      const cleaned = referralCode.trim().toUpperCase();
+      // Check local creators first
+      const local = creators.find(
+        (c) => c.referralCode && c.referralCode.toUpperCase() === cleaned,
+      );
+      if (local) {
+        setReferrerInfo({ id: local.id, name: local.displayName || local.name });
+        setReferralStatus(`Invited by ${local.displayName || local.name}`);
+        return;
+      }
+      // Check Supabase
+      const remote = await supabaseDb.lookupReferralCode(cleaned);
+      if (remote) {
+        setReferrerInfo({ id: remote.id, name: remote.displayName || remote.name });
+        setReferralStatus(`Invited by ${remote.displayName || remote.name}`);
+      } else {
+        setReferrerInfo(null);
+        setReferralStatus("Referral code not found");
+      }
+    }
+    checkReferral();
+  }, [referralCode, creators]);
 
   // Initialize form from existing creator OR saved draft in localStorage
   const [form, setForm] = useState<Form>(() => {
@@ -272,13 +315,15 @@ function Register() {
       turnaround: form.turnaround || "3–5 days",
       status: existing?.status ?? "Inactive",
       birthDate: form.birthDate || undefined,
+      referralCode: existing?.referralCode,
+      referredBy: referrerInfo?.id ?? existing?.referredBy,
       contact: {
         phone: form.mobile,
         whatsapp: form.mobile,
         email: form.email,
       },
     }),
-    [form, existing],
+    [form, existing, referrerInfo],
   );
 
   const validateStep = () => {
@@ -441,6 +486,11 @@ function Register() {
             "Failed to save profile to database. Please check your connection and retry.",
         );
         return;
+      }
+
+      // Automatically start 3-day free trial for new creators
+      if (!existing && !hasUsedTrial(draft.id)) {
+        await startFreeTrial(draft.id);
       }
 
       // Success! Clear local draft cache
@@ -656,6 +706,41 @@ function Register() {
                     </div>
                   </Field>
 
+                  <Field
+                    label="Referral code (optional)"
+                    hint="Enter a creator's referral code to connect accounts"
+                  >
+                    <TextInput
+                      type="text"
+                      value={referralCode}
+                      maxLength={30}
+                      onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                      placeholder="e.g. DHUNDO-RS7X2A"
+                      className="font-mono uppercase tracking-wider"
+                    />
+                    {referrerInfo ? (
+                      <p className="mt-1 text-xs font-semibold text-tealdeep">
+                        ✓ Valid invitation from {referrerInfo.name}
+                      </p>
+                    ) : referralCode.trim().length >= 4 ? (
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        {referralStatus || "Checking code..."}
+                      </p>
+                    ) : null}
+                  </Field>
+
+                  <div className="rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20 p-3.5 flex items-center gap-3">
+                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-xs">
+                      3D
+                    </div>
+                    <div className="text-xs">
+                      <p className="font-semibold text-foreground">3-Day Free Trial Included</p>
+                      <p className="text-muted-foreground">
+                        Your profile automatically goes live for 3 days once created. No credit card required.
+                      </p>
+                    </div>
+                  </div>
+
                   <p className="text-xs text-muted-foreground">
                     Already have an account?{" "}
                     <Link
@@ -731,7 +816,7 @@ function Register() {
                                 ⏳ Uploading to Supabase Storage...
                               </span>
                             ) : (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-medium">
+                              <span className="text-tealdeep font-medium">
                                 ✓ Photo ready
                               </span>
                             )}
@@ -768,11 +853,11 @@ function Register() {
                         : "Required to calculate your age accurately for brand listings"
                     }
                   >
-                    <TextInput
-                      type="date"
+                    <DatePicker
                       value={form.birthDate}
-                      max={new Date().toISOString().split("T")[0]}
-                      onChange={(e) => set("birthDate", e.target.value)}
+                      maxDate={new Date().toISOString().split("T")[0]}
+                      onChange={(val) => set("birthDate", val)}
+                      placeholder="Select your date of birth"
                     />
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-3">

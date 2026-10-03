@@ -100,7 +100,7 @@ export function SiteHeader() {
                   to="/creator/dashboard"
                   className="inline-flex items-center gap-1.5 rounded-full bg-saffrondeep/10 px-3 py-1 text-xs font-semibold text-saffrondeep hover:bg-saffrondeep/20 transition-colors"
                 >
-                  <Sparkles className="size-3" />
+                  <User className="size-3.5" />
                   <span className="max-w-[120px] truncate sm:max-w-[160px]">
                     {myCreator.name.split(" ")[0]}
                   </span>
@@ -243,7 +243,7 @@ export function SiteHeader() {
                 onClick={closeMenu}
                 className="flex items-center gap-2 rounded-xl bg-saffrondeep/10 px-4 py-3"
               >
-                <Sparkles className="size-4 text-saffrondeep shrink-0" />
+                <User className="size-4 text-saffrondeep shrink-0" />
                 <span className="text-sm font-semibold text-saffrondeep truncate">
                   {myCreator.name.split(" ")[0]}
                 </span>

@@ -133,6 +133,49 @@ export function isSubscriptionActive(sub?: {
   return new Date() < getSubscriptionExpiry(sub);
 }
 
+/** Generates a unique referral code for a creator based on their display name */
+export function generateReferralCode(displayName: string): string {
+  const initials = displayName
+    .replace(/[^a-zA-Z0-9]/g, "")
+    .toUpperCase()
+    .slice(0, 3)
+    .padEnd(3, "X");
+  const rand = Math.random().toString(36).substring(2, 7).toUpperCase();
+  return `DHUNDO-${initials}${rand}`;
+}
+
+/** Builds the full referral URL for sharing */
+export function getReferralUrl(referralCode: string): string {
+  const base =
+    typeof window !== "undefined" ? window.location.origin : "https://influencerdhundo.com";
+  return `${base}/creator/register?ref=${encodeURIComponent(referralCode)}`;
+}
+
+/** Builds a WhatsApp share URL for the referral link */
+export function getWhatsAppShareUrl(referralUrl: string, creatorName: string): string {
+  const msg = encodeURIComponent(
+    `Hey! I'm on Influencer Dhundo — a platform that connects local creators with local businesses. Create your free creator profile and start getting discovered!\n\nJoin using my link: ${referralUrl}`,
+  );
+  return `https://wa.me/?text=${msg}`;
+}
+
+/** Returns the subscription expiry date considering referral bonus days */
+export function getEffectiveExpiry(
+  sub: { planId?: string; duration?: string; startedAt: string } | undefined,
+  subscriptionExpiresAt?: string | undefined,
+  referralBonusDays?: number | undefined,
+): Date | null {
+  if (!sub && !subscriptionExpiresAt) return null;
+  // If the DB has a stored expiry (with bonus days already baked in), use that
+  if (subscriptionExpiresAt) {
+    return new Date(subscriptionExpiresAt);
+  }
+  if (!sub) return null;
+  const base = getSubscriptionExpiry(sub);
+  const bonus = (referralBonusDays ?? 0) * 24 * 60 * 60 * 1000;
+  return new Date(base.getTime() + bonus);
+}
+
 export function formatTimeRemaining(expiry: Date): string {
   const diff = expiry.getTime() - Date.now();
   if (diff <= 0) return "Expired";
@@ -196,6 +239,12 @@ export type Creator = {
   featured?: boolean | undefined;
   birthDate?: string | undefined;
   contact: { phone: string; whatsapp: string; email: string };
+  // Referral system
+  referralCode?: string | undefined;
+  referredBy?: string | undefined; // creator id of referrer
+  trialStartedAt?: string | undefined;
+  subscriptionExpiresAt?: string | undefined;
+  referralBonusDays?: number | undefined;
 };
 
 export const CREATORS: Creator[] = [

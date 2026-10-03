@@ -12,6 +12,7 @@ import {
   CheckCheck,
   ArrowRight,
   Building2,
+  Users,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -83,23 +84,6 @@ function Landing() {
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
         <div className="relative mx-auto max-w-5xl px-5 pt-10 pb-14 md:pt-16 md:pb-20">
-          {/* PROMOTIONAL PILL */}
-          <div className="mb-6 inline-block">
-            <a
-              href="#pricing"
-              className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-4 py-1.5 text-xs font-semibold text-saffrondeep border border-primary/25 shadow-xs hover:bg-primary/20 transition-all active:scale-98"
-            >
-              <Gift className="size-3.5 text-saffrondeep" />
-              <span>
-                3-Day Free Trial available with code{" "}
-                <strong className="font-mono underline underline-offset-2">
-                  {PROMO_CODE_3DAYS}
-                </strong>
-              </span>
-              <span className="text-muted-foreground ml-1">→</span>
-            </a>
-          </div>
-
           <h1 className="max-w-[22ch] text-[2.8rem] leading-[0.95] text-balance font-display font-semibold tracking-tight md:text-[4.5rem]">
             Where small influencers meet small businesses to make it big.
           </h1>
@@ -186,18 +170,12 @@ function Landing() {
                 <span>Connect directly.</span>
               </li>
             </ul>
-            <div className="mt-auto pt-6 flex flex-wrap items-center gap-3">
+            <div className="mt-auto pt-6">
               <Link
                 to="/discover"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
               >
                 Find a Creator →
-              </Link>
-              <Link
-                to="/business/login"
-                className="inline-flex items-center justify-center rounded-xl bg-background px-4 py-3 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
-              >
-                Business Login
               </Link>
             </div>
           </div>
@@ -227,18 +205,12 @@ function Landing() {
                 <span>Get discovered by local businesses.</span>
               </li>
             </ul>
-            <div className="mt-auto pt-6 flex flex-wrap items-center gap-3">
+            <div className="mt-auto pt-6">
               <Link
                 to="/creator/register"
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-display text-sm font-semibold text-primary-foreground ring-1 ring-saffrondeep/30 hover:bg-primary/90 transition-colors"
               >
                 Get Listed →
-              </Link>
-              <Link
-                to="/creator/login"
-                className="inline-flex items-center justify-center rounded-xl bg-background px-4 py-3 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
-              >
-                Creator Login
               </Link>
             </div>
           </div>
@@ -441,8 +413,8 @@ function PricingSection() {
                   >
                     {copied ? (
                       <>
-                        <CheckCheck className="size-3 text-emerald-600" />
-                        <span className="text-emerald-600">Copied!</span>
+                        <CheckCheck className="size-3 text-tealdeep" />
+                        <span className="text-tealdeep font-bold">Copied!</span>
                       </>
                     ) : (
                       <>
@@ -527,10 +499,6 @@ function PricingSection() {
                     <Check className="size-3.5 text-tealdeep shrink-0 mt-0.5 font-bold" />
                     <span>0% commission on all earnings</span>
                   </li>
-                  <li className="flex items-start gap-2">
-                    <Check className="size-3.5 text-tealdeep shrink-0 mt-0.5 font-bold" />
-                    <span>Unlimited profile &amp; pricing updates</span>
-                  </li>
                 </ul>
 
                 <div className="mt-6 pt-2">
@@ -549,6 +517,97 @@ function PricingSection() {
               </div>
             );
           })}
+        </div>
+
+        {/* ── REFERRAL PROGRAM FEATURE CARD ── */}
+        <div className="mt-10 relative overflow-hidden rounded-3xl bg-gradient-to-br from-primary/15 via-background to-accent/15 p-7 md:p-9 border-2 border-primary/30 shadow-xl">
+          <div className="pointer-events-none absolute -top-12 -right-12 size-48 rounded-full bg-primary/20 blur-2xl" />
+          <div className="pointer-events-none absolute bottom-0 -left-12 size-48 rounded-full bg-accent/20 blur-2xl" />
+
+          <div className="relative">
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-6 pb-6 border-b border-border/80">
+              <div className="space-y-2">
+                <div className="inline-flex items-center gap-2 rounded-full bg-accent/15 px-3.5 py-1 text-xs font-bold text-tealdeep border border-accent/25">
+                  <Gift className="size-3.5 text-tealdeep" />
+                  <span>CREATOR REFERRAL PROGRAM</span>
+                </div>
+                <h3 className="text-2xl font-display font-bold md:text-3xl text-foreground">
+                  Refer Creators. Get +7 Days Added to Your Subscription.
+                </h3>
+                <p className="text-sm text-muted-foreground max-w-2xl">
+                  Every creator gets their own permanent referral code. When a creator joins with your link and subscribes to any paid plan, you instantly get <strong>+7 extra days</strong> added directly to your existing subscription.
+                </p>
+              </div>
+
+              <div className="shrink-0">
+                <Link
+                  to="/creator/register"
+                  className="inline-flex items-center gap-2 rounded-xl bg-foreground px-5 py-3 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md"
+                >
+                  <span>Get Your Referral Link</span>
+                  <ArrowRight className="size-4" />
+                </Link>
+              </div>
+            </div>
+
+            {/* 3 Step Flow */}
+            <div className="mt-6 grid gap-4 sm:grid-cols-3">
+              <div className="rounded-2xl bg-card p-4 sm:p-5 border border-border/80 shadow-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-primary text-xs font-bold text-primary-foreground">
+                    1
+                  </span>
+                  <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                    Share Your Link
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Copy your unique referral link from your creator dashboard and share it with fellow influencers.
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-card p-4 sm:p-5 border border-border/80 shadow-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-tealdeep text-xs font-bold text-white">
+                    2
+                  </span>
+                  <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                    They Try Free
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Invited creators get a 3-day free trial to set up their profile and test the platform with zero risk.
+                </p>
+              </div>
+
+              <div className="rounded-2xl bg-card p-4 sm:p-5 border border-border/80 shadow-xs space-y-2">
+                <div className="flex items-center gap-2">
+                  <span className="flex size-6 items-center justify-center rounded-full bg-saffrondeep text-xs font-bold text-white">
+                    3
+                  </span>
+                  <span className="text-xs font-bold text-foreground uppercase tracking-wider">
+                    Earn +7 Days Each
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  When they buy any paid subscription, +7 bonus days are immediately added to your active expiration date!
+                </p>
+              </div>
+            </div>
+
+            {/* Stacking Multiplier Note */}
+            <div className="mt-5 rounded-xl bg-accent/10 border border-accent/20 px-4 py-3 flex flex-wrap items-center justify-between gap-3 text-xs">
+              <div className="flex items-center gap-2 font-medium text-tealdeep">
+                <Sparkles className="size-4 shrink-0 text-primary" />
+                <span>
+                  <strong>Rewards stack indefinitely:</strong> 1 referral = +7 days · 2 referrals = +14 days · 3 referrals = +21 days
+                </span>
+              </div>
+              <span className="text-[11px] text-muted-foreground">
+                *Referral code remains active while your subscription or trial is active.
+              </span>
+            </div>
+          </div>
         </div>
 
         {/* ── FOR BUSINESSES CALLOUT ── */}

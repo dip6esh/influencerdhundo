@@ -45,6 +45,12 @@ export interface CreatorRow {
   featured: boolean;
   birth_date?: string | null;
   contact: { phone: string; whatsapp: string; email: string };
+  // Referral system
+  referral_code?: string | null;
+  referred_by?: string | null;
+  trial_started_at?: string | null;
+  subscription_expires_at?: string | null;
+  referral_bonus_days?: number | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -78,6 +84,11 @@ export function creatorToRow(c: Creator, authUserId?: string): CreatorRow {
     featured: !!c.featured,
     birth_date: c.birthDate || null,
     contact: c.contact || { phone: "", whatsapp: "", email: "" },
+    referral_code: c.referralCode ?? null,
+    referred_by: c.referredBy ?? null,
+    trial_started_at: c.trialStartedAt ?? null,
+    subscription_expires_at: c.subscriptionExpiresAt ?? null,
+    referral_bonus_days: c.referralBonusDays ?? 0,
   };
 }
 
@@ -109,6 +120,11 @@ export function rowToCreator(row: CreatorRow): Creator {
     featured: Boolean(row.featured),
     birthDate: row.birth_date ?? undefined,
     contact: row.contact || { phone: "", whatsapp: "", email: "" },
+    referralCode: row.referral_code ?? undefined,
+    referredBy: row.referred_by ?? undefined,
+    trialStartedAt: row.trial_started_at ?? undefined,
+    subscriptionExpiresAt: row.subscription_expires_at ?? undefined,
+    referralBonusDays: row.referral_bonus_days ?? 0,
   };
 }
 
@@ -209,6 +225,9 @@ export const supabaseDb = {
         duration: sub.duration,
         price: sub.price,
         started_at: sub.startedAt,
+        expires_at: sub.expiresAt ?? null,
+        is_trial: sub.isTrial ?? false,
+        referral_code_used: sub.referralCodeUsed ?? null,
       });
       return !error;
     } catch (e) {
@@ -228,11 +247,15 @@ export const supabaseDb = {
 
       if (error || !data) return [];
       return data.map((row) => ({
-        creatorId: row.creator_id,
-        planId: row.plan_id,
-        duration: row.duration,
+        id: row.id as string | undefined,
+        creatorId: row.creator_id as string,
+        planId: row.plan_id as string,
+        duration: row.duration as string,
         price: Number(row.price),
-        startedAt: row.started_at,
+        startedAt: row.started_at as string,
+        expiresAt: row.expires_at as string | undefined,
+        isTrial: Boolean(row.is_trial),
+        referralCodeUsed: row.referral_code_used as string | undefined,
       }));
     } catch (e) {
       console.warn("Supabase fetchSubscriptionsForCreator error:", e);
@@ -667,4 +690,203 @@ export const supabaseDb = {
       return { success: false, error: String(e) };
     }
   },
+
+  // ── Referral System ───────────────────────────────────────────────────────
+
+  /** Save a referral code to a creator row */
+  async setReferralCode(creatorId: string, referralCode: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("creators")
+        .update({ referral_code: referralCode, updated_at: new Date().toISOString() })
+        .eq("id", creatorId);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Find a creator by their referral code */
+  async findCreatorByReferralCode(code: string): Promise<Creator | null> {
+    try {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("*")
+        .eq("referral_code", code.trim().toUpperCase())
+        .limit(1);
+      if (error || !data || data.length === 0) return null;
+      return rowToCreator(data[0] as CreatorRow);
+    } catch {
+      return null;
+    }
+  },
+
+  /** Alias for findCreatorByReferralCode */
+  async lookupReferralCode(code: string): Promise<Creator | null> {
+    return this.findCreatorByReferralCode(code);
+  },
+
+  /** Save the referredBy creator id to a creator row */
+  async setReferredBy(creatorId: string, referrerId: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("creators")
+        .update({ referred_by: referrerId, updated_at: new Date().toISOString() })
+        .eq("id", creatorId);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Update the subscription_expires_at and referral_bonus_days on a creator row */
+  async updateSubscriptionExpiry(
+    creatorId: string,
+    expiresAt: Date,
+    bonusDays: number,
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("creators")
+        .update({
+          subscription_expires_at: expiresAt.toISOString(),
+          referral_bonus_days: bonusDays,
+          updated_at: new Date().toISOString(),
+        })
+        .eq("id", creatorId);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Fetch all referral events for a creator (as the referrer) */
+  async fetchReferralEvents(referrerId: string): Promise<ReferralEvent[]> {
+    try {
+      const { data, error } = await supabase
+        .from("referral_events")
+        .select("*")
+        .eq("referrer_id", referrerId)
+        .order("created_at", { ascending: false });
+      if (error || !data) return [];
+      return data.map((row) => ({
+        id: row.id as string,
+        referrerId: row.referrer_id as string,
+        referredCreatorId: row.referred_creator_id as string,
+        referredSubId: row.referred_sub_id as string | undefined,
+        daysDelta: Number(row.days_delta),
+        eventType: row.event_type as "earned" | "reversed",
+        note: row.note as string,
+        createdAt: row.created_at as string,
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  /** Record a referral event (earned or reversed) */
+  async addReferralEvent(event: Omit<ReferralEvent, "id" | "createdAt">): Promise<string | null> {
+    try {
+      const { data, error } = await supabase
+        .from("referral_events")
+        .insert({
+          referrer_id: event.referrerId,
+          referred_creator_id: event.referredCreatorId,
+          referred_sub_id: event.referredSubId ?? null,
+          days_delta: event.daysDelta,
+          event_type: event.eventType,
+          note: event.note,
+        })
+        .select("id")
+        .single();
+      if (error || !data) return null;
+      return (data as { id: string }).id;
+    } catch {
+      return null;
+    }
+  },
+
+  /** Mark a subscription as having its referral reversed (for refund scenarios) */
+  async reverseReferralForSub(
+    referrerId: string,
+    referredCreatorId: string,
+    referredSubId: string,
+    referredCreatorName: string,
+  ): Promise<boolean> {
+    try {
+      // 1. Record the reversal event (-7 days)
+      await this.addReferralEvent({
+        referrerId,
+        referredCreatorId,
+        referredSubId,
+        daysDelta: -7,
+        eventType: "reversed",
+        note: `${referredCreatorName}'s subscription was refunded (-7 Days)`,
+      });
+
+      // 2. Fetch current referral_bonus_days and subscription_expires_at for referrer
+      const { data: referrerRow } = await supabase
+        .from("creators")
+        .select("referral_bonus_days, subscription_expires_at")
+        .eq("id", referrerId)
+        .single();
+
+      if (!referrerRow) return false;
+
+      const currentBonus = Number((referrerRow as { referral_bonus_days: number }).referral_bonus_days ?? 0);
+      const newBonus = Math.max(0, currentBonus - 7);
+
+      const currentExpiry = (referrerRow as { subscription_expires_at: string | null }).subscription_expires_at;
+      const newExpiry = currentExpiry
+        ? new Date(new Date(currentExpiry).getTime() - 7 * 24 * 60 * 60 * 1000)
+        : null;
+
+      if (newExpiry) {
+        await this.updateSubscriptionExpiry(referrerId, newExpiry, newBonus);
+      } else {
+        // Just update bonus days
+        await supabase
+          .from("creators")
+          .update({ referral_bonus_days: newBonus, updated_at: new Date().toISOString() })
+          .eq("id", referrerId);
+      }
+
+      return true;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Start free trial for a creator — sets trial_started_at and subscription_expires_at */
+  async startFreeTrial(creatorId: string): Promise<boolean> {
+    try {
+      const now = new Date();
+      const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      const { error } = await supabase
+        .from("creators")
+        .update({
+          trial_started_at: now.toISOString(),
+          subscription_expires_at: expiresAt.toISOString(),
+          status: "Active",
+          updated_at: now.toISOString(),
+        })
+        .eq("id", creatorId);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
 };
+
+// ── Referral Event type ────────────────────────────────────────────────────
+export type ReferralEvent = {
+  id: string;
+  referrerId: string;
+  referredCreatorId: string;
+  referredSubId?: string | undefined;
+  daysDelta: number; // +3 or -3
+  eventType: "earned" | "reversed";
+  note: string;
+  createdAt: string;
+};
+

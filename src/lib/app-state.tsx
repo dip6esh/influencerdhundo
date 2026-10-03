@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { CREATORS, type Creator, type CreatorStatus } from "./directory-data";
-import { supabaseDb } from "./supabase";
+import { CREATORS, generateReferralCode, getSubscriptionExpiry, type Creator, type CreatorStatus } from "./directory-data";
+import { supabaseDb, type ReferralEvent } from "./supabase";
 
 export type BusinessAccount = {
   id?: string;
@@ -20,11 +20,15 @@ export type Report = {
 };
 
 export type Subscription = {
+  id?: string | undefined;
   creatorId: string;
   planId: string;
   duration: string;
   price: number;
   startedAt: string;
+  expiresAt?: string | undefined;
+  isTrial?: boolean | undefined;
+  referralCodeUsed?: string | undefined;
 };
 
 type AppState = {
@@ -33,6 +37,7 @@ type AppState = {
   myCreatorId: string | null;
   reports: Report[];
   subscriptions: Subscription[];
+  referralEvents: ReferralEvent[];
   /** Returns true if the creator has ever used the free 3-day trial */
   hasUsedTrial: (creatorId: string) => boolean;
   signUpBusiness: (b: BusinessAccount, authUserId?: string | null) => void;
@@ -51,7 +56,18 @@ type AppState = {
   removeCreator: (id: string) => void;
   toggleFeatured: (id: string) => void;
   addReport: (r: Omit<Report, "id" | "at">) => void;
-  activateSubscription: (s: Omit<Subscription, "startedAt">) => void;
+  activateSubscription: (
+    s: Omit<Subscription, "startedAt">,
+    referralCode?: string | undefined,
+  ) => Promise<void>;
+  startFreeTrial: (creatorId: string) => Promise<boolean>;
+  reverseReferralReward: (
+    referrerId: string,
+    referredCreatorId: string,
+    referredSubId?: string,
+    reason?: string,
+  ) => Promise<void>;
+  fetchReferralEvents: (creatorId: string) => Promise<void>;
   refreshFromSupabase: () => Promise<void>;
 };
 
@@ -65,6 +81,7 @@ type Persisted = {
   myCreatorId: string | null;
   reports: Report[];
   subscriptions: Subscription[];
+  referralEvents: ReferralEvent[];
 };
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
@@ -73,6 +90,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [myCreatorId, setMyCreatorId] = useState<string | null>(null);
   const [reports, setReports] = useState<Report[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
+  const [referralEvents, setReferralEvents] = useState<ReferralEvent[]>([]);
   const [hydrated, setHydrated] = useState(false);
 
   // 1. Hydrate from localStorage first for instant initial render
@@ -86,6 +104,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setMyCreatorId(p.myCreatorId ?? null);
         setReports(p.reports ?? []);
         setSubscriptions(p.subscriptions ?? []);
+        setReferralEvents(p.referralEvents ?? []);
       }
     } catch {
       /* ignore corrupt storage */
@@ -128,6 +147,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               );
             });
           }
+
+          // Fetch referral events
+          const events = await supabaseDb.fetchReferralEvents(creatorProfile.id);
+          if (isMounted) setReferralEvents(events);
         }
 
         const businessProfile = await supabaseDb.getBusinessProfileForAuthUser(uid);
@@ -148,7 +171,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ creators, business, myCreatorId, reports, subscriptions }),
+        JSON.stringify({ creators, business, myCreatorId, reports, subscriptions, referralEvents }),
       );
     } catch {
       /* storage full or unavailable */
@@ -169,12 +192,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       myCreatorId,
       reports,
       subscriptions,
+      referralEvents,
       refreshFromSupabase,
       hasUsedTrial: (creatorId: string) =>
         subscriptions.some(
           (s) =>
             s.creatorId === creatorId &&
-            (s.planId === "trial-3d" || s.duration?.toLowerCase().includes("3 day")),
+            (s.planId === "trial-3d" || s.isTrial === true || s.duration?.toLowerCase().includes("3 day")),
         ),
       signUpBusiness: (b, authUserId) => {
         setBusiness(b);
@@ -271,20 +295,161 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setReports((prev) => [item, ...prev]);
         supabaseDb.addReport(item);
       },
-      activateSubscription: (s) => {
+
+      activateSubscription: async (s, referralCode) => {
+        const now = new Date();
+        // Calculate expiry from plan
+        const tempSub = { planId: s.planId, duration: s.duration, startedAt: now.toISOString() };
+        const expiresAt = getSubscriptionExpiry(tempSub);
+
         const item: Subscription = {
           ...s,
-          startedAt: new Date().toISOString(),
+          startedAt: now.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          isTrial: s.planId === "trial-3d",
+          referralCodeUsed: referralCode,
         };
         setSubscriptions((prev) => [item, ...prev]);
+
+        // Mark creator Active and update expiry
         setCreators((prev) =>
-          prev.map((c) => (c.id === s.creatorId ? { ...c, status: "Active" } : c)),
+          prev.map((c) =>
+            c.id === s.creatorId
+              ? { ...c, status: "Active" as CreatorStatus, subscriptionExpiresAt: expiresAt.toISOString() }
+              : c,
+          ),
         );
-        supabaseDb.addSubscription(item);
-        supabaseDb.updateCreatorStatus(s.creatorId, "Active");
+
+        // Persist to Supabase
+        await supabaseDb.addSubscription(item);
+        await supabaseDb.updateCreatorStatus(s.creatorId, "Active");
+        await supabaseDb.updateSubscriptionExpiry(s.creatorId, expiresAt, 0);
+
+        // If paid plan: generate referral code and fire referral reward
+        if (s.planId !== "trial-3d") {
+          const creator = creators.find((c) => c.id === s.creatorId);
+          if (creator && !creator.referralCode) {
+            const code = generateReferralCode(creator.displayName || creator.name);
+            await supabaseDb.setReferralCode(s.creatorId, code);
+            setCreators((prev) =>
+              prev.map((c) => (c.id === s.creatorId ? { ...c, referralCode: code } : c)),
+            );
+          }
+
+          // Reward referrer if this creator was referred
+          const thisCreator = creators.find((c) => c.id === s.creatorId);
+          const effectiveReferrerId = thisCreator?.referredBy;
+          if (effectiveReferrerId) {
+            const referrer = creators.find((c) => c.id === effectiveReferrerId);
+            if (referrer) {
+              const referrerExpiry = referrer.subscriptionExpiresAt
+                ? new Date(referrer.subscriptionExpiresAt)
+                : null;
+              const referrerActive = referrerExpiry ? referrerExpiry > now : false;
+              const referrerSub = subscriptions.find((sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d");
+              if (referrerActive || referrerSub) {
+                const baseExpiry = referrer.subscriptionExpiresAt
+                  ? new Date(referrer.subscriptionExpiresAt)
+                  : now;
+                const newExpiry = new Date(baseExpiry.getTime() + 7 * 24 * 60 * 60 * 1000);
+                const newBonus = (referrer.referralBonusDays ?? 0) + 7;
+                await supabaseDb.updateSubscriptionExpiry(referrer.id, newExpiry, newBonus);
+                await supabaseDb.addReferralEvent({
+                  referrerId: referrer.id,
+                  referredCreatorId: s.creatorId,
+                  referredSubId: item.id,
+                  daysDelta: 7,
+                  eventType: "earned",
+                  note: `${thisCreator.name} subscribed to ${s.duration} (+7 Days added)`,
+                });
+                setCreators((prev) =>
+                  prev.map((c) =>
+                    c.id === referrer.id
+                      ? { ...c, subscriptionExpiresAt: newExpiry.toISOString(), referralBonusDays: newBonus }
+                      : c,
+                  ),
+                );
+                if (myCreatorId === referrer.id) {
+                  const events = await supabaseDb.fetchReferralEvents(referrer.id);
+                  setReferralEvents(events);
+                }
+              }
+            }
+          }
+        }
+      },
+
+      reverseReferralReward: async (
+        referrerId: string,
+        referredCreatorId: string,
+        referredSubId?: string,
+        reason?: string,
+      ) => {
+        const referrer = creators.find((c) => c.id === referrerId);
+        if (!referrer) return;
+
+        const baseExpiry = referrer.subscriptionExpiresAt
+          ? new Date(referrer.subscriptionExpiresAt)
+          : new Date();
+        // Subtract 7 days (clamped so it doesn't break)
+        const newExpiry = new Date(baseExpiry.getTime() - 7 * 24 * 60 * 60 * 1000);
+        const newBonus = Math.max(0, (referrer.referralBonusDays ?? 0) - 7);
+
+        await supabaseDb.updateSubscriptionExpiry(referrer.id, newExpiry, newBonus);
+        await supabaseDb.addReferralEvent({
+          referrerId: referrer.id,
+          referredCreatorId,
+          referredSubId,
+          daysDelta: -7,
+          eventType: "reversed",
+          note: reason || `Subscription refunded/reversed (-7 Days)`,
+        });
+
+        setCreators((prev) =>
+          prev.map((c) =>
+            c.id === referrer.id
+              ? { ...c, subscriptionExpiresAt: newExpiry.toISOString(), referralBonusDays: newBonus }
+              : c,
+          ),
+        );
+
+        if (myCreatorId === referrer.id) {
+          const events = await supabaseDb.fetchReferralEvents(referrer.id);
+          setReferralEvents(events);
+        }
+      },
+
+      startFreeTrial: async (creatorId: string) => {
+        const now = new Date();
+        const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+        const trialSub: Subscription = {
+          creatorId,
+          planId: "trial-3d",
+          duration: "3 Days Free Trial",
+          price: 0,
+          startedAt: now.toISOString(),
+          expiresAt: expiresAt.toISOString(),
+          isTrial: true,
+        };
+        setSubscriptions((prev) => [trialSub, ...prev]);
+        setCreators((prev) =>
+          prev.map((c) =>
+            c.id === creatorId
+              ? { ...c, status: "Active" as CreatorStatus, trialStartedAt: now.toISOString(), subscriptionExpiresAt: expiresAt.toISOString() }
+              : c,
+          ),
+        );
+        const ok = await supabaseDb.startFreeTrial(creatorId);
+        await supabaseDb.addSubscription(trialSub);
+        return ok;
+      },
+
+      fetchReferralEvents: async (creatorId: string) => {
+        const events = await supabaseDb.fetchReferralEvents(creatorId);
+        setReferralEvents(events);
       },
     }),
-    [creators, business, myCreatorId, reports, subscriptions],
+    [creators, business, myCreatorId, reports, subscriptions, referralEvents],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

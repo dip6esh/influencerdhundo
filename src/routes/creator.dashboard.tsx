@@ -7,11 +7,26 @@ import {
   formatFollowers,
   formatPrice,
   formatTimeRemaining,
+  generateReferralCode,
   getSubscriptionExpiry,
   isSubscriptionActive,
 } from "@/lib/directory-data";
 import { supabaseDb } from "@/lib/supabase";
-import { AlertCircle, Clock, Loader2, Sparkles, Zap } from "lucide-react";
+import {
+  AlertCircle,
+  ArrowUpRight,
+  Check,
+  Clock,
+  Copy,
+  Gift,
+  History,
+  Loader2,
+  MessageCircle,
+  Share2,
+  Sparkles,
+  Users,
+  Zap,
+} from "lucide-react";
 
 export const Route = createFileRoute("/creator/dashboard")({
   head: () => ({
@@ -41,8 +56,18 @@ const STATUS_NOTE: Record<string, string> = {
 };
 
 function Dashboard() {
-  const { creators, myCreatorId, subscriptions, upsertCreator, setCreatorStatus } = useAppState();
+  const {
+    creators,
+    myCreatorId,
+    subscriptions,
+    referralEvents,
+    fetchReferralEvents,
+    upsertCreator,
+    setCreatorStatus,
+  } = useAppState();
   const [loading, setLoading] = useState(!myCreatorId);
+  const [copiedLink, setCopiedLink] = useState(false);
+  const [copiedCode, setCopiedCode] = useState(false);
   const mine = creators.find((c) => c.id === myCreatorId);
   const sub = subscriptions.find((s) => s.creatorId === myCreatorId);
 
@@ -70,6 +95,22 @@ function Dashboard() {
     };
   }, [mine, upsertCreator]);
 
+  // Fetch referral events on mount
+  useEffect(() => {
+    if (mine?.id) {
+      fetchReferralEvents(mine.id);
+    }
+  }, [mine?.id, fetchReferralEvents]);
+
+  // Ensure referral code is generated for the creator
+  useEffect(() => {
+    if (mine && !mine.referralCode) {
+      const code = generateReferralCode(mine.displayName || mine.name);
+      supabaseDb.setReferralCode(mine.id, code);
+      upsertCreator({ ...mine, referralCode: code });
+    }
+  }, [mine, upsertCreator]);
+
   // Subscription expiration check
   const subActive = isSubscriptionActive(sub);
   const subExpiry = sub ? getSubscriptionExpiry(sub) : null;
@@ -83,6 +124,37 @@ function Dashboard() {
       }
     }
   }, [mine, sub, subActive, setCreatorStatus]);
+
+  // Referral Calculations
+  const referralCode = mine?.referralCode || (mine ? generateReferralCode(mine.displayName || mine.name) : "");
+  const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://influencerdhundo.com";
+  const referralLink = `${baseUrl}/creator/register?ref=${referralCode}`;
+
+  const referredCreators = creators.filter((c) => c.referredBy === mine?.id);
+  const paidReferredCount = referredCreators.filter((c) =>
+    subscriptions.some((s) => s.creatorId === c.id && s.planId !== "trial-3d"),
+  ).length;
+
+  const totalBonusDaysEarned = referralEvents.reduce((acc, ev) => acc + (ev.daysDelta || 0), 0);
+  const netBonusDays = Math.max(0, mine?.referralBonusDays ?? totalBonusDaysEarned);
+
+  const handleCopyLink = () => {
+    if (!referralLink) return;
+    navigator.clipboard.writeText(referralLink);
+    setCopiedLink(true);
+    setTimeout(() => setCopiedLink(false), 2000);
+  };
+
+  const handleCopyCode = () => {
+    if (!referralCode) return;
+    navigator.clipboard.writeText(referralCode);
+    setCopiedCode(true);
+    setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const whatsappMessage = encodeURIComponent(
+    `Hey! Join Influencer Dhundo using my invite link to get a 3-day free trial and connect with local businesses looking for creators:\n${referralLink}`,
+  );
 
   if (loading) {
     return (
@@ -123,7 +195,7 @@ function Dashboard() {
         <div className="relative mx-auto max-w-5xl px-5">
           {/* TRIAL BANNER / EXPIRED BANNER */}
           {sub && isTrial && subActive && subExpiry ? (
-            <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/15 via-emerald-500/15 to-primary/10 border border-primary/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 border border-primary/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
                   <Sparkles className="size-5" />
@@ -131,7 +203,7 @@ function Dashboard() {
                 <div>
                   <p className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <span>3-Day Free Trial Active</span>
-                    <span className="rounded-full bg-emerald-500/20 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-bold">
+                    <span className="rounded-full bg-accent/20 text-tealdeep px-2 py-0.5 text-[11px] font-bold">
                       {formatTimeRemaining(subExpiry)}
                     </span>
                   </p>
@@ -196,6 +268,7 @@ function Dashboard() {
             </p>
           </div>
 
+          {/* MAIN PROFILE & SUBSCRIPTION CARDS */}
           <div className="mt-8 grid gap-6 md:grid-cols-3">
             <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
               <div className="flex flex-col sm:flex-row gap-5">
@@ -282,6 +355,11 @@ function Dashboard() {
                           : "Ended"}
                       </p>
                     ) : null}
+                    {netBonusDays > 0 ? (
+                      <p className="font-medium text-tealdeep">
+                        🎁 Includes +{netBonusDays} bonus referral days
+                      </p>
+                    ) : null}
                   </div>
                 </div>
               ) : (
@@ -300,8 +378,242 @@ function Dashboard() {
               )}
             </Card>
           </div>
+
+          {/* ── REFERRAL PROGRAM & REWARDS SECTION ─────────────────────────────────── */}
+          <div className="mt-10">
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative">
+              <div className="pointer-events-none absolute -top-24 -right-24 size-48 rounded-full bg-accent/10 blur-3xl" />
+
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-border/60">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-xs font-bold text-tealdeep border border-accent/25 mb-2">
+                    <Gift className="size-3.5 text-tealdeep" />
+                    Referral Program — Earn +7 Days Free
+                  </div>
+                  <h2 className="text-2xl font-display font-semibold tracking-tight">
+                    Invite Creators & Extend Your Subscription
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground max-w-xl">
+                    Share your unique link. When a creator signs up and buys any paid plan, you
+                    receive <strong>+7 extra days</strong> added directly to your subscription.
+                    Stack unlimited bonus days!
+                  </p>
+                </div>
+
+                {/* Referral Link Active Status Badge */}
+                <div className="shrink-0 flex items-center gap-2">
+                  {subActive ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-semibold text-tealdeep border border-accent/30">
+                      <span className="size-2 rounded-full bg-tealdeep animate-pulse" />
+                      Referral Code Active
+                    </span>
+                  ) : (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                      <span className="size-2 rounded-full bg-amber-500" />
+                      Inactive (Renew plan to earn rewards)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* STATS TILES */}
+              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
+                <div className="rounded-2xl bg-background/60 border border-border/60 p-4">
+                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Users className="size-3.5 text-primary" /> Total Invites
+                  </span>
+                  <p className="mt-1 text-2xl font-display font-bold text-foreground">
+                    {referredCreators.length}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Creators registered</p>
+                </div>
+
+                <div className="rounded-2xl bg-background/60 border border-border/60 p-4">
+                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Zap className="size-3.5 text-primary" /> Paid Conversions
+                  </span>
+                  <p className="mt-1 text-2xl font-display font-bold text-tealdeep">
+                    {paidReferredCount}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Subscribed creators</p>
+                </div>
+
+                <div className="rounded-2xl bg-background/60 border border-border/60 p-4">
+                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Gift className="size-3.5 text-saffrondeep" /> Bonus Days Earned
+                  </span>
+                  <p className="mt-1 text-2xl font-display font-bold text-saffrondeep">
+                    +{netBonusDays} Days
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">+7 days per paid referral</p>
+                </div>
+
+                <div className="rounded-2xl bg-background/60 border border-border/60 p-4 relative group">
+                  <div className="flex items-center justify-between">
+                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Clock className="size-3.5 text-primary" /> Referral Code
+                    </span>
+                    <button
+                      type="button"
+                      onClick={handleCopyCode}
+                      title={copiedCode ? "Copied!" : "Copy referral code"}
+                      aria-label="Copy referral code"
+                      className="inline-flex size-6 items-center justify-center rounded-lg text-foreground hover:bg-secondary transition-all cursor-pointer"
+                    >
+                      {copiedCode ? (
+                        <Check className="size-3.5 text-foreground stroke-[2.5]" />
+                      ) : (
+                        <Copy className="size-3.5 text-foreground" />
+                      )}
+                    </button>
+                  </div>
+                  <p className="mt-1 text-lg font-mono font-bold text-foreground tracking-wider truncate">
+                    {referralCode}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Permanent account code</p>
+                </div>
+              </div>
+
+              {/* LINK SHARING BOX */}
+              <div className="mt-6 rounded-2xl bg-secondary/60 border border-border/80 p-4 sm:p-5">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
+                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                    Your Unique Referral Link &amp; Code
+                  </label>
+                  <span className="text-[11px] text-muted-foreground">
+                    Code: <strong className="font-mono text-foreground">{referralCode}</strong>
+                  </span>
+                </div>
+
+                <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+                  <div className="min-w-0 flex-1">
+                    <input
+                      type="text"
+                      readOnly
+                      value={referralLink}
+                      className="w-full truncate rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-mono text-foreground border border-border focus:outline-none select-all shadow-xs"
+                    />
+                  </div>
+
+                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                    <button
+                      type="button"
+                      onClick={handleCopyLink}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs active:scale-98"
+                    >
+                      {copiedLink ? (
+                        <>
+                          <Check className="size-4 text-tealdeep" />
+                          <span>Link Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-4" />
+                          <span>Copy Link</span>
+                        </>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={handleCopyCode}
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all cursor-pointer shadow-xs active:scale-98"
+                    >
+                      {copiedCode ? (
+                        <>
+                          <Check className="size-4 text-tealdeep" />
+                          <span>Code Copied!</span>
+                        </>
+                      ) : (
+                        <>
+                          <Copy className="size-4 text-primary" />
+                          <span>Copy Code</span>
+                        </>
+                      )}
+                    </button>
+
+                    <a
+                      href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
+                      target="_blank"
+                      rel="noopener noreferrer"
+                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-xs active:scale-98"
+                    >
+                      <MessageCircle className="size-4" />
+                      <span>WhatsApp</span>
+                    </a>
+                  </div>
+                </div>
+              </div>
+
+              {/* REFERRAL HISTORY */}
+              <div className="mt-8">
+                <div className="flex items-center gap-2 mb-3">
+                  <History className="size-4 text-muted-foreground" />
+                  <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                    Referral & Bonus Days History
+                  </h3>
+                </div>
+
+                {referralEvents.length > 0 ? (
+                  <div className="overflow-x-auto rounded-2xl border border-border/80 bg-background/60">
+                    <table className="w-full text-left text-xs">
+                      <thead className="border-b border-border bg-secondary/50 font-semibold text-muted-foreground uppercase tracking-wider">
+                        <tr>
+                          <th className="px-4 py-3">Date</th>
+                          <th className="px-4 py-3">Event</th>
+                          <th className="px-4 py-3">Bonus Days</th>
+                          <th className="px-4 py-3">Details</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {referralEvents.map((ev) => (
+                          <tr key={ev.id} className="hover:bg-secondary/30 transition-colors">
+                            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                              {new Date(ev.createdAt).toLocaleDateString("en-IN", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </td>
+                            <td className="px-4 py-3">
+                              {ev.eventType === "earned" ? (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep">
+                                  + Earned
+                                </span>
+                              ) : (
+                                <span className="inline-flex items-center gap-1 rounded-md bg-rose/15 px-2 py-0.5 font-bold text-rose">
+                                  - Reversed
+                                </span>
+                              )}
+                            </td>
+                            <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
+                              {ev.daysDelta > 0 ? `+${ev.daysDelta} Days` : `${ev.daysDelta} Days`}
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {ev.note || "Referral conversion"}
+                            </td>
+                          </tr>
+                        ))}
+                      </tbody>
+                    </table>
+                  </div>
+                ) : (
+                  <div className="rounded-2xl border border-dashed border-border/80 p-6 text-center">
+                    <p className="text-sm font-medium text-muted-foreground">
+                      No referral events yet.
+                    </p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      Share your link with fellow creators. When they upgrade to a paid subscription,
+                      your history and +7 day rewards will appear here!
+                    </p>
+                  </div>
+                )}
+              </div>
+            </Card>
+          </div>
         </div>
       </section>
     </div>
   );
 }
+
