@@ -4,6 +4,21 @@ import { Button, Card, Field, Select, Tag, TextArea } from "@/components/ui-kit"
 import { useAppState } from "@/lib/app-state";
 import { REPORT_REASONS, calculateAge, formatFollowers, formatPrice } from "@/lib/directory-data";
 
+import {
+  Briefcase,
+  Calendar,
+  Clock,
+  Coins,
+  ExternalLink,
+  Gift,
+  Globe,
+  Layers,
+  MapPin,
+  Plane,
+  Sparkles,
+  Users,
+} from "lucide-react";
+
 export const Route = createFileRoute("/creators/$creatorId")({
   head: () => ({
     meta: [
@@ -30,15 +45,6 @@ export const Route = createFileRoute("/creators/$creatorId")({
   }),
   component: CreatorProfile,
 });
-
-function Detail({ label, value }: { label: string; value: string }) {
-  return (
-    <div>
-      <dt className="label-caps">{label}</dt>
-      <dd className="mt-1 text-sm font-medium">{value}</dd>
-    </div>
-  );
-}
 
 function CreatorProfile() {
   const { creatorId } = Route.useParams();
@@ -104,83 +110,235 @@ function CreatorProfile() {
           </Link>
         )}
 
-        <Card className="glass-card mt-6 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
-          <div className="flex flex-col sm:flex-row gap-5">
-            <img
-              src={creator.photo}
-              alt={creator.name}
-              width={816}
-              height={816}
-              className="size-24 shrink-0 rounded-2xl object-cover ring-1 ring-border shadow-sm"
-            />
-            <div className="min-w-0">
-              <h1 className="text-3xl font-display font-semibold tracking-tight">{creator.name}</h1>
-              <p className="mt-1 text-sm text-muted-foreground">
-                📍 {creator.locality}, {creator.state}
-                {age !== null ? ` · ${age} yrs old` : ""}
-              </p>
-              <p className="mt-1 text-sm font-semibold text-tealdeep">
-                {formatFollowers(creator.followers)} Instagram followers
+        {/* UNIFIED CREATOR PROFILE CARD */}
+        <Card className="glass-card mt-6 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 space-y-8">
+          {/* 1. IDENTITY & HEADER AREA */}
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/60">
+            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+              <div className="relative shrink-0">
+                <img
+                  src={creator.photo}
+                  alt={creator.name}
+                  width={816}
+                  height={816}
+                  className="size-24 sm:size-28 rounded-2xl object-cover ring-2 ring-border shadow-md bg-secondary"
+                />
+                <span
+                  className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
+                  title="Verified Profile"
+                />
+              </div>
+
+              <div className="min-w-0">
+                <div className="flex flex-wrap items-center gap-2">
+                  <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-foreground">
+                    {creator.displayName || creator.name}
+                  </h1>
+                  <span className="inline-flex items-center rounded-full bg-accent/20 px-2.5 py-0.5 text-xs font-semibold text-tealdeep border border-accent/30">
+                    Verified Creator
+                  </span>
+                </div>
+
+                <p className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-1.5">
+                  <span className="inline-flex items-center gap-1 text-foreground/80">
+                    <MapPin className="size-3.5 text-primary" />
+                    {[creator.locality, creator.city, creator.state].filter(Boolean).join(", ")}
+                  </span>
+                  {age !== null && (
+                    <>
+                      <span>•</span>
+                      <span>{age} yrs old</span>
+                    </>
+                  )}
+                </p>
+
+                {/* Social Channels Row */}
+                <div className="mt-3 flex flex-wrap items-center gap-2">
+                  <a
+                    href={`https://instagram.com/${creator.instagram.replace("@", "")}`}
+                    target="_blank"
+                    rel="noreferrer"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/80 hover:bg-secondary hover:ring-border text-foreground transition-all shadow-xs"
+                  >
+                    <span className="grid size-4 place-items-center rounded-[4px] bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-[9px] font-bold text-white">
+                      IG
+                    </span>
+                    <span className="font-mono font-semibold">
+                      {creator.instagram.startsWith("@") ? creator.instagram : `@${creator.instagram}`}
+                    </span>
+                    <ExternalLink className="size-3 text-muted-foreground ml-0.5" />
+                  </a>
+
+                  {creator.otherSocials?.map((s) => (
+                    <span
+                      key={s.platform}
+                      className="inline-flex items-center gap-1.5 rounded-xl bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border text-foreground"
+                    >
+                      <span className="font-semibold">{s.platform}:</span> {s.handle}
+                    </span>
+                  ))}
+                </div>
+              </div>
+            </div>
+
+            {/* Audience & Rate Highlight Tiles */}
+            <div className="flex flex-row items-center gap-3 shrink-0 w-full sm:w-auto">
+              <div className="flex-1 sm:flex-initial rounded-2xl bg-secondary/70 border border-border/80 px-4 py-3 sm:min-w-[145px] text-center shadow-xs">
+                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-center gap-1.5">
+                  <Users className="size-3.5 text-tealdeep" /> Audience
+                </span>
+                <p className="font-display text-xl sm:text-2xl font-bold text-foreground mt-1">
+                  {formatFollowers(creator.followers)}
+                </p>
+                <span className="text-[10px] text-muted-foreground block mt-0.5">Instagram Followers</span>
+              </div>
+
+              <div className="flex-1 sm:flex-initial rounded-2xl bg-secondary/70 border border-border/80 px-4 py-3 sm:min-w-[145px] text-center shadow-xs">
+                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-center gap-1.5">
+                  <Coins className="size-3.5 text-saffrondeep" /> Starting Rate
+                </span>
+                <p className="font-display text-xl sm:text-2xl font-bold text-saffrondeep mt-1">
+                  {formatPrice(creator.startingPrice)}
+                </p>
+                <span className="text-[10px] text-muted-foreground block mt-0.5">Base Collab Fee</span>
+              </div>
+            </div>
+          </div>
+
+          {/* 2. ABOUT THE CREATOR */}
+          <div className="space-y-2.5">
+            <div className="flex items-center gap-2 text-foreground font-display font-semibold text-base">
+              <Sparkles className="size-4 text-primary" />
+              <h2>About the Creator</h2>
+            </div>
+            <div className="rounded-2xl bg-background/60 border border-border/60 p-4 sm:p-5">
+              <p className="text-sm sm:text-base leading-relaxed text-muted-foreground whitespace-pre-line">
+                {creator.about || "No detailed bio provided by the creator."}
               </p>
             </div>
           </div>
 
-          <div className="mt-5 flex flex-wrap gap-2">
-            {creator.categories.map((c) => (
-              <Tag key={c} tone="primary">
-                {c}
-              </Tag>
-            ))}
-            <Tag>{creator.languages.join(" · ")}</Tag>
+          {/* 3. CONTENT NICHES & LANGUAGES */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-foreground font-display font-semibold text-base">
+              <Layers className="size-4 text-primary" />
+              <h2>Niche, Formats &amp; Languages</h2>
+            </div>
+
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {/* Categories */}
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-2">
+                <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                  Primary Categories &amp; Niche
+                </span>
+                <div className="flex flex-wrap gap-1.5 pt-1">
+                  {creator.categories && creator.categories.length > 0 ? (
+                    creator.categories.map((c) => (
+                      <span
+                        key={c}
+                        className="inline-flex items-center rounded-lg bg-primary/15 px-2.5 py-1 text-xs font-semibold text-saffrondeep border border-primary/20"
+                      >
+                        {c}
+                      </span>
+                    ))
+                  ) : (
+                    <span className="text-xs text-muted-foreground">None specified</span>
+                  )}
+                </div>
+              </div>
+
+              {/* Languages & Formats */}
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-3">
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Languages Spoken
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {creator.languages && creator.languages.length > 0 ? (
+                      creator.languages.map((lang) => (
+                        <span
+                          key={lang}
+                          className="inline-flex items-center gap-1 rounded-lg bg-secondary px-2.5 py-1 text-xs font-medium text-foreground border border-border/60"
+                        >
+                          <Globe className="size-3 text-muted-foreground" />
+                          {lang}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not specified</span>
+                    )}
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Content Formats
+                  </span>
+                  <div className="flex flex-wrap gap-1.5 pt-1">
+                    {creator.contentTypes && creator.contentTypes.length > 0 ? (
+                      creator.contentTypes.map((ct) => (
+                        <span
+                          key={ct}
+                          className="inline-flex items-center rounded-lg bg-accent/15 px-2.5 py-1 text-xs font-medium text-tealdeep border border-accent/25"
+                        >
+                          {ct}
+                        </span>
+                      ))
+                    ) : (
+                      <span className="text-xs text-muted-foreground">Not specified</span>
+                    )}
+                  </div>
+                </div>
+              </div>
+            </div>
           </div>
 
-          <p className="mt-5 text-base text-pretty text-muted-foreground">{creator.about}</p>
-
-          <dl className="mt-6 grid grid-cols-1 sm:grid-cols-2 md:grid-cols-3 gap-x-6 gap-y-4">
-            {age !== null ? <Detail label="Age" value={`${age} years old`} /> : null}
-            <Detail label="Creates" value={creator.contentTypes.join(" · ")} />
-            <Detail label="Collaboration" value={creator.collabType} />
-            <Detail
-              label="Travel"
-              value={creator.travels ? (creator.travelRange ?? "Yes") : "Does not travel"}
-            />
-            <Detail
-              label="Accepts products"
-              value={
-                creator.acceptsProducts === "Depends" && creator.acceptsProductsDetails
-                  ? `Depends (${creator.acceptsProductsDetails})`
-                  : creator.acceptsProducts
-              }
-            />
-            <Detail label="Typical turnaround" value={creator.turnaround} />
-            <div>
-              <dt className="label-caps">Starting from</dt>
-              <dd className="mt-1 font-display text-2xl font-semibold text-saffrondeep">
-                {formatPrice(creator.startingPrice)}
-              </dd>
+          {/* 4. COLLABORATION & DELIVERABLES DETAILS */}
+          <div className="space-y-3">
+            <div className="flex items-center gap-2 text-foreground font-display font-semibold text-base">
+              <Briefcase className="size-4 text-primary" />
+              <h2>Collaboration Details &amp; Terms</h2>
             </div>
-          </dl>
 
-          <div className="mt-6 flex flex-wrap gap-2">
-            <a
-              href={`https://instagram.com/${creator.instagram.replace("@", "")}`}
-              target="_blank"
-              rel="noreferrer"
-              className="inline-flex items-center gap-2 rounded-xl bg-background px-4 py-2.5 text-sm font-medium ring-1 ring-border hover:bg-secondary transition-colors"
-            >
-              <span className="grid size-4 place-items-center rounded-[3px] bg-rose/15 text-[10px] text-rose">
-                IG
-              </span>
-              {creator.instagram}
-            </a>
-            {creator.otherSocials.map((s) => (
-              <span
-                key={s.platform}
-                className="inline-flex items-center gap-2 rounded-xl bg-background px-4 py-2.5 text-sm font-medium ring-1 ring-border"
-              >
-                {s.platform} · {s.handle}
-              </span>
-            ))}
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              {/* Collab Type */}
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Briefcase className="size-3.5 text-primary" /> Collab Type
+                </span>
+                <p className="text-base font-bold text-foreground mt-0.5">{creator.collabType || "Paid"}</p>
+              </div>
+
+              {/* Turnaround */}
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Clock className="size-3.5 text-primary" /> Turnaround
+                </span>
+                <p className="text-base font-bold text-foreground mt-0.5">{creator.turnaround || "3–5 days"}</p>
+              </div>
+
+              {/* Accepts Products */}
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Gift className="size-3.5 text-primary" /> Accepts Products
+                </span>
+                <p className="text-base font-bold text-foreground truncate mt-0.5" title={creator.acceptsProductsDetails}>
+                  {creator.acceptsProducts === "Depends" && creator.acceptsProductsDetails
+                    ? `Depends (${creator.acceptsProductsDetails})`
+                    : creator.acceptsProducts || "Depends"}
+                </p>
+              </div>
+
+              {/* Travel */}
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
+                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Plane className="size-3.5 text-primary" /> Travel Availability
+                </span>
+                <p className="text-base font-bold text-foreground truncate mt-0.5" title={creator.travelRange}>
+                  {creator.travels ? (creator.travelRange ?? "Yes") : "Does not travel"}
+                </p>
+              </div>
+            </div>
           </div>
         </Card>
 
