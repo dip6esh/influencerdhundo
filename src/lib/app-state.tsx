@@ -1,6 +1,7 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import {
   CREATORS,
+  EMPTY_FILTERS,
   generateReferralCode,
   getSubscriptionDurationMs,
   getSubscriptionExpiry,
@@ -8,6 +9,7 @@ import {
   isSubscriptionQueued,
   type Creator,
   type CreatorStatus,
+  type Filters,
 } from "./directory-data";
 import { supabaseDb, type ReferralEvent } from "./supabase";
 
@@ -80,6 +82,11 @@ type AppState = {
   ) => Promise<void>;
   fetchReferralEvents: (creatorId: string) => Promise<void>;
   refreshFromSupabase: () => Promise<void>;
+  discoverFilters: Filters;
+  setDiscoverFilters: React.Dispatch<React.SetStateAction<Filters>>;
+  discoverHasSearched: boolean;
+  setDiscoverHasSearched: (searched: boolean) => void;
+  resetDiscoverFilters: () => void;
 };
 
 const AppStateContext = createContext<AppState | null>(null);
@@ -102,7 +109,14 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [reports, setReports] = useState<Report[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [referralEvents, setReferralEvents] = useState<ReferralEvent[]>([]);
+  const [discoverFilters, setDiscoverFilters] = useState<Filters>(EMPTY_FILTERS);
+  const [discoverHasSearched, setDiscoverHasSearched] = useState(false);
   const [hydrated, setHydrated] = useState(false);
+
+  const resetDiscoverFilters = () => {
+    setDiscoverFilters(EMPTY_FILTERS);
+    setDiscoverHasSearched(false);
+  };
 
   // 1. Hydrate from localStorage first for instant initial render
   useEffect(() => {
@@ -607,8 +621,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         const events = await supabaseDb.fetchReferralEvents(creatorId);
         setReferralEvents(events);
       },
+
+      discoverFilters,
+      setDiscoverFilters,
+      discoverHasSearched,
+      setDiscoverHasSearched,
+      resetDiscoverFilters,
     }),
-    [creators, business, myCreatorId, reports, subscriptions, referralEvents],
+    [
+      creators,
+      business,
+      myCreatorId,
+      reports,
+      subscriptions,
+      referralEvents,
+      discoverFilters,
+      discoverHasSearched,
+    ],
   );
 
   return <AppStateContext.Provider value={value}>{children}</AppStateContext.Provider>;

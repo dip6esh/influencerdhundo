@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { CreatorCard } from "@/components/creator-card";
 import {
   Button,
@@ -45,10 +45,23 @@ export const Route = createFileRoute("/discover")({
 });
 
 function Discover() {
-  const { creators } = useAppState();
-  const [filters, setFilters] = useState<Filters>(EMPTY_FILTERS);
-  const [showMore, setShowMore] = useState(false);
-  const [results, setResults] = useState<ReturnType<typeof filterCreators> | null>(null);
+  const {
+    creators,
+    discoverFilters: filters,
+    setDiscoverFilters: setFilters,
+    discoverHasSearched,
+    setDiscoverHasSearched,
+    resetDiscoverFilters,
+  } = useAppState();
+
+  const [showMore, setShowMore] = useState(() => {
+    return (
+      Boolean(filters.locality) ||
+      Boolean(filters.language) ||
+      Boolean(filters.travel) ||
+      Boolean(filters.products)
+    );
+  });
 
   const toggleContentType = (type: string) => {
     setFilters((f) => ({
@@ -59,7 +72,12 @@ function Discover() {
     }));
   };
 
-  const search = () => setResults(filterCreators(creators, filters));
+  const search = () => setDiscoverHasSearched(true);
+
+  const results = useMemo(() => {
+    if (!discoverHasSearched) return null;
+    return filterCreators(creators, filters);
+  }, [discoverHasSearched, creators, filters]);
 
   const hasActiveFilters =
     Boolean(filters.city) ||
@@ -359,10 +377,7 @@ function Discover() {
                 {(results !== null || hasActiveFilters) && (
                   <button
                     type="button"
-                    onClick={() => {
-                      setFilters(EMPTY_FILTERS);
-                      setResults(null);
-                    }}
+                    onClick={resetDiscoverFilters}
                     className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4 px-3 py-1 cursor-pointer transition-colors"
                   >
                     Clear all
@@ -409,10 +424,7 @@ function Discover() {
                 <Button
                   variant="ghost"
                   className="mt-4"
-                  onClick={() => {
-                    setFilters(EMPTY_FILTERS);
-                    setResults(null);
-                  }}
+                  onClick={resetDiscoverFilters}
                 >
                   Reset filters
                 </Button>

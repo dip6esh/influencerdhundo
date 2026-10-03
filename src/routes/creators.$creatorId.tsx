@@ -102,12 +102,19 @@ function CreatorProfile() {
             </Link>
           </div>
         ) : (
-          <Link
-            to="/discover"
-            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors"
+          <button
+            type="button"
+            onClick={() => {
+              if (typeof window !== "undefined" && window.history.length > 1) {
+                window.history.back();
+              } else {
+                navigate({ to: "/discover" });
+              }
+            }}
+            className="inline-flex items-center gap-1 text-sm font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
           >
             ← Back to results
-          </Link>
+          </button>
         )}
 
         {/* UNIFIED CREATOR PROFILE CARD */}
