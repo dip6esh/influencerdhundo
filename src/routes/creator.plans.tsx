@@ -6,12 +6,18 @@ import {
   PLANS,
   PROMO_CODE_3DAYS,
   formatPrice,
+  getActiveSubscription,
+  getQueuedSubscriptions,
+  getSubscriptionExpiry,
+  isSubscriptionActive,
 } from "@/lib/directory-data";
 import {
+  CalendarClock,
   Check,
   CheckCircle2,
   CreditCard,
   Gift,
+  Layers,
   Loader2,
   QrCode,
   ShieldCheck,
@@ -43,11 +49,27 @@ type PaymentMethod = "upi" | "card" | "netbanking";
 
 function Plans() {
   const navigate = useNavigate();
-  const { myCreatorId, creators, activateSubscription, hasUsedTrial } = useAppState();
+  const { myCreatorId, creators, subscriptions, activateSubscription, hasUsedTrial } = useAppState();
   const mine = creators.find((c) => c.id === myCreatorId);
 
-  // One-time trial enforcement
-  const trialAlreadyUsed = myCreatorId ? hasUsedTrial(myCreatorId) : false;
+  // Check active and queued subscriptions
+  const activeSub = myCreatorId ? getActiveSubscription(subscriptions, myCreatorId) : undefined;
+  const queuedSubs = myCreatorId ? getQueuedSubscriptions(subscriptions, myCreatorId) : [];
+  const hasActivePlan = !!activeSub && isSubscriptionActive(activeSub);
+  const currentExpiry = activeSub ? getSubscriptionExpiry(activeSub) : null;
+  const lastQueued = queuedSubs.length > 0 ? queuedSubs[queuedSubs.length - 1] : undefined;
+  const queueStartTime = lastQueued ? getSubscriptionExpiry(lastQueued) : currentExpiry;
+
+  // One-time trial enforcement: Strictly allowed only once per creator
+  const trialAlreadyUsed = Boolean(
+    mine?.trialStartedAt ||
+      (myCreatorId ? hasUsedTrial(myCreatorId) : false) ||
+      subscriptions.some(
+        (s) =>
+          s.creatorId === myCreatorId &&
+          (s.planId === "trial-3d" || s.isTrial === true || s.duration?.toLowerCase().includes("3 day")),
+      ),
+  );
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>("3m");
   const [promoCodeInput, setPromoCodeInput] = useState("");
@@ -58,7 +80,7 @@ function Plans() {
   const [success, setSuccess] = useState(false);
 
   const selectedPlan = PLANS.find((p) => p.id === selectedPlanId) || PLANS[1];
-  const isTrialApplied = appliedPromo?.toUpperCase() === PROMO_CODE_3DAYS;
+  const isTrialApplied = !trialAlreadyUsed && appliedPromo?.toUpperCase() === PROMO_CODE_3DAYS;
 
   // Price calculations
   const originalPrice = selectedPlan.price;
@@ -76,7 +98,7 @@ function Plans() {
     if (cleaned === PROMO_CODE_3DAYS) {
       if (trialAlreadyUsed) {
         setPromoError(
-          "You have already used the TRYFREE3DAYS trial. This code can only be used once per creator account. Please choose a paid plan to continue.",
+          "You have already availed the free trial. The trial is strictly available once per creator and cannot be renewed or used again. Please choose a paid plan.",
         );
         return;
       }
@@ -97,18 +119,27 @@ function Plans() {
     setProcessing(true);
 
     try {
+      if (isTrialApplied && trialAlreadyUsed) {
+        setPromoError(
+          "You have already used the free trial. Please choose a paid subscription plan.",
+        );
+        setAppliedPromo(null);
+        setProcessing(false);
+        return;
+      }
+
       // Simulate payment gateway response
       await new Promise((r) => setTimeout(r, 900));
 
       if (isTrialApplied) {
-        activateSubscription({
+        await activateSubscription({
           creatorId: mine.id,
           planId: "trial-3d",
           duration: "3 Days Free Trial",
           price: 0,
         });
       } else {
-        activateSubscription({
+        await activateSubscription({
           creatorId: mine.id,
           planId: selectedPlan.id,
           duration: selectedPlan.duration,
@@ -144,8 +175,38 @@ function Plans() {
             </p>
           </div>
 
-          {/* QUICK PROMO NOTICE BANNER — only shown if trial not yet used */}
-          {!appliedPromo && !trialAlreadyUsed ? (
+          {/* ACTIVE SUBSCRIPTION QUEUE NOTICE BANNER */}
+          {hasActivePlan && queueStartTime ? (
+            <div className="mt-6 rounded-2xl bg-gradient-to-r from-accent/20 via-primary/15 to-accent/10 p-4 border border-accent/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tealdeep text-white shadow-sm">
+                  <CalendarClock className="size-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <span>You Have an Active Plan ({activeSub?.duration})</span>
+                    <span className="rounded-full bg-accent/25 text-tealdeep px-2 py-0.5 text-[11px] font-bold">
+                      Active
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Your current plan is valid until{" "}
+                    <strong className="text-foreground font-semibold">
+                      {currentExpiry?.toLocaleDateString("en-IN", {
+                        month: "short",
+                        day: "numeric",
+                        year: "numeric",
+                      })}
+                    </strong>
+                    . Subscribing to a new plan now will place it in your <strong>queue</strong>, and it will <strong>automatically activate</strong> the instant your current plan expires!
+                  </p>
+                </div>
+              </div>
+            </div>
+          ) : null}
+
+          {/* QUICK PROMO NOTICE BANNER — only shown if trial not yet used and no active plan */}
+          {!hasActivePlan && !appliedPromo && !trialAlreadyUsed ? (
             <div className="mt-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 p-4 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -374,6 +435,17 @@ function Plans() {
                     </span>
                   </div>
 
+                  {hasActivePlan && queueStartTime ? (
+                    <div className="flex justify-between items-center text-tealdeep font-medium">
+                      <span className="flex items-center gap-1 text-xs">
+                        <CalendarClock className="size-3.5 text-tealdeep" /> Activation
+                      </span>
+                      <span className="rounded-full bg-accent/20 px-2 py-0.5 text-xs font-bold text-tealdeep">
+                        Queued (starts {queueStartTime.toLocaleDateString("en-IN", { month: "short", day: "numeric" })})
+                      </span>
+                    </div>
+                  ) : null}
+
                   {isTrialApplied ? (
                     <div className="flex justify-between text-tealdeep font-medium">
                       <span className="flex items-center gap-1">
@@ -409,10 +481,14 @@ function Plans() {
                     <p className="mt-2 text-sm font-semibold text-tealdeep">
                       {isTrialApplied
                         ? "🎉 3-Day Free Trial Activated!"
+                        : hasActivePlan
+                        ? "🎉 Payment Successful & Plan Queued!"
                         : "🎉 Payment Successful & Profile Active!"}
                     </p>
                     <p className="text-xs text-muted-foreground mt-0.5">
-                      Redirecting to your dashboard...
+                      {hasActivePlan
+                        ? "Your queued plan will auto-activate when the current one expires."
+                        : "Redirecting to your dashboard..."}
                     </p>
                   </div>
                 ) : (
@@ -426,13 +502,19 @@ function Plans() {
                       {processing ? (
                         <>
                           <Loader2 className="size-4 animate-spin" />
-                          {isTrialApplied ? "Activating free trial..." : "Processing payment..."}
+                          {isTrialApplied
+                            ? "Activating free trial..."
+                            : hasActivePlan
+                            ? "Queueing plan..."
+                            : "Processing payment..."}
                         </>
                       ) : isTrialApplied ? (
                         <>
                           <Zap className="size-4" />
                           Activate 3 Days Free Trial (₹0)
                         </>
+                      ) : hasActivePlan ? (
+                        `Pay ${formatPrice(finalPrice)} & Queue Plan`
                       ) : (
                         `Pay ${formatPrice(finalPrice)} & Activate`
                       )}

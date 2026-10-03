@@ -228,10 +228,29 @@ export const supabaseDb = {
         expires_at: sub.expiresAt ?? null,
         is_trial: sub.isTrial ?? false,
         referral_code_used: sub.referralCodeUsed ?? null,
+        is_queued: sub.isQueued ?? false,
+        status: sub.status ?? (sub.isQueued ? "queued" : "active"),
       });
       return !error;
     } catch (e) {
       console.warn("Supabase addSubscription error:", e);
+      return false;
+    }
+  },
+
+  async updateSubscriptionStatus(
+    id: string,
+    status: "active" | "queued" | "expired",
+    isQueued = false,
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("subscriptions")
+        .update({ status, is_queued: isQueued })
+        .eq("id", id);
+      return !error;
+    } catch (e) {
+      console.warn("Supabase updateSubscriptionStatus error:", e);
       return false;
     }
   },
@@ -256,6 +275,8 @@ export const supabaseDb = {
         expiresAt: row.expires_at as string | undefined,
         isTrial: Boolean(row.is_trial),
         referralCodeUsed: row.referral_code_used as string | undefined,
+        isQueued: Boolean(row.is_queued),
+        status: (row.status as "active" | "queued" | "expired") || (row.is_queued ? "queued" : "active"),
       }));
     } catch (e) {
       console.warn("Supabase fetchSubscriptionsForCreator error:", e);
@@ -852,6 +873,36 @@ export const supabaseDb = {
       }
 
       return true;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Check if a creator has ever used free trial (by checking trial_started_at and subscriptions table) */
+  async checkCreatorHasUsedTrial(creatorId: string): Promise<boolean> {
+    try {
+      // 1. Check creators table
+      const { data: creator } = await supabase
+        .from("creators")
+        .select("trial_started_at")
+        .eq("id", creatorId)
+        .maybeSingle();
+      if (creator && (creator as { trial_started_at?: string | null }).trial_started_at) {
+        return true;
+      }
+
+      // 2. Check subscriptions table
+      const { data: subs } = await supabase
+        .from("subscriptions")
+        .select("id")
+        .eq("creator_id", creatorId)
+        .or("is_trial.eq.true,plan_id.eq.trial-3d")
+        .limit(1);
+      if (subs && subs.length > 0) {
+        return true;
+      }
+
+      return false;
     } catch {
       return false;
     }

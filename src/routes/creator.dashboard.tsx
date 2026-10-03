@@ -8,18 +8,23 @@ import {
   formatPrice,
   formatTimeRemaining,
   generateReferralCode,
+  getActiveSubscription,
+  getQueuedSubscriptions,
   getSubscriptionExpiry,
   isSubscriptionActive,
+  isSubscriptionQueued,
 } from "@/lib/directory-data";
 import { supabaseDb } from "@/lib/supabase";
 import {
   AlertCircle,
   ArrowUpRight,
+  CalendarClock,
   Check,
   Clock,
   Copy,
   Gift,
   History,
+  Layers,
   Loader2,
   MessageCircle,
   Share2,
@@ -69,7 +74,13 @@ function Dashboard() {
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const mine = creators.find((c) => c.id === myCreatorId);
-  const sub = subscriptions.find((s) => s.creatorId === myCreatorId);
+
+  // Subscriptions & Queued plans calculation
+  const userSubs = subscriptions.filter((s) => s.creatorId === myCreatorId);
+  const activeSub = myCreatorId ? getActiveSubscription(subscriptions, myCreatorId) : undefined;
+  const queuedSubs = myCreatorId ? getQueuedSubscriptions(subscriptions, myCreatorId) : [];
+  const latestSub = userSubs[0];
+  const sub = activeSub || latestSub;
 
   // Auto-fetch profile from Supabase on mount
   useEffect(() => {
@@ -102,33 +113,45 @@ function Dashboard() {
     }
   }, [mine?.id, fetchReferralEvents]);
 
-  // Ensure referral code is generated for the creator
+  // Only generate/save referral code for paid subscribers (not trial-only users)
   useEffect(() => {
-    if (mine && !mine.referralCode) {
+    const hasPaidPlan = userSubs.some(
+      (s) => s.planId !== "trial-3d" && !s.duration?.toLowerCase().includes("3 day"),
+    );
+    if (mine && !mine.referralCode && hasPaidPlan) {
       const code = generateReferralCode(mine.displayName || mine.name);
       supabaseDb.setReferralCode(mine.id, code);
       upsertCreator({ ...mine, referralCode: code });
     }
-  }, [mine, upsertCreator]);
+  }, [mine, userSubs, upsertCreator]);
 
   // Subscription expiration check
-  const subActive = isSubscriptionActive(sub);
-  const subExpiry = sub ? getSubscriptionExpiry(sub) : null;
-  const isTrial = sub?.planId === "trial-3d" || sub?.duration?.toLowerCase().includes("3 day");
+  const subActive = isSubscriptionActive(activeSub);
+  const subExpiry = activeSub
+    ? getSubscriptionExpiry(activeSub)
+    : latestSub
+    ? getSubscriptionExpiry(latestSub)
+    : null;
+  const isTrial =
+    sub?.planId === "trial-3d" || sub?.duration?.toLowerCase().includes("3 day");
 
   useEffect(() => {
     if (mine && sub) {
-      if (!subActive && mine.status === "Active") {
-        // Subscription / trial expired: mark as Expired
+      if (!subActive && queuedSubs.length === 0 && mine.status === "Active") {
+        // Subscription / trial expired and no active/queued plan: mark as Expired
         setCreatorStatus(mine.id, "Expired");
+      } else if (subActive && mine.status !== "Active") {
+        setCreatorStatus(mine.id, "Active");
       }
     }
-  }, [mine, sub, subActive, setCreatorStatus]);
+  }, [mine, sub, subActive, queuedSubs.length, setCreatorStatus]);
 
   // Referral Calculations
-  const referralCode = mine?.referralCode || (mine ? generateReferralCode(mine.displayName || mine.name) : "");
+  // Referral is only unlocked for paid subscribers — trial users cannot share their code
+  const isReferralUnlocked = (subActive || queuedSubs.length > 0) && !isTrial;
+  const referralCode = mine?.referralCode || "";
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://influencerdhundo.com";
-  const referralLink = `${baseUrl}/creator/register?ref=${referralCode}`;
+  const referralLink = referralCode ? `${baseUrl}/creator/register?ref=${referralCode}` : "";
 
   const referredCreators = creators.filter((c) => c.referredBy === mine?.id);
   const paidReferredCount = referredCreators.filter((c) =>
@@ -193,6 +216,42 @@ function Dashboard() {
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
         <div className="relative mx-auto max-w-5xl px-5">
+          {/* QUEUED PLAN NOTICE BANNER */}
+          {queuedSubs.length > 0 && queuedSubs[0] ? (
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-accent/20 via-primary/15 to-accent/10 border border-accent/30 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
+              <div className="flex items-center gap-3">
+                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tealdeep text-white shadow-sm">
+                  <CalendarClock className="size-5" />
+                </div>
+                <div>
+                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
+                    <span>Upcoming Plan in Queue: {queuedSubs[0].duration}</span>
+                    <span className="rounded-full bg-accent/30 text-tealdeep px-2 py-0.5 text-[11px] font-bold">
+                      Queued
+                    </span>
+                  </p>
+                  <p className="text-xs text-muted-foreground">
+                    Your {queuedSubs[0].duration} plan is queued and will <strong>automatically activate</strong> on{" "}
+                    {new Date(queuedSubs[0].startedAt).toLocaleDateString("en-IN", {
+                      month: "short",
+                      day: "numeric",
+                      year: "numeric",
+                      hour: "2-digit",
+                      minute: "2-digit",
+                    })}{" "}
+                    when your current plan expires.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/creator/plans"
+                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-background px-3.5 py-1.5 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-all"
+              >
+                Manage Plans
+              </Link>
+            </div>
+          ) : null}
+
           {/* TRIAL BANNER / EXPIRED BANNER */}
           {sub && isTrial && subActive && subExpiry ? (
             <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 border border-primary/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
@@ -229,7 +288,7 @@ function Dashboard() {
             </div>
           ) : null}
 
-          {sub && !subActive ? (
+          {sub && !subActive && queuedSubs.length === 0 ? (
             <div className="mb-6 rounded-2xl bg-rose/10 border border-rose/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rose text-white">
@@ -328,7 +387,7 @@ function Dashboard() {
                 <div className="mt-4 space-y-3 text-sm">
                   <div>
                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Plan
+                      Current Plan
                     </span>
                     <p className="text-lg font-semibold text-foreground">{sub.duration}</p>
                   </div>
@@ -336,7 +395,7 @@ function Dashboard() {
                     <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Amount
                     </span>
-                    <p className="font-medium text-saffrondeep">{formatPrice(sub.price)}</p>
+                    <p className="font-medium text-saffrondeep">{formatPrice(sub.price ?? 0)}</p>
                   </div>
                   <div className="border-t border-border pt-2.5 text-xs text-muted-foreground space-y-1">
                     <p>
@@ -361,6 +420,41 @@ function Dashboard() {
                       </p>
                     ) : null}
                   </div>
+
+                  {/* QUEUED PLANS SUB-SECTION */}
+                  {queuedSubs.length > 0 ? (
+                    <div className="mt-4 pt-3 border-t border-border">
+                      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-tealdeep mb-2">
+                        <span className="flex items-center gap-1">
+                          <CalendarClock className="size-3.5" /> Next in Queue
+                        </span>
+                        <span className="rounded-full bg-accent/20 text-tealdeep px-2 py-0.5 text-[10px] font-bold">
+                          Auto-activates
+                        </span>
+                      </div>
+                      {queuedSubs.map((q, idx) => (
+                        <div
+                          key={q.id || idx}
+                          className="rounded-xl bg-background/80 border border-accent/30 p-2.5 text-xs space-y-1 mt-1.5"
+                        >
+                          <div className="flex justify-between items-center">
+                            <span className="font-semibold text-foreground">{q.duration}</span>
+                            <span className="font-medium text-saffrondeep">
+                              {formatPrice(q.price ?? 0)}
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground">
+                            Starts automatically:{" "}
+                            {new Date(q.startedAt).toLocaleDateString("en-IN", {
+                              month: "short",
+                              day: "numeric",
+                              year: "numeric",
+                            })}
+                          </p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ) : (
                 <div className="mt-4 space-y-3">
@@ -402,10 +496,15 @@ function Dashboard() {
 
                 {/* Referral Link Active Status Badge */}
                 <div className="shrink-0 flex items-center gap-2">
-                  {subActive ? (
+                  {isReferralUnlocked ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-semibold text-tealdeep border border-accent/30">
                       <span className="size-2 rounded-full bg-tealdeep animate-pulse" />
                       Referral Code Active
+                    </span>
+                  ) : isTrial && subActive ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary border border-primary/30">
+                      <span className="size-2 rounded-full bg-primary" />
+                      Locked — Upgrade to Unlock
                     </span>
                   ) : (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/30">
@@ -453,97 +552,132 @@ function Dashboard() {
                     <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
                       <Clock className="size-3.5 text-primary" /> Referral Code
                     </span>
-                    <button
-                      type="button"
-                      onClick={handleCopyCode}
-                      title={copiedCode ? "Copied!" : "Copy referral code"}
-                      aria-label="Copy referral code"
-                      className="inline-flex size-6 items-center justify-center rounded-lg text-foreground hover:bg-secondary transition-all cursor-pointer"
-                    >
-                      {copiedCode ? (
-                        <Check className="size-3.5 text-foreground stroke-[2.5]" />
-                      ) : (
-                        <Copy className="size-3.5 text-foreground" />
-                      )}
-                    </button>
+                   {/* Hide copy button when locked */}
+                    {isReferralUnlocked && (
+                      <button
+                        type="button"
+                        onClick={handleCopyCode}
+                        title={copiedCode ? "Copied!" : "Copy referral code"}
+                        aria-label="Copy referral code"
+                        className="inline-flex size-6 items-center justify-center rounded-lg text-foreground hover:bg-secondary transition-all cursor-pointer"
+                      >
+                        {copiedCode ? (
+                          <Check className="size-3.5 text-foreground stroke-[2.5]" />
+                        ) : (
+                          <Copy className="size-3.5 text-foreground" />
+                        )}
+                      </button>
+                    )}
                   </div>
-                  <p className="mt-1 text-lg font-mono font-bold text-foreground tracking-wider truncate">
-                    {referralCode}
+                  <p
+                    className={`mt-1 text-lg font-mono font-bold text-foreground tracking-wider truncate transition-all select-none ${
+                      isReferralUnlocked ? "" : "blur-sm opacity-50 pointer-events-none"
+                    }`}
+                  >
+                    {isReferralUnlocked ? referralCode : "DHUNDO-XXXXXX"}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Permanent account code</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    {isReferralUnlocked ? "Permanent account code" : "Unlocks on paid plan"}
+                  </p>
                 </div>
               </div>
 
-              {/* LINK SHARING BOX */}
-              <div className="mt-6 rounded-2xl bg-secondary/60 border border-border/80 p-4 sm:p-5">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
-                  <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                    Your Unique Referral Link &amp; Code
-                  </label>
-                  <span className="text-[11px] text-muted-foreground">
-                    Code: <strong className="font-mono text-foreground">{referralCode}</strong>
-                  </span>
-                </div>
-
-                <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-                  <div className="min-w-0 flex-1">
-                    <input
-                      type="text"
-                      readOnly
-                      value={referralLink}
-                      className="w-full truncate rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-mono text-foreground border border-border focus:outline-none select-all shadow-xs"
-                    />
+              {/* LINK SHARING BOX — locked for trial users */}
+              {isReferralUnlocked ? (
+                <div className="mt-6 rounded-2xl bg-secondary/60 border border-border/80 p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
+                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                      Your Unique Referral Link &amp; Code
+                    </label>
+                    <span className="text-[11px] text-muted-foreground">
+                      Code: <strong className="font-mono text-foreground">{referralCode}</strong>
+                    </span>
                   </div>
 
-                  <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
-                    <button
-                      type="button"
-                      onClick={handleCopyLink}
-                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs active:scale-98"
-                    >
-                      {copiedLink ? (
-                        <>
-                          <Check className="size-4 text-tealdeep" />
-                          <span>Link Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="size-4" />
-                          <span>Copy Link</span>
-                        </>
-                      )}
-                    </button>
+                  <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
+                    <div className="min-w-0 flex-1">
+                      <input
+                        type="text"
+                        readOnly
+                        value={referralLink}
+                        className="w-full truncate rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-mono text-foreground border border-border focus:outline-none select-all shadow-xs"
+                      />
+                    </div>
 
-                    <button
-                      type="button"
-                      onClick={handleCopyCode}
-                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all cursor-pointer shadow-xs active:scale-98"
-                    >
-                      {copiedCode ? (
-                        <>
-                          <Check className="size-4 text-tealdeep" />
-                          <span>Code Copied!</span>
-                        </>
-                      ) : (
-                        <>
-                          <Copy className="size-4 text-primary" />
-                          <span>Copy Code</span>
-                        </>
-                      )}
-                    </button>
+                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                      <button
+                        type="button"
+                        onClick={handleCopyLink}
+                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs active:scale-98"
+                      >
+                        {copiedLink ? (
+                          <>
+                            <Check className="size-4 text-tealdeep" />
+                            <span>Link Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-4" />
+                            <span>Copy Link</span>
+                          </>
+                        )}
+                      </button>
 
-                    <a
-                      href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
-                      target="_blank"
-                      rel="noopener noreferrer"
-                      className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-xs active:scale-98"
-                    >
-                      <MessageCircle className="size-4" />
-                      <span>WhatsApp</span>
-                    </a>
+                      <button
+                        type="button"
+                        onClick={handleCopyCode}
+                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all cursor-pointer shadow-xs active:scale-98"
+                      >
+                        {copiedCode ? (
+                          <>
+                            <Check className="size-4 text-tealdeep" />
+                            <span>Code Copied!</span>
+                          </>
+                        ) : (
+                          <>
+                            <Copy className="size-4 text-primary" />
+                            <span>Copy Code</span>
+                          </>
+                        )}
+                      </button>
+
+                      <a
+                        href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
+                        target="_blank"
+                        rel="noopener noreferrer"
+                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-xs active:scale-98"
+                      >
+                        <MessageCircle className="size-4" />
+                        <span>WhatsApp</span>
+                      </a>
+                    </div>
                   </div>
                 </div>
-              </div>
+              ) : (
+                /* Locked state — trial or expired */
+                <div className="mt-6 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
+                  <div className="inline-flex items-center justify-center size-12 rounded-full bg-primary/10 border border-primary/20 mb-3">
+                    <AlertCircle className="size-5 text-primary" />
+                  </div>
+                  <h3 className="text-sm font-bold text-foreground">
+                    {isTrial && subActive
+                      ? "Referral Code Locked — Available on Paid Plans"
+                      : "Referral Code Inactive — Renew to Reactivate"}
+                  </h3>
+                  <p className="text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto">
+                    {isTrial && subActive
+                      ? "Your referral code unlocks once you activate any paid subscription. Trial accounts cannot share referral links."
+                      : "Your subscription has expired. Renew any paid plan to reactivate your referral code and start earning bonus days again."}
+                  </p>
+                  <Link
+                    to="/creator/plans"
+                    className="inline-flex items-center gap-1.5 mt-4 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs"
+                  >
+                    <ArrowUpRight className="size-4" />
+                    {isTrial && subActive ? "Upgrade to Paid Plan" : "Renew Subscription"}
+                  </Link>
+                </div>
+              )}
 
               {/* REFERRAL HISTORY */}
               <div className="mt-8">

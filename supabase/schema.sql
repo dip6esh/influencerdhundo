@@ -72,6 +72,8 @@ CREATE TABLE IF NOT EXISTS public.subscriptions (
   expires_at TIMESTAMPTZ,
   is_trial BOOLEAN NOT NULL DEFAULT FALSE,
   referral_code_used TEXT,  -- code used at signup
+  is_queued BOOLEAN NOT NULL DEFAULT FALSE,
+  status TEXT NOT NULL DEFAULT 'active',
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -183,5 +185,11 @@ DO $$ BEGIN
   END IF;
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='referral_code_used') THEN
     ALTER TABLE public.subscriptions ADD COLUMN referral_code_used TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='is_queued') THEN
+    ALTER TABLE public.subscriptions ADD COLUMN is_queued BOOLEAN NOT NULL DEFAULT FALSE;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='status') THEN
+    ALTER TABLE public.subscriptions ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
   END IF;
 END $$;

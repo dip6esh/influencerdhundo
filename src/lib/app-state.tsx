@@ -1,5 +1,14 @@
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
-import { CREATORS, generateReferralCode, getSubscriptionExpiry, type Creator, type CreatorStatus } from "./directory-data";
+import {
+  CREATORS,
+  generateReferralCode,
+  getSubscriptionDurationMs,
+  getSubscriptionExpiry,
+  isSubscriptionActive,
+  isSubscriptionQueued,
+  type Creator,
+  type CreatorStatus,
+} from "./directory-data";
 import { supabaseDb, type ReferralEvent } from "./supabase";
 
 export type BusinessAccount = {
@@ -29,6 +38,8 @@ export type Subscription = {
   expiresAt?: string | undefined;
   isTrial?: boolean | undefined;
   referralCodeUsed?: string | undefined;
+  isQueued?: boolean | undefined;
+  status?: "active" | "queued" | "expired" | undefined;
 };
 
 type AppState = {
@@ -165,7 +176,45 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  // 3. Persist to localStorage whenever state changes
+  // 3. Auto-activate queued subscriptions when their start time arrives
+  useEffect(() => {
+    if (!hydrated) return;
+    const checkAndActivate = async () => {
+      const now = Date.now();
+      let hasUpdates = false;
+
+      const nextSubs = await Promise.all(
+        subscriptions.map(async (sub) => {
+          const startTime = new Date(sub.startedAt).getTime();
+          const expiryTime = getSubscriptionExpiry(sub).getTime();
+          // If queued and start time has passed, and hasn't fully expired yet
+          if (
+            (sub.isQueued || sub.status === "queued" || startTime <= now) &&
+            startTime <= now &&
+            expiryTime > now &&
+            (sub.isQueued || sub.status === "queued")
+          ) {
+            hasUpdates = true;
+            if (sub.id) {
+              await supabaseDb.updateSubscriptionStatus(sub.id, "active", false);
+            }
+            return { ...sub, isQueued: false, status: "active" as const };
+          }
+          return sub;
+        }),
+      );
+
+      if (hasUpdates) {
+        setSubscriptions(nextSubs);
+      }
+    };
+
+    checkAndActivate();
+    const interval = setInterval(checkAndActivate, 10000); // Poll every 10s
+    return () => clearInterval(interval);
+  }, [hydrated, subscriptions]);
+
+  // 4. Persist to localStorage whenever state changes
   useEffect(() => {
     if (!hydrated) return;
     try {
@@ -176,7 +225,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     } catch {
       /* storage full or unavailable */
     }
-  }, [hydrated, creators, business, myCreatorId, reports, subscriptions]);
+  }, [hydrated, creators, business, myCreatorId, reports, subscriptions, referralEvents]);
 
   const refreshFromSupabase = async () => {
     const remoteCreators = await supabaseDb.fetchCreators();
@@ -194,12 +243,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       subscriptions,
       referralEvents,
       refreshFromSupabase,
-      hasUsedTrial: (creatorId: string) =>
-        subscriptions.some(
+      hasUsedTrial: (creatorId: string) => {
+        const creator = creators.find((c) => c.id === creatorId);
+        if (creator?.trialStartedAt) return true;
+        return subscriptions.some(
           (s) =>
             s.creatorId === creatorId &&
             (s.planId === "trial-3d" || s.isTrial === true || s.duration?.toLowerCase().includes("3 day")),
-        ),
+        );
+      },
       signUpBusiness: (b, authUserId) => {
         setBusiness(b);
         supabaseDb.saveBusinessAccount(b, authUserId);
@@ -298,36 +350,98 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       activateSubscription: async (s, referralCode) => {
         const now = new Date();
-        // Calculate expiry from plan
-        const tempSub = { planId: s.planId, duration: s.duration, startedAt: now.toISOString() };
-        const expiresAt = getSubscriptionExpiry(tempSub);
+        const creator = creators.find((c) => c.id === s.creatorId);
+        const creatorExistingSubs = subscriptions.filter((sub) => sub.creatorId === s.creatorId);
+
+        const isTrialPlan = s.planId === "trial-3d" || s.isTrial === true;
+
+        // STRICT CHECK: Trial can be used ONLY once per account
+        if (isTrialPlan) {
+          const trialAlreadyUsed =
+            Boolean(creator?.trialStartedAt) ||
+            creatorExistingSubs.some(
+              (sub) =>
+                sub.planId === "trial-3d" ||
+                sub.isTrial === true ||
+                sub.duration?.toLowerCase().includes("3 day"),
+            );
+          if (trialAlreadyUsed) {
+            console.warn("Trial renewal rejected: Trial can only be availed once per user.");
+            return;
+          }
+        }
+
+        // Find the latest active or queued expiration for this creator
+        let queueStartDate = now;
+        if (creator?.subscriptionExpiresAt) {
+          const d = new Date(creator.subscriptionExpiresAt);
+          if (!isNaN(d.getTime()) && d.getTime() > queueStartDate.getTime()) {
+            queueStartDate = d;
+          }
+        }
+        for (const existingSub of creatorExistingSubs) {
+          const exp = getSubscriptionExpiry(existingSub);
+          if (exp.getTime() > queueStartDate.getTime()) {
+            queueStartDate = exp;
+          }
+        }
+
+        const isQueued = queueStartDate.getTime() > now.getTime();
+        const startTime = isQueued ? queueStartDate : now;
+        const durationMs = getSubscriptionDurationMs(s.planId, s.duration);
+        const expiresAt = new Date(startTime.getTime() + durationMs);
 
         const item: Subscription = {
           ...s,
-          startedAt: now.toISOString(),
+          startedAt: startTime.toISOString(),
           expiresAt: expiresAt.toISOString(),
-          isTrial: s.planId === "trial-3d",
+          isTrial: isTrialPlan,
           referralCodeUsed: referralCode,
+          isQueued,
+          status: isQueued ? "queued" : "active",
         };
         setSubscriptions((prev) => [item, ...prev]);
 
-        // Mark creator Active and update expiry
+        // Target expiration date for creator record
+        const currentExpTime = creator?.subscriptionExpiresAt
+          ? new Date(creator.subscriptionExpiresAt).getTime()
+          : 0;
+        const targetExp =
+          expiresAt.getTime() > currentExpTime
+            ? expiresAt.toISOString()
+            : creator?.subscriptionExpiresAt;
+
+        // Mark creator Active and update expiry + trial_started_at if trial
         setCreators((prev) =>
           prev.map((c) =>
             c.id === s.creatorId
-              ? { ...c, status: "Active" as CreatorStatus, subscriptionExpiresAt: expiresAt.toISOString() }
+              ? {
+                  ...c,
+                  status: "Active" as CreatorStatus,
+                  subscriptionExpiresAt: targetExp,
+                  ...(isTrialPlan ? { trialStartedAt: startTime.toISOString() } : {}),
+                }
               : c,
           ),
         );
 
         // Persist to Supabase
         await supabaseDb.addSubscription(item);
-        await supabaseDb.updateCreatorStatus(s.creatorId, "Active");
-        await supabaseDb.updateSubscriptionExpiry(s.creatorId, expiresAt, 0);
+        if (isTrialPlan) {
+          await supabaseDb.startFreeTrial(s.creatorId);
+        } else {
+          await supabaseDb.updateCreatorStatus(s.creatorId, "Active");
+        }
+        if (targetExp) {
+          await supabaseDb.updateSubscriptionExpiry(
+            s.creatorId,
+            new Date(targetExp),
+            creator?.referralBonusDays ?? 0,
+          );
+        }
 
         // If paid plan: generate referral code and fire referral reward
-        if (s.planId !== "trial-3d") {
-          const creator = creators.find((c) => c.id === s.creatorId);
+        if (!isTrialPlan) {
           if (creator && !creator.referralCode) {
             const code = generateReferralCode(creator.displayName || creator.name);
             await supabaseDb.setReferralCode(s.creatorId, code);
@@ -346,7 +460,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 ? new Date(referrer.subscriptionExpiresAt)
                 : null;
               const referrerActive = referrerExpiry ? referrerExpiry > now : false;
-              const referrerSub = subscriptions.find((sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d");
+              const referrerSub = subscriptions.find(
+                (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d",
+              );
               if (referrerActive || referrerSub) {
                 const baseExpiry = referrer.subscriptionExpiresAt
                   ? new Date(referrer.subscriptionExpiresAt)
@@ -360,12 +476,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   referredSubId: item.id,
                   daysDelta: 7,
                   eventType: "earned",
-                  note: `${thisCreator.name} subscribed to ${s.duration} (+7 Days added)`,
+                  note: `${thisCreator?.name || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
                 });
                 setCreators((prev) =>
                   prev.map((c) =>
                     c.id === referrer.id
-                      ? { ...c, subscriptionExpiresAt: newExpiry.toISOString(), referralBonusDays: newBonus }
+                      ? {
+                          ...c,
+                          subscriptionExpiresAt: newExpiry.toISOString(),
+                          referralBonusDays: newBonus,
+                        }
                       : c,
                   ),
                 );
@@ -420,6 +540,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
 
       startFreeTrial: async (creatorId: string) => {
+        const creator = creators.find((c) => c.id === creatorId);
+        const alreadyUsed =
+          Boolean(creator?.trialStartedAt) ||
+          subscriptions.some(
+            (sub) =>
+              sub.creatorId === creatorId &&
+              (sub.planId === "trial-3d" ||
+                sub.isTrial === true ||
+                sub.duration?.toLowerCase().includes("3 day")),
+          );
+        if (alreadyUsed) {
+          console.warn("Free trial can only be availed once per creator.");
+          return false;
+        }
+
         const now = new Date();
         const expiresAt = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
         const trialSub: Subscription = {
@@ -430,12 +565,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           startedAt: now.toISOString(),
           expiresAt: expiresAt.toISOString(),
           isTrial: true,
+          isQueued: false,
+          status: "active",
         };
         setSubscriptions((prev) => [trialSub, ...prev]);
         setCreators((prev) =>
           prev.map((c) =>
             c.id === creatorId
-              ? { ...c, status: "Active" as CreatorStatus, trialStartedAt: now.toISOString(), subscriptionExpiresAt: expiresAt.toISOString() }
+              ? {
+                  ...c,
+                  status: "Active" as CreatorStatus,
+                  trialStartedAt: now.toISOString(),
+                  subscriptionExpiresAt: expiresAt.toISOString(),
+                }
               : c,
           ),
         );

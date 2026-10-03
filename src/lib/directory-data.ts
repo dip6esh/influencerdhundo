@@ -99,38 +99,97 @@ export const PLANS = [
 
 export const PROMO_CODE_3DAYS = "TRYFREE3DAYS";
 
-export function getSubscriptionExpiry(sub: {
-  planId?: string;
-  duration?: string;
+export function getSubscriptionDurationMs(planId?: string, duration?: string): number {
+  if (planId === "trial-3d" || duration?.toLowerCase().includes("3 day")) {
+    return 3 * 24 * 60 * 60 * 1000;
+  }
+  if (planId === "1m" || duration?.toLowerCase().includes("1 month")) {
+    return 30 * 24 * 60 * 60 * 1000;
+  }
+  if (planId === "3m" || duration?.toLowerCase().includes("3 month")) {
+    return 90 * 24 * 60 * 60 * 1000;
+  }
+  if (planId === "6m" || duration?.toLowerCase().includes("6 month")) {
+    return 180 * 24 * 60 * 60 * 1000;
+  }
+  if (planId === "1y" || duration?.toLowerCase().includes("1 year")) {
+    return 365 * 24 * 60 * 60 * 1000;
+  }
+  return 30 * 24 * 60 * 60 * 1000;
+}
+
+export type SubscriptionLike = {
+  id?: string | undefined;
+  creatorId: string;
+  planId?: string | undefined;
+  duration?: string | undefined;
+  price?: number | undefined;
   startedAt: string;
+  expiresAt?: string | undefined;
+  isTrial?: boolean | undefined;
+  referralCodeUsed?: string | undefined;
+  isQueued?: boolean | undefined;
+  status?: string | undefined;
+};
+
+export function getSubscriptionExpiry(sub: {
+  planId?: string | undefined;
+  duration?: string | undefined;
+  startedAt: string;
+  expiresAt?: string | undefined;
 }): Date {
+  if (sub.expiresAt) {
+    const d = new Date(sub.expiresAt);
+    if (!isNaN(d.getTime())) return d;
+  }
   const started = new Date(sub.startedAt).getTime();
-  if (sub.planId === "trial-3d" || sub.duration?.toLowerCase().includes("3 day")) {
-    return new Date(started + 3 * 24 * 60 * 60 * 1000);
-  }
-  if (sub.planId === "1m" || sub.duration?.toLowerCase().includes("1 month")) {
-    return new Date(started + 30 * 24 * 60 * 60 * 1000);
-  }
-  if (sub.planId === "3m" || sub.duration?.toLowerCase().includes("3 month")) {
-    return new Date(started + 90 * 24 * 60 * 60 * 1000);
-  }
-  if (sub.planId === "6m" || sub.duration?.toLowerCase().includes("6 month")) {
-    return new Date(started + 180 * 24 * 60 * 60 * 1000);
-  }
-  if (sub.planId === "1y" || sub.duration?.toLowerCase().includes("1 year")) {
-    return new Date(started + 365 * 24 * 60 * 60 * 1000);
-  }
-  // Default fallback: 30 days
-  return new Date(started + 30 * 24 * 60 * 60 * 1000);
+  const dur = getSubscriptionDurationMs(sub.planId, sub.duration);
+  return new Date(started + dur);
+}
+
+export function isSubscriptionQueued(sub?: {
+  startedAt?: string | undefined;
+  isQueued?: boolean | undefined;
+  status?: string | undefined;
+}): boolean {
+  if (!sub) return false;
+  if (sub.isQueued || sub.status === "queued") return true;
+  if (sub.startedAt && new Date(sub.startedAt).getTime() > Date.now()) return true;
+  return false;
 }
 
 export function isSubscriptionActive(sub?: {
-  planId?: string;
-  duration?: string;
+  planId?: string | undefined;
+  duration?: string | undefined;
   startedAt: string;
+  expiresAt?: string | undefined;
+  isQueued?: boolean | undefined;
+  status?: string | undefined;
 }): boolean {
   if (!sub || !sub.startedAt) return false;
-  return new Date() < getSubscriptionExpiry(sub);
+  if (isSubscriptionQueued(sub)) return false;
+  const now = Date.now();
+  const started = new Date(sub.startedAt).getTime();
+  const expiry = getSubscriptionExpiry(sub).getTime();
+  return now >= started && now < expiry;
+}
+
+export function getActiveSubscription<T extends SubscriptionLike>(
+  subscriptions: T[],
+  creatorId: string,
+): T | undefined {
+  const userSubs = subscriptions.filter((s) => s.creatorId === creatorId);
+  // Find currently active subscription (started <= now < expiry and not queued)
+  return userSubs.find((s) => isSubscriptionActive(s));
+}
+
+export function getQueuedSubscriptions<T extends SubscriptionLike>(
+  subscriptions: T[],
+  creatorId: string,
+): T[] {
+  return subscriptions
+    .filter((s) => s.creatorId === creatorId && isSubscriptionQueued(s))
+    .sort((a, b) => new Date(a.startedAt).getTime() - new Date(b.startedAt).getTime());
 }
 
 /** Generates a unique referral code for a creator based on their display name */
@@ -514,7 +573,7 @@ export type Filters = {
   category: string;
   otherCategory?: string | undefined;
   followerRange: [number, number];
-  budget: string;
+  budgetRange: [number, number];
   contentTypes: string[];
   collabType: string;
   language: string;
@@ -529,7 +588,7 @@ export const EMPTY_FILTERS: Filters = {
   category: "",
   otherCategory: "",
   followerRange: [500, 50000],
-  budget: "",
+  budgetRange: [0, 50000],
   contentTypes: [],
   collabType: "",
   language: "",
@@ -568,9 +627,10 @@ export function filterCreators(creators: Creator[], f: Filters) {
       if (c.followers < min) return false;
       if (max < 50000 && c.followers > max) return false;
     }
-    if (f.budget) {
-      const band = BUDGET_BANDS.find((b) => b.label === f.budget);
-      if (band && c.startingPrice > band.max) return false;
+    if (f.budgetRange) {
+      const [min, max] = f.budgetRange;
+      if (c.startingPrice < min) return false;
+      if (max < 50000 && c.startingPrice > max) return false;
     }
     if (f.collabType) {
       if (

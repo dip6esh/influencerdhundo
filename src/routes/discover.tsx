@@ -13,7 +13,6 @@ import {
 import { Slider } from "@/components/ui/slider";
 import { useAppState } from "@/lib/app-state";
 import {
-  BUDGET_BANDS,
   CATEGORIES,
   CITIES,
   COLLAB_TYPES,
@@ -22,6 +21,7 @@ import {
   LANGUAGES,
   filterCreators,
   formatFollowers,
+  formatPrice,
   type Filters,
 } from "@/lib/directory-data";
 
@@ -69,7 +69,8 @@ function Discover() {
     Boolean(filters.otherCategory) ||
     filters.followerRange[0] > 500 ||
     filters.followerRange[1] < 50000 ||
-    Boolean(filters.budget) ||
+    filters.budgetRange[0] > 0 ||
+    filters.budgetRange[1] < 50000 ||
     filters.contentTypes.length > 0 ||
     Boolean(filters.collabType) ||
     Boolean(filters.language) ||
@@ -100,8 +101,8 @@ function Discover() {
             <div className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
               <div className="space-y-6">
                 
-                {/* SECTION 1: 2x2 CLEAN DROPDOWN / INPUT GRID */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                {/* SECTION 1: 3-FIELD LOCATION & CATEGORY GRID */}
+                <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                   <Field label="City">
                     <DropdownSelect
                       value={filters.city}
@@ -140,18 +141,6 @@ function Discover() {
                       }))}
                     />
                   </Field>
-
-                  <Field label="Budget">
-                    <DropdownSelect
-                      value={filters.budget}
-                      onChange={(val) => setFilters({ ...filters, budget: val })}
-                      placeholder="Any budget"
-                      options={BUDGET_BANDS.map((b) => ({
-                        label: b.label,
-                        value: b.label,
-                      }))}
-                    />
-                  </Field>
                 </div>
 
                 {/* CUSTOM CATEGORY INPUT (When 'Other' selected in dropdown) */}
@@ -173,39 +162,79 @@ function Discover() {
                   </div>
                 )}
 
-                {/* SECTION 2: CREATOR SIZE RANGE SLIDER */}
-                <div className="rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60">
-                  <div className="flex items-center justify-between mb-3">
-                    <Label>Follower Size</Label>
-                    <span className="text-xs font-semibold text-saffrondeep px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-                      {filters.followerRange[0] === 500 && filters.followerRange[1] >= 50000
-                        ? "Any size (500 – 50K+)"
-                        : filters.followerRange[1] >= 50000
-                          ? `${formatFollowers(filters.followerRange[0])} – 50K+`
-                          : `${formatFollowers(filters.followerRange[0])} – ${formatFollowers(filters.followerRange[1])}`}
-                    </span>
+                {/* SECTION 2: DUAL RANGE SLIDERS (FOLLOWER SIZE & BUDGET) */}
+                <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
+                  {/* FOLLOWER SIZE RANGE */}
+                  <div className="rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-3">
+                      <Label>Follower Size</Label>
+                      <span className="text-xs font-semibold text-saffrondeep px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+                        {filters.followerRange[0] === 500 && filters.followerRange[1] >= 50000
+                          ? "Any size"
+                          : filters.followerRange[1] >= 50000
+                            ? `${formatFollowers(filters.followerRange[0])} – 50K+`
+                            : `${formatFollowers(filters.followerRange[0])} – ${formatFollowers(filters.followerRange[1])}`}
+                      </span>
+                    </div>
+                    <div className="pt-2 pb-1 px-1">
+                      <Slider
+                        value={filters.followerRange}
+                        onValueChange={(val) =>
+                          setFilters({
+                            ...filters,
+                            followerRange: [val[0] ?? 500, val[1] ?? 50000],
+                          })
+                        }
+                        min={500}
+                        max={50000}
+                        step={500}
+                        minStepsBetweenThumbs={1}
+                      />
+                      <div className="flex justify-between text-[11px] text-muted-foreground mt-2 font-medium">
+                        <span>500</span>
+                        <span>10K</span>
+                        <span>20K</span>
+                        <span>30K</span>
+                        <span>40K</span>
+                        <span>50K+</span>
+                      </div>
+                    </div>
                   </div>
-                  <div className="pt-2 pb-1 px-1">
-                    <Slider
-                      value={filters.followerRange}
-                      onValueChange={(val) =>
-                        setFilters({
-                          ...filters,
-                          followerRange: [val[0] ?? 500, val[1] ?? 50000],
-                        })
-                      }
-                      min={500}
-                      max={50000}
-                      step={500}
-                      minStepsBetweenThumbs={1}
-                    />
-                    <div className="flex justify-between text-[11px] text-muted-foreground mt-2 font-medium">
-                      <span>500</span>
-                      <span>10K</span>
-                      <span>20K</span>
-                      <span>30K</span>
-                      <span>40K</span>
-                      <span>50K+</span>
+
+                  {/* BUDGET RANGE (0 - 50,000) */}
+                  <div className="rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60 flex flex-col justify-between">
+                    <div className="flex items-center justify-between mb-3">
+                      <Label>Budget Range</Label>
+                      <span className="text-xs font-semibold text-saffrondeep px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
+                        {filters.budgetRange[0] === 0 && filters.budgetRange[1] >= 50000
+                          ? "Any budget"
+                          : filters.budgetRange[1] >= 50000
+                            ? `${formatPrice(filters.budgetRange[0])} – ₹50,000+`
+                            : `${formatPrice(filters.budgetRange[0])} – ${formatPrice(filters.budgetRange[1])}`}
+                      </span>
+                    </div>
+                    <div className="pt-2 pb-1 px-1">
+                      <Slider
+                        value={filters.budgetRange}
+                        onValueChange={(val) =>
+                          setFilters({
+                            ...filters,
+                            budgetRange: [val[0] ?? 0, val[1] ?? 50000],
+                          })
+                        }
+                        min={0}
+                        max={50000}
+                        step={500}
+                        minStepsBetweenThumbs={1}
+                      />
+                      <div className="flex justify-between text-[11px] text-muted-foreground mt-2 font-medium">
+                        <span>₹0</span>
+                        <span>₹10K</span>
+                        <span>₹20K</span>
+                        <span>₹30K</span>
+                        <span>₹40K</span>
+                        <span>₹50K+</span>
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -319,10 +348,10 @@ function Discover() {
               </div>
 
               {/* ACTION BUTTONS */}
-              <div className="mt-6 flex flex-col sm:flex-row gap-3 items-center">
+              <div className="mt-6 flex flex-col items-center gap-3">
                 <Button
                   variant="primary"
-                  className="w-full py-4 text-base sm:text-lg font-semibold flex-1 shadow-md hover:shadow-lg transition-all cursor-pointer"
+                  className="w-full py-4 text-base sm:text-lg font-semibold shadow-md hover:shadow-lg transition-all cursor-pointer"
                   onClick={search}
                 >
                   Find Creators
@@ -334,7 +363,7 @@ function Discover() {
                       setFilters(EMPTY_FILTERS);
                       setResults(null);
                     }}
-                    className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4 px-3 py-2 cursor-pointer"
+                    className="text-xs font-medium text-muted-foreground hover:text-foreground underline underline-offset-4 px-3 py-1 cursor-pointer transition-colors"
                   >
                     Clear all
                   </button>

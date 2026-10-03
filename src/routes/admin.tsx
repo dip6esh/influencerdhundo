@@ -153,17 +153,31 @@ function Admin() {
             <p className="text-sm text-muted-foreground">No subscriptions recorded yet.</p>
           ) : (
             <ul className="space-y-3 text-sm">
-              {subscriptions.map((s) => (
-                <li key={s.startedAt} className="flex flex-wrap justify-between gap-2">
-                  <span className="font-semibold">
-                    {creators.find((c) => c.id === s.creatorId)?.name ?? s.creatorId}
-                  </span>
-                  <span className="text-muted-foreground">
-                    {s.duration} · {formatPrice(s.price)} ·{" "}
-                    {new Date(s.startedAt).toLocaleDateString("en-IN")}
-                  </span>
-                </li>
-              ))}
+              {subscriptions.map((s) => {
+                const isQueued = s.isQueued || s.status === "queued" || new Date(s.startedAt).getTime() > Date.now();
+                return (
+                  <li key={s.id || s.startedAt} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5 last:border-0">
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold">
+                        {creators.find((c) => c.id === s.creatorId)?.name ?? s.creatorId}
+                      </span>
+                      {isQueued ? (
+                        <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-bold text-tealdeep">
+                          Queued (starts {new Date(s.startedAt).toLocaleDateString("en-IN")})
+                        </span>
+                      ) : (
+                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold text-saffrondeep">
+                          Active
+                        </span>
+                      )}
+                    </div>
+                    <span className="text-muted-foreground">
+                      {s.duration} · {formatPrice(s.price)} ·{" "}
+                      {new Date(s.startedAt).toLocaleDateString("en-IN")}
+                    </span>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
