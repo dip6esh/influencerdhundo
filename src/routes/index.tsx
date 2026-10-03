@@ -42,21 +42,25 @@ function ArrowLink({
 }: {
   to: string;
   label: string;
-  variant: "ink" | "glass";
+  variant: "ink" | "glass" | "primary";
 }) {
   return (
     <Link
       to={to}
       className={
         variant === "ink"
-          ? "flex items-center justify-between gap-3 rounded-xl bg-foreground px-5 py-4 text-left hover:bg-foreground/90 transition-colors"
-          : "glass-card flex items-center justify-between gap-3 rounded-xl px-5 py-4 text-left hover:border-foreground/30 transition-colors"
+          ? "flex items-center justify-between gap-3 rounded-xl bg-foreground px-5 py-4 text-left hover:bg-foreground/90 transition-all shadow-sm active:scale-98"
+          : variant === "primary"
+          ? "flex items-center justify-between gap-3 rounded-xl bg-primary px-5 py-4 text-left hover:bg-primary/90 transition-all shadow-sm active:scale-98"
+          : "glass-card flex items-center justify-between gap-3 rounded-xl px-5 py-4 text-left hover:border-foreground/30 transition-all active:scale-98"
       }
     >
       <span
         className={
           variant === "ink"
             ? "font-display text-lg font-semibold text-background"
+            : variant === "primary"
+            ? "font-display text-lg font-semibold text-primary-foreground"
             : "font-display text-lg font-semibold text-foreground"
         }
       >
@@ -66,6 +70,8 @@ function ArrowLink({
         className={
           variant === "ink"
             ? "text-lg leading-none text-background/70"
+            : variant === "primary"
+            ? "text-lg leading-none text-primary-foreground/90 font-bold"
             : "text-lg leading-none text-muted-foreground"
         }
       >
@@ -93,7 +99,7 @@ function Landing() {
 
           <div className="mt-8 grid max-w-md grid-cols-1 gap-3 md:max-w-xl md:grid-cols-2">
             <ArrowLink to="/discover" label="Find a Creator" variant="ink" />
-            <ArrowLink to="/creator/register" label="I'm a Creator" variant="glass" />
+            <ArrowLink to="/creator/register" label="I'm a Creator" variant="primary" />
           </div>
         </div>
       </section>

@@ -13,6 +13,9 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PrivacyRouteImport } from './routes/privacy'
+import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
+import { Route as TermsRouteImport } from './routes/terms'
 import { Route as BusinessLoginRouteImport } from './routes/business.login'
 import { Route as BusinessSignupRouteImport } from './routes/business.signup'
 import { Route as CreatorDashboardRouteImport } from './routes/creator.dashboard'
@@ -39,6 +42,21 @@ const DiscoverRoute = DiscoverRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PrivacyRoute = PrivacyRouteImport.update({
+  id: '/privacy',
+  path: '/privacy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const RefundPolicyRoute = RefundPolicyRouteImport.update({
+  id: '/refund-policy',
+  path: '/refund-policy',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const TermsRoute = TermsRouteImport.update({
+  id: '/terms',
+  path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
 const BusinessLoginRoute = BusinessLoginRouteImport.update({
@@ -82,6 +100,9 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/discover': typeof DiscoverRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/terms': typeof TermsRoute
   '/business/login': typeof BusinessLoginRoute
   '/business/signup': typeof BusinessSignupRoute
   '/creator/dashboard': typeof CreatorDashboardRoute
@@ -95,6 +116,9 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/discover': typeof DiscoverRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/terms': typeof TermsRoute
   '/business/login': typeof BusinessLoginRoute
   '/business/signup': typeof BusinessSignupRoute
   '/creator/dashboard': typeof CreatorDashboardRoute
@@ -109,6 +133,9 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/discover': typeof DiscoverRoute
   '/login': typeof LoginRoute
+  '/privacy': typeof PrivacyRoute
+  '/refund-policy': typeof RefundPolicyRoute
+  '/terms': typeof TermsRoute
   '/business/login': typeof BusinessLoginRoute
   '/business/signup': typeof BusinessSignupRoute
   '/creator/dashboard': typeof CreatorDashboardRoute
@@ -124,6 +151,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/discover'
     | '/login'
+    | '/privacy'
+    | '/refund-policy'
+    | '/terms'
     | '/business/login'
     | '/business/signup'
     | '/creator/dashboard'
@@ -137,6 +167,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/discover'
     | '/login'
+    | '/privacy'
+    | '/refund-policy'
+    | '/terms'
     | '/business/login'
     | '/business/signup'
     | '/creator/dashboard'
@@ -150,6 +183,9 @@ export interface FileRouteTypes {
     | '/admin'
     | '/discover'
     | '/login'
+    | '/privacy'
+    | '/refund-policy'
+    | '/terms'
     | '/business/login'
     | '/business/signup'
     | '/creator/dashboard'
@@ -164,6 +200,9 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   DiscoverRoute: typeof DiscoverRoute
   LoginRoute: typeof LoginRoute
+  PrivacyRoute: typeof PrivacyRoute
+  RefundPolicyRoute: typeof RefundPolicyRoute
+  TermsRoute: typeof TermsRoute
   BusinessLoginRoute: typeof BusinessLoginRoute
   BusinessSignupRoute: typeof BusinessSignupRoute
   CreatorDashboardRoute: typeof CreatorDashboardRoute
@@ -201,6 +240,27 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/privacy': {
+      id: '/privacy'
+      path: '/privacy'
+      fullPath: '/privacy'
+      preLoaderRoute: typeof PrivacyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/refund-policy': {
+      id: '/refund-policy'
+      path: '/refund-policy'
+      fullPath: '/refund-policy'
+      preLoaderRoute: typeof RefundPolicyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/terms': {
+      id: '/terms'
+      path: '/terms'
+      fullPath: '/terms'
+      preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/business/login': {
@@ -260,6 +320,9 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   DiscoverRoute: DiscoverRoute,
   LoginRoute: LoginRoute,
+  PrivacyRoute: PrivacyRoute,
+  RefundPolicyRoute: RefundPolicyRoute,
+  TermsRoute: TermsRoute,
   BusinessLoginRoute: BusinessLoginRoute,
   BusinessSignupRoute: BusinessSignupRoute,
   CreatorDashboardRoute: CreatorDashboardRoute,

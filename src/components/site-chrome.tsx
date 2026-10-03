@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { useAppState } from "@/lib/app-state";
 import {
   Building2,
@@ -10,6 +10,7 @@ import {
   Menu,
   X,
   Gift,
+  Mail,
 } from "lucide-react";
 
 export function SiteHeader() {
@@ -19,6 +20,8 @@ export function SiteHeader() {
   const isLoggedIn = !!(business || myCreator);
 
   const [menuOpen, setMenuOpen] = useState(false);
+  const routerState = useRouterState();
+  const isLandingPage = routerState.location.pathname === "/";
 
   // Close menu on route change / ESC
   useEffect(() => {
@@ -39,12 +42,23 @@ export function SiteHeader() {
 
   const closeMenu = () => setMenuOpen(false);
 
+  const handleLogoClick = (e: React.MouseEvent) => {
+    closeMenu();
+    if (isLandingPage || window.location.pathname === "/") {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (window.location.hash) {
+        window.history.pushState(null, "", "/");
+      }
+    }
+  };
+
   return (
     <>
       <header className="sticky top-0 z-30 border-b border-border bg-background/90 backdrop-blur-md">
         <div className="mx-auto flex max-w-5xl items-center justify-between px-5 py-3">
           {/* LOGO */}
-          <Link to="/" className="flex items-center gap-2" onClick={closeMenu}>
+          <Link to="/" className="flex items-center gap-2" onClick={handleLogoClick}>
             <img
               src="/logo.png"
               alt="Influencer Dhundo logo"
@@ -169,7 +183,7 @@ export function SiteHeader() {
         <div className="flex items-center justify-between px-5 py-4 border-b border-border">
           <Link
             to="/"
-            onClick={closeMenu}
+            onClick={handleLogoClick}
             className="flex items-center gap-2"
           >
             <img
@@ -320,27 +334,134 @@ export function SiteHeader() {
 }
 
 export function SiteFooter() {
+  const routerState = useRouterState();
+  const isLandingPage = routerState.location.pathname === "/";
+
+  const handleLogoClick = (e: React.MouseEvent) => {
+    if (isLandingPage || window.location.pathname === "/") {
+      e.preventDefault();
+      window.scrollTo({ top: 0, behavior: "smooth" });
+      if (window.location.hash) {
+        window.history.pushState(null, "", "/");
+      }
+    }
+  };
+
   return (
-    <footer className="border-t border-border bg-secondary/50">
-      <div className="mx-auto flex max-w-5xl flex-wrap items-center justify-between gap-3 px-5 py-6 text-xs text-muted-foreground">
-        <p>Influencer Dhundo — a directory, not an agency.</p>
-        <nav className="flex flex-wrap gap-4">
-          <Link to="/discover" className="hover:text-foreground">
-            Find creators
-          </Link>
-          <a href="/#pricing" className="hover:text-foreground">
-            Pricing &amp; Plans
-          </a>
-          <Link to="/business/login" className="hover:text-foreground">
-            For businesses
-          </Link>
-          <Link to="/creator/login" className="hover:text-foreground">
-            For creators
-          </Link>
-          <Link to="/admin" className="hover:text-foreground">
-            Admin
-          </Link>
-        </nav>
+    <footer className="border-t border-border bg-card/60">
+      <div className="mx-auto max-w-5xl px-5 py-12 md:py-16">
+        <div className="grid grid-cols-1 gap-8 sm:grid-cols-2 lg:grid-cols-5 lg:gap-10">
+          {/* Brand & Description */}
+          <div className="space-y-4 sm:col-span-2">
+            <Link to="/" className="inline-flex items-center gap-2.5" onClick={handleLogoClick}>
+              <img
+                src="/logo.png"
+                alt="Influencer Dhundo logo"
+                className="size-8 rounded-full ring-1 ring-border/50"
+              />
+              <span className="font-display text-lg font-bold tracking-tight text-foreground">
+                Influencer <span className="text-saffrondeep">Dhundo</span>
+              </span>
+            </Link>
+            <p className="text-xs sm:text-sm text-muted-foreground leading-relaxed max-w-sm">
+              Discover and connect with local creators in your city. Direct contact, 0% commission, and transparent pricing.
+            </p>
+            <div className="pt-1">
+              <a
+                href="mailto:support@influencerdhundo.com"
+                className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
+              >
+                <Mail className="size-3.5 text-primary" />
+                <span>support@influencerdhundo.com</span>
+              </a>
+            </div>
+          </div>
+
+          {/* Creators */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-foreground">
+              For Creators
+            </p>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link to="/creator/register" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Join as Creator
+                </Link>
+              </li>
+              <li>
+                <Link to="/creator/login" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Creator Login
+                </Link>
+              </li>
+              <li>
+                <a href="/#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Pricing &amp; 3-Day Trial
+                </a>
+              </li>
+              <li>
+                <Link to="/creator/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Creator Dashboard
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Businesses */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-foreground">
+              For Businesses
+            </p>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link to="/discover" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Find Creators
+                </Link>
+              </li>
+              <li>
+                <Link to="/business/signup" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Business Sign Up
+                </Link>
+              </li>
+              <li>
+                <Link to="/business/login" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Business Login
+                </Link>
+              </li>
+            </ul>
+          </div>
+
+          {/* Legal & Trust */}
+          <div className="space-y-3">
+            <p className="text-xs font-bold uppercase tracking-wider text-foreground">
+              Legal &amp; Policy
+            </p>
+            <ul className="space-y-2 text-xs">
+              <li>
+                <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Privacy Policy
+                </Link>
+              </li>
+              <li>
+                <Link to="/terms" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Terms &amp; Conditions
+                </Link>
+              </li>
+              <li>
+                <Link to="/refund-policy" className="text-muted-foreground hover:text-foreground transition-colors">
+                  Refund &amp; Cancellation
+                </Link>
+              </li>
+            </ul>
+          </div>
+        </div>
+
+        {/* Bottom Bar */}
+        <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
+          <p>© {new Date().getFullYear()} Influencer Dhundo. All rights reserved.</p>
+          <p className="text-center sm:text-right">
+            Influencer Dhundo is a discovery directory, not an agency.
+          </p>
+        </div>
       </div>
     </footer>
   );
