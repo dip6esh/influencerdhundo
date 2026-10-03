@@ -126,13 +126,15 @@ function Dashboard() {
     }
   }, [mine, userSubs, upsertCreator]);
 
-  // Subscription expiration check
-  const subActive = isSubscriptionActive(activeSub);
-  const subExpiry = activeSub
+  // Subscription expiration check (incorporating referral bonus days)
+  const subExpiry = mine?.subscriptionExpiresAt
+    ? new Date(mine.subscriptionExpiresAt)
+    : activeSub
     ? getSubscriptionExpiry(activeSub)
     : latestSub
     ? getSubscriptionExpiry(latestSub)
     : null;
+  const subActive = subExpiry ? subExpiry.getTime() > Date.now() : isSubscriptionActive(activeSub);
   const isTrial =
     sub?.planId === "trial-3d" || sub?.duration?.toLowerCase().includes("3 day");
 

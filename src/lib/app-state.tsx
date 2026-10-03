@@ -499,6 +499,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                       : c,
                   ),
                 );
+                setSubscriptions((prev) =>
+                  prev.map((sub) =>
+                    sub.creatorId === referrer.id && (sub.status === "active" || !sub.isQueued)
+                      ? { ...sub, expiresAt: newExpiry.toISOString() }
+                      : sub,
+                  ),
+                );
                 if (myCreatorId === referrer.id) {
                   const events = await supabaseDb.fetchReferralEvents(referrer.id);
                   setReferralEvents(events);

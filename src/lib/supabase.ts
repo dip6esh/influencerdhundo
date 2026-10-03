@@ -788,14 +788,15 @@ export const supabaseDb = {
     }
   },
 
-  /** Update the subscription_expires_at and referral_bonus_days on a creator row */
+  /** Update the subscription_expires_at and referral_bonus_days on a creator row and their active subscription */
   async updateSubscriptionExpiry(
     creatorId: string,
     expiresAt: Date,
     bonusDays: number,
   ): Promise<boolean> {
     try {
-      const { error } = await supabase
+      // 1. Update creators table
+      const { error: cErr } = await supabase
         .from("creators")
         .update({
           subscription_expires_at: expiresAt.toISOString(),
@@ -803,7 +804,15 @@ export const supabaseDb = {
           updated_at: new Date().toISOString(),
         })
         .eq("id", creatorId);
-      return !error;
+
+      // 2. Also update the active subscription in subscriptions table
+      await supabase
+        .from("subscriptions")
+        .update({ expires_at: expiresAt.toISOString() })
+        .eq("creator_id", creatorId)
+        .eq("status", "active");
+
+      return !cErr;
     } catch {
       return false;
     }
