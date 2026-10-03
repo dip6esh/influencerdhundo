@@ -337,162 +337,307 @@ function Dashboard() {
             </div>
           ) : null}
 
-          <div className="max-w-2xl">
-            <SectionEyebrow>Creator dashboard</SectionEyebrow>
-            <div className="mt-2 flex flex-wrap items-center gap-3">
-              <h1 className="text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
-                {mine.name}
-              </h1>
-              <StatusPill status={mine.status} />
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+            <div>
+              <SectionEyebrow>Creator Portal</SectionEyebrow>
+              <div className="mt-1 flex flex-wrap items-center gap-3">
+                <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-foreground md:text-4xl">
+                  {mine.name}
+                </h1>
+                <StatusPill status={mine.status} />
+              </div>
+              <p className="mt-1.5 text-sm text-muted-foreground">
+                {STATUS_NOTE[mine.status]}
+              </p>
             </div>
-            <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">
-              {STATUS_NOTE[mine.status]}
-            </p>
+
+            {/* QUICK HEADER ACTIONS */}
+            <div className="flex flex-wrap items-center gap-2.5">
+              <Link
+                to="/creators/$creatorId"
+                params={{ creatorId: mine.id }}
+                search={{ preview: true }}
+                className="inline-flex items-center gap-2 rounded-xl bg-background px-4 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border/80 hover:bg-secondary hover:ring-border transition-all shadow-xs"
+              >
+                <ArrowUpRight className="size-4 text-muted-foreground" />
+                View Public Profile
+              </Link>
+              <Link
+                to="/creator/register"
+                className="inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-xs"
+              >
+                <Check className="size-3.5 hidden" />
+                Edit Profile
+              </Link>
+            </div>
           </div>
 
           {/* MAIN PROFILE & SUBSCRIPTION CARDS */}
-          <div className="mt-8 grid gap-6 md:grid-cols-3">
-            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
-              <div className="flex flex-col sm:flex-row gap-5">
-                <img
-                  src={mine.photo}
-                  alt={mine.name}
-                  loading="lazy"
-                  width={816}
-                  height={816}
-                  className="size-20 shrink-0 rounded-2xl object-cover ring-1 ring-border shadow-sm"
-                />
-                <div className="min-w-0 text-sm space-y-1">
-                  <p className="font-semibold text-lg">{mine.instagram}</p>
-                  <p className="text-tealdeep font-medium">
-                    {formatFollowers(mine.followers)} followers · 📍{" "}
-                    {[mine.locality, mine.city].filter(Boolean).join(", ")}
-                    {calculateAge(mine.birthDate) !== null
-                      ? ` · ${calculateAge(mine.birthDate)} yrs old`
-                      : ""}
-                  </p>
-                  <p className="text-muted-foreground">
-                    {mine.categories.join(" · ") || "No categories yet"}
-                  </p>
-                  <p className="pt-1 font-display text-base font-semibold text-saffrondeep">
-                    Starting from {formatPrice(mine.startingPrice)}
-                  </p>
+          <div className="mt-8 grid gap-6 md:grid-cols-3 items-stretch">
+            {/* CREATOR PROFILE HERO CARD */}
+            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-6 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between">
+              <div>
+                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-border/60">
+                  <div className="flex items-center gap-4">
+                    <div className="relative">
+                      <img
+                        src={mine.photo}
+                        alt={mine.name}
+                        loading="lazy"
+                        width={816}
+                        height={816}
+                        className="size-16 sm:size-20 rounded-2xl object-cover ring-2 ring-border/60 shadow-md bg-secondary"
+                      />
+                      {mine.status === "Active" && (
+                        <span
+                          className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
+                          title="Directory Live"
+                        />
+                      )}
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h2 className="text-lg sm:text-xl font-display font-bold text-foreground">
+                          {mine.displayName || mine.name}
+                        </h2>
+                        {mine.status === "Active" && (
+                          <span className="inline-flex items-center rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-tealdeep">
+                            Verified Creator
+                          </span>
+                        )}
+                      </div>
+                      <p className="text-sm font-mono font-medium text-tealdeep mt-0.5">
+                        {mine.instagram.startsWith("@") ? mine.instagram : `@${mine.instagram}`}
+                      </p>
+                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                        <span>📍 {[mine.locality, mine.city].filter(Boolean).join(", ") || "Location not set"}</span>
+                        {calculateAge(mine.birthDate) !== null && (
+                          <>
+                            <span>•</span>
+                            <span>{calculateAge(mine.birthDate)} yrs old</span>
+                          </>
+                        )}
+                      </p>
+                    </div>
+                  </div>
+
+                  <div className="shrink-0 flex sm:flex-col items-end gap-1.5">
+                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                      Starting Rate
+                    </span>
+                    <span className="font-display text-lg sm:text-xl font-bold text-saffrondeep">
+                      {formatPrice(mine.startingPrice)}
+                    </span>
+                  </div>
+                </div>
+
+                {/* CATEGORIES & STATS GRID */}
+                <div className="py-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
+                  <div className="rounded-xl bg-background/70 border border-border/70 p-3">
+                    <span className="text-[11px] font-medium text-muted-foreground block">
+                      Audience Size
+                    </span>
+                    <p className="text-base sm:text-lg font-display font-bold text-foreground mt-0.5">
+                      {formatFollowers(mine.followers)}
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">Instagram followers</span>
+                  </div>
+
+                  <div className="rounded-xl bg-background/70 border border-border/70 p-3">
+                    <span className="text-[11px] font-medium text-muted-foreground block">
+                      Categories & Niche
+                    </span>
+                    <div className="flex flex-wrap gap-1 mt-1">
+                      {mine.categories && mine.categories.length > 0 ? (
+                        mine.categories.slice(0, 2).map((cat) => (
+                          <span
+                            key={cat}
+                            className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground"
+                          >
+                            {cat}
+                          </span>
+                        ))
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">None set</span>
+                      )}
+                      {mine.categories && mine.categories.length > 2 && (
+                        <span className="text-[10px] text-muted-foreground font-medium self-center">
+                          +{mine.categories.length - 2} more
+                        </span>
+                      )}
+                    </div>
+                  </div>
+
+                  <div className="col-span-2 sm:col-span-1 rounded-xl bg-background/70 border border-border/70 p-3">
+                    <span className="text-[11px] font-medium text-muted-foreground block">
+                      Directory Listing
+                    </span>
+                    <p className="text-sm font-semibold text-foreground mt-1 flex items-center gap-1.5">
+                      <span
+                        className={`size-2 rounded-full ${
+                          mine.status === "Active"
+                            ? "bg-tealdeep animate-pulse"
+                            : mine.status === "Expired"
+                              ? "bg-rose"
+                              : "bg-muted-foreground"
+                        }`}
+                      />
+                      {mine.status === "Active"
+                        ? "Public & Searchable"
+                        : mine.status === "Expired"
+                          ? "Hidden (Expired)"
+                          : "Draft Status"}
+                    </p>
+                    <span className="text-[10px] text-muted-foreground">
+                      {mine.status === "Active" ? "Visible to brands" : "Activate plan to show"}
+                    </span>
+                  </div>
                 </div>
               </div>
 
-              <div className="mt-8 grid gap-3 sm:grid-cols-3">
-                <Link
-                  to="/creator/register"
-                  className="rounded-xl bg-foreground px-4 py-3 text-center text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
-                >
-                  Edit profile
-                </Link>
-                <Link
-                  to="/creators/$creatorId"
-                  params={{ creatorId: mine.id }}
-                  search={{ preview: true }}
-                  className="rounded-xl bg-background px-4 py-3 text-center text-sm font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
-                >
-                  View public profile
-                </Link>
-                <Link
-                  to="/creator/plans"
-                  className="rounded-xl bg-primary px-4 py-3 text-center text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
-                >
-                  {mine.status === "Active" ? "Manage plan" : "Activate plan"}
-                </Link>
+              {/* CARD FOOTER ACTION BAR */}
+              <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+                <span className="text-xs text-muted-foreground">
+                  Want to update your collaboration rates, photos, or bio?
+                </span>
+                <div className="flex items-center gap-2 w-full sm:w-auto">
+                  <Link
+                    to="/creator/register"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-foreground hover:bg-secondary/80 ring-1 ring-border transition-all"
+                  >
+                    Edit Profile
+                  </Link>
+                  <Link
+                    to="/creators/$creatorId"
+                    params={{ creatorId: mine.id }}
+                    search={{ preview: true }}
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background hover:bg-foreground/90 transition-all shadow-xs"
+                  >
+                    <ArrowUpRight className="size-3.5" />
+                    Preview Listing
+                  </Link>
+                </div>
               </div>
             </Card>
 
-            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
-              <h2 className="text-xl font-display font-semibold">Subscription</h2>
-              {sub ? (
-                <div className="mt-4 space-y-3 text-sm">
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Current Plan
+            {/* SUBSCRIPTION STATUS CARD */}
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between">
+              <div>
+                <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                  <h2 className="text-base font-display font-semibold text-foreground flex items-center gap-2">
+                    <Sparkles className="size-4 text-primary" />
+                    Membership Plan
+                  </h2>
+                  {subActive ? (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-tealdeep">
+                      <span className="size-1.5 rounded-full bg-tealdeep" />
+                      Active
                     </span>
-                    <p className="text-lg font-semibold text-foreground">{sub.duration}</p>
-                  </div>
-                  <div>
-                    <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Amount
+                  ) : (
+                    <span className="inline-flex items-center gap-1 rounded-full bg-rose/15 px-2.5 py-0.5 text-[11px] font-bold text-rose">
+                      Inactive
                     </span>
-                    <p className="font-medium text-saffrondeep">{formatPrice(sub.price ?? 0)}</p>
-                  </div>
-                  <div className="border-t border-border pt-2.5 text-xs text-muted-foreground space-y-1">
-                    <p>
-                      Started:{" "}
-                      {new Date(sub.startedAt).toLocaleDateString("en-IN", {
-                        month: "short",
-                        day: "numeric",
-                        year: "numeric",
-                      })}
-                    </p>
-                    {subExpiry ? (
-                      <p className="flex items-center gap-1 font-medium text-foreground">
-                        <Clock className="size-3.5 text-primary" />
-                        {subActive
-                          ? `Ends: ${subExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", hour: "2-digit", minute: "2-digit" })} (${formatTimeRemaining(subExpiry)})`
-                          : "Ended"}
-                      </p>
-                    ) : null}
-                    {netBonusDays > 0 ? (
-                      <p className="font-medium text-tealdeep">
-                        🎁 Includes +{netBonusDays} bonus referral days
-                      </p>
-                    ) : null}
-                  </div>
+                  )}
+                </div>
 
-                  {/* QUEUED PLANS SUB-SECTION */}
-                  {queuedSubs.length > 0 ? (
-                    <div className="mt-4 pt-3 border-t border-border">
-                      <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-tealdeep mb-2">
-                        <span className="flex items-center gap-1">
-                          <CalendarClock className="size-3.5" /> Next in Queue
-                        </span>
-                        <span className="rounded-full bg-accent/20 text-tealdeep px-2 py-0.5 text-[10px] font-bold">
-                          Auto-activates
+                {sub ? (
+                  <div className="mt-4 space-y-3.5 text-sm">
+                    <div>
+                      <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        Current Plan
+                      </span>
+                      <div className="flex items-baseline justify-between mt-0.5">
+                        <p className="text-xl font-display font-bold text-foreground">{sub.duration}</p>
+                        <p className="font-semibold text-saffrondeep">
+                          {sub.price && sub.price > 0 ? formatPrice(sub.price) : "Free Trial"}
+                        </p>
+                      </div>
+                    </div>
+
+                    {/* Expiry & Timing */}
+                    <div className="rounded-xl bg-background/80 border border-border/70 p-3 text-xs space-y-1.5">
+                      <div className="flex items-center justify-between">
+                        <span className="text-muted-foreground">Started</span>
+                        <span className="font-medium text-foreground">
+                          {new Date(sub.startedAt).toLocaleDateString("en-IN", {
+                            month: "short",
+                            day: "numeric",
+                            year: "numeric",
+                          })}
                         </span>
                       </div>
-                      {queuedSubs.map((q, idx) => (
-                        <div
-                          key={q.id || idx}
-                          className="rounded-xl bg-background/80 border border-accent/30 p-2.5 text-xs space-y-1 mt-1.5"
-                        >
-                          <div className="flex justify-between items-center">
-                            <span className="font-semibold text-foreground">{q.duration}</span>
-                            <span className="font-medium text-saffrondeep">
-                              {formatPrice(q.price ?? 0)}
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground">
-                            Starts automatically:{" "}
-                            {new Date(q.startedAt).toLocaleDateString("en-IN", {
-                              month: "short",
-                              day: "numeric",
-                              year: "numeric",
-                            })}
-                          </p>
+                      {subExpiry && (
+                        <div className="flex items-center justify-between pt-1 border-t border-border/50">
+                          <span className="text-muted-foreground flex items-center gap-1">
+                            <Clock className="size-3 text-primary" /> Time Left
+                          </span>
+                          <span className="font-bold text-foreground">
+                            {subActive ? formatTimeRemaining(subExpiry) : "Expired"}
+                          </span>
                         </div>
-                      ))}
+                      )}
+                      {netBonusDays > 0 && (
+                        <div className="flex items-center justify-between pt-1 border-t border-border/50 text-tealdeep font-semibold text-[11px]">
+                          <span>🎁 Referral Bonus</span>
+                          <span>+{netBonusDays} days added</span>
+                        </div>
+                      )}
                     </div>
-                  ) : null}
-                </div>
-              ) : (
-                <div className="mt-4 space-y-3">
-                  <p className="text-sm text-muted-foreground">
-                    No active subscription. Your profile stays hidden from businesses until you
-                    activate a plan.
-                  </p>
-                  <Link
-                    to="/creator/plans"
-                    className="inline-flex w-full items-center justify-center rounded-xl bg-primary px-4 py-2.5 text-sm font-semibold text-primary-foreground"
-                  >
-                    View plans
-                  </Link>
-                </div>
-              )}
+
+                    {/* QUEUED PLANS SUB-SECTION */}
+                    {queuedSubs.length > 0 && (
+                      <div className="mt-3 pt-3 border-t border-border/60">
+                        <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-tealdeep mb-2">
+                          <span className="flex items-center gap-1">
+                            <CalendarClock className="size-3.5" /> Next in Queue
+                          </span>
+                          <span className="rounded-full bg-accent/20 text-tealdeep px-2 py-0.5 text-[10px] font-bold">
+                            Auto-activates
+                          </span>
+                        </div>
+                        {queuedSubs.map((q, idx) => (
+                          <div
+                            key={q.id || idx}
+                            className="rounded-xl bg-accent/10 border border-accent/30 p-2.5 text-xs space-y-1"
+                          >
+                            <div className="flex justify-between items-center">
+                              <span className="font-bold text-foreground">{q.duration}</span>
+                              <span className="font-semibold text-saffrondeep">
+                                {formatPrice(q.price ?? 0)}
+                              </span>
+                            </div>
+                            <p className="text-[11px] text-muted-foreground">
+                              Starts automatically on expiry of current plan
+                            </p>
+                          </div>
+                        ))}
+                      </div>
+                    )}
+                  </div>
+                ) : (
+                  <div className="mt-4 space-y-3">
+                    <p className="text-xs text-muted-foreground">
+                      No active subscription. Activate a plan to list your profile in the directory.
+                    </p>
+                  </div>
+                )}
+              </div>
+
+              <div className="mt-5 pt-3 border-t border-border/60">
+                <Link
+                  to="/creator/plans"
+                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
+                >
+                  <Zap className="size-3.5" />
+                  {queuedSubs.length > 0
+                    ? "Manage Subscription"
+                    : isTrial && subActive
+                      ? "Upgrade to Paid Plan"
+                      : subActive
+                        ? "Renew / Upgrade Plan"
+                        : "Choose a Plan"}
+                </Link>
+              </div>
             </Card>
           </div>
 
