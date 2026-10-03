@@ -398,27 +398,34 @@ function PricingSection() {
             </div>
 
             {/* Trial Promo Code & CTA Box */}
-            <div className="w-full lg:w-auto shrink-0 flex flex-col sm:flex-row lg:flex-col items-stretch sm:items-center lg:items-end gap-3 bg-background/80 backdrop-blur-md rounded-2xl p-5 border border-border/80 shadow-md">
-              <div className="text-left sm:text-right lg:text-right">
-                <span className="text-xs text-muted-foreground block">Special Promo Code</span>
-                <div className="mt-1 inline-flex items-center gap-2 rounded-xl bg-secondary px-3 py-1.5 border border-border">
-                  <span className="font-mono text-sm font-bold tracking-wider text-foreground">
+            <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4 bg-card rounded-2xl p-5 sm:p-6 border border-border/80 shadow-md">
+              <div className="space-y-2">
+                <div className="flex items-center justify-between">
+                  <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                    Special Promo Code
+                  </span>
+                  <span className="text-[11px] font-medium text-tealdeep bg-tealdeep/10 px-2 py-0.5 rounded-full">
+                    100% OFF
+                  </span>
+                </div>
+                <div className="flex items-center justify-between gap-2 rounded-xl bg-secondary/80 px-3.5 py-2 border border-border">
+                  <span className="font-mono text-base font-bold tracking-widest text-foreground select-all">
                     {PROMO_CODE_3DAYS}
                   </span>
                   <button
                     type="button"
                     onClick={handleCopyCode}
                     title="Copy coupon code"
-                    className="inline-flex items-center gap-1 rounded-lg bg-background px-2 py-1 text-[11px] font-semibold text-primary shadow-xs ring-1 ring-border hover:bg-secondary transition-colors"
+                    className="inline-flex items-center gap-1.5 rounded-lg bg-background px-2.5 py-1 text-xs font-semibold text-foreground shadow-xs ring-1 ring-border hover:bg-secondary transition-all active:scale-95 cursor-pointer"
                   >
                     {copied ? (
                       <>
-                        <CheckCheck className="size-3 text-tealdeep" />
-                        <span className="text-tealdeep font-bold">Copied!</span>
+                        <CheckCheck className="size-3.5 text-tealdeep" />
+                        <span className="text-tealdeep font-bold">Copied</span>
                       </>
                     ) : (
                       <>
-                        <Copy className="size-3" />
+                        <Copy className="size-3.5 text-muted-foreground" />
                         <span>Copy</span>
                       </>
                     )}
@@ -428,7 +435,7 @@ function PricingSection() {
 
               <Link
                 to="/creator/register"
-                className="inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-6 py-3.5 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98"
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3.5 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98"
               >
                 <span>Claim 3-Day Free Trial</span>
                 <ArrowRight className="size-4" />
