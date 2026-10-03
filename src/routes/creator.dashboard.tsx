@@ -83,37 +83,36 @@ function Dashboard() {
   const latestSub = userSubs[0];
   const sub = activeSub || latestSub;
 
-  // Auto-fetch profile from Supabase on mount
+  // Auto-fetch profile from Supabase & sync latest data on mount
   useEffect(() => {
     let mounted = true;
-    async function checkAuthUser() {
-      if (!mine) {
-        setLoading(true);
+    async function initDashboard() {
+      try {
+        refreshFromSupabase();
         const uid = await supabaseDb.getCreatorSession();
         if (uid && mounted) {
           const profile = await supabaseDb.getCreatorProfileForAuthUser(uid);
           if (profile && mounted) {
             upsertCreator(profile, true);
+            fetchReferralEvents(profile.id);
           }
         }
+      } finally {
         if (mounted) setLoading(false);
-      } else {
-        setLoading(false);
       }
     }
-    checkAuthUser();
-    refreshFromSupabase();
+    initDashboard();
     return () => {
       mounted = false;
     };
-  }, [mine, upsertCreator, refreshFromSupabase]);
+  }, []);
 
-  // Fetch referral events on mount
+  // Fetch referral events when creator ID is ready
   useEffect(() => {
     if (mine?.id) {
       fetchReferralEvents(mine.id);
     }
-  }, [mine?.id, fetchReferralEvents]);
+  }, [mine?.id]);
 
   // Only generate/save referral code for paid subscribers (not trial-only users)
   useEffect(() => {
@@ -860,26 +859,26 @@ function Dashboard() {
 
                 {referralEvents.length > 0 ? (
                   <div className="overflow-x-auto rounded-2xl border border-border/80 bg-background/60">
-                    <table className="w-full text-left text-xs">
+                    <table className="w-full text-left text-xs table-fixed min-w-[520px]">
                       <thead className="border-b border-border bg-secondary/50 font-semibold text-muted-foreground uppercase tracking-wider">
                         <tr>
-                          <th className="px-4 py-3">Date</th>
-                          <th className="px-4 py-3">Event</th>
-                          <th className="px-4 py-3">Bonus Days</th>
+                          <th className="w-28 px-4 py-3">Date</th>
+                          <th className="w-28 px-4 py-3">Event</th>
+                          <th className="w-28 px-4 py-3">Bonus Days</th>
                           <th className="px-4 py-3">Details</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
                         {referralEvents.map((ev) => (
                           <tr key={ev.id} className="hover:bg-secondary/30 transition-colors">
-                            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap truncate">
                               {new Date(ev.createdAt).toLocaleDateString("en-IN", {
                                 month: "short",
                                 day: "numeric",
                                 year: "numeric",
                               })}
                             </td>
-                            <td className="px-4 py-3">
+                            <td className="px-4 py-3 whitespace-nowrap">
                               {ev.eventType === "earned" ? (
                                 <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep">
                                   + Earned
@@ -893,7 +892,7 @@ function Dashboard() {
                             <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
                               {ev.daysDelta > 0 ? `+${ev.daysDelta} Days` : `${ev.daysDelta} Days`}
                             </td>
-                            <td className="px-4 py-3 text-muted-foreground">
+                            <td className="px-4 py-3 text-muted-foreground truncate" title={ev.note}>
                               {ev.note || "Referral conversion"}
                             </td>
                           </tr>
