@@ -145,16 +145,34 @@ function Register() {
   const [error, setError] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Referral code from URL param or manual input
+  // Referral code from URL param, localStorage draft, or manual input
   const [referralCode, setReferralCode] = useState(() => {
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
-      return (params.get("ref") || "").trim().toUpperCase();
+      const urlRef = params.get("ref");
+      if (urlRef) return urlRef.trim().toUpperCase();
+      try {
+        const saved = localStorage.getItem("influencer_referral_code");
+        if (saved) return saved.trim().toUpperCase();
+      } catch {
+        // ignore
+      }
     }
     return "";
   });
   const [referrerInfo, setReferrerInfo] = useState<{ id: string; name: string } | null>(null);
   const [referralStatus, setReferralStatus] = useState<string>("");
+
+  // Persist referral code to localStorage
+  useEffect(() => {
+    if (referralCode) {
+      try {
+        localStorage.setItem("influencer_referral_code", referralCode.trim().toUpperCase());
+      } catch {
+        // ignore
+      }
+    }
+  }, [referralCode]);
 
   useEffect(() => {
     async function checkReferral() {
@@ -477,8 +495,27 @@ function Register() {
     setSaveError("");
 
     try {
+      let finalReferredBy = draft.referredBy;
+      if (!finalReferredBy && referralCode && referralCode.trim().length >= 4) {
+        const cleaned = referralCode.trim().toUpperCase();
+        const local = creators.find((c) => c.referralCode && c.referralCode.toUpperCase() === cleaned);
+        if (local) {
+          finalReferredBy = local.id;
+        } else {
+          const remote = await supabaseDb.lookupReferralCode(cleaned);
+          if (remote) {
+            finalReferredBy = remote.id;
+          }
+        }
+      }
+
+      const finalDraft: Creator = {
+        ...draft,
+        referredBy: finalReferredBy || undefined,
+      };
+
       const uid = authUserId || (await supabaseDb.getCreatorSession());
-      const result = await upsertCreatorWithAuth(draft, uid);
+      const result = await upsertCreatorWithAuth(finalDraft, uid);
 
       if (!result.success) {
         setSaveError(
@@ -489,18 +526,19 @@ function Register() {
       }
 
       // Automatically start 3-day free trial for new creators
-      if (!existing && !hasUsedTrial(draft.id)) {
-        await startFreeTrial(draft.id);
+      if (!existing && !hasUsedTrial(finalDraft.id)) {
+        await startFreeTrial(finalDraft.id);
       }
 
-      // Success! Clear local draft cache
+      // Success! Clear local draft cache & referral cache
       try {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
+        localStorage.removeItem("influencer_referral_code");
       } catch {
         // ignore
       }
 
-      loginCreator(draft.id);
+      loginCreator(finalDraft.id);
       navigate({ to: redirectTo });
     } catch (err) {
       setSaveError(String(err));

@@ -228,9 +228,19 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   }, [hydrated, creators, business, myCreatorId, reports, subscriptions, referralEvents]);
 
   const refreshFromSupabase = async () => {
-    const remoteCreators = await supabaseDb.fetchCreators();
-    if (remoteCreators && remoteCreators.length > 0) {
-      setCreators(remoteCreators);
+    try {
+      const [remoteCreators, remoteSubs] = await Promise.all([
+        supabaseDb.fetchCreators(),
+        supabaseDb.fetchAllSubscriptions(),
+      ]);
+      if (remoteCreators && remoteCreators.length > 0) {
+        setCreators(remoteCreators);
+      }
+      if (remoteSubs && remoteSubs.length > 0) {
+        setSubscriptions(remoteSubs);
+      }
+    } catch {
+      // ignore
     }
   };
 

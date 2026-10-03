@@ -284,6 +284,34 @@ export const supabaseDb = {
     }
   },
 
+  /** Fetch all subscriptions in the system, ordered by most recent first. */
+  async fetchAllSubscriptions(): Promise<Subscription[]> {
+    try {
+      const { data, error } = await supabase
+        .from("subscriptions")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error || !data) return [];
+      return data.map((row) => ({
+        id: row.id as string | undefined,
+        creatorId: row.creator_id as string,
+        planId: row.plan_id as string,
+        duration: row.duration as string,
+        price: Number(row.price),
+        startedAt: row.started_at as string,
+        expiresAt: row.expires_at as string | undefined,
+        isTrial: Boolean(row.is_trial),
+        referralCodeUsed: row.referral_code_used as string | undefined,
+        isQueued: Boolean(row.is_queued),
+        status: (row.status as "active" | "queued" | "expired") || (row.is_queued ? "queued" : "active"),
+      }));
+    } catch (e) {
+      console.warn("Supabase fetchAllSubscriptions error:", e);
+      return [];
+    }
+  },
+
   async saveBusinessAccount(
     business: BusinessAccount,
     authUserId?: string | null,

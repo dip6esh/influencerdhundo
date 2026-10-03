@@ -69,6 +69,7 @@ function Dashboard() {
     fetchReferralEvents,
     upsertCreator,
     setCreatorStatus,
+    refreshFromSupabase,
   } = useAppState();
   const [loading, setLoading] = useState(!myCreatorId);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -101,10 +102,11 @@ function Dashboard() {
       }
     }
     checkAuthUser();
+    refreshFromSupabase();
     return () => {
       mounted = false;
     };
-  }, [mine, upsertCreator]);
+  }, [mine, upsertCreator, refreshFromSupabase]);
 
   // Fetch referral events on mount
   useEffect(() => {

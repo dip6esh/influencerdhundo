@@ -235,8 +235,8 @@ function Plans() {
             </div>
           ) : null}
 
-          {/* TRIAL ALREADY USED NOTICE */}
-          {trialAlreadyUsed ? (
+          {/* TRIAL ALREADY USED NOTICE — only shown if trial has ended/used AND creator has no active plan */}
+          {trialAlreadyUsed && !hasActivePlan ? (
             <div className="mt-6 rounded-2xl bg-secondary/80 border border-border p-4 flex items-start gap-3 shadow-sm">
               <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-muted-foreground/10 text-muted-foreground">
                 <ShieldCheck className="size-5" />
