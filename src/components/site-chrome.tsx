@@ -12,6 +12,7 @@ import {
   Gift,
   Mail,
 } from "lucide-react";
+import { IndiaFlag } from "@/components/ui-kit";
 
 export function SiteHeader() {
   const { business, signOutBusiness, myCreatorId, creators, signOutCreator } =
@@ -144,7 +145,7 @@ export function SiteHeader() {
                   to="/creator/login"
                   className="inline-flex items-center gap-1 rounded-xl bg-foreground px-2.5 sm:px-3 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors"
                 >
-                  <Sparkles className="size-3 text-saffron shrink-0" />
+                  <User className="size-3 text-saffron shrink-0" />
                   <span>Creator Login</span>
                 </Link>
               </div>
@@ -308,7 +309,7 @@ export function SiteHeader() {
                 onClick={closeMenu}
                 className="flex items-center gap-3 rounded-xl bg-foreground px-4 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
               >
-                <Sparkles className="size-4 text-saffron shrink-0" />
+                <User className="size-4 text-saffron shrink-0" />
                 Creator Login
               </Link>
 
@@ -462,7 +463,13 @@ export function SiteFooter() {
 
         {/* Bottom Bar */}
         <div className="mt-12 pt-6 border-t border-border flex flex-col sm:flex-row items-center justify-between gap-3 text-xs text-muted-foreground">
-          <p>© {new Date().getFullYear()} Influencer Dhundo. All rights reserved.</p>
+          <p className="flex items-center gap-1.5">
+            <span>© {new Date().getFullYear()} Influencer Dhundo. All rights reserved.</span>
+            <span>•</span>
+            <span className="inline-flex items-center gap-1">
+              Made in India <IndiaFlag className="w-3.5 h-2.5 rounded-[2px]" />
+            </span>
+          </p>
           <p className="text-center sm:text-right">
             Influencer Dhundo is a discovery directory, not an agency.
           </p>

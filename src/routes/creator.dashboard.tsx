@@ -24,6 +24,7 @@ import {
   Copy,
   Gift,
   History,
+  IndianRupee,
   Layers,
   Loader2,
   MessageCircle,
@@ -308,7 +309,7 @@ function Dashboard() {
                 to="/creator/plans"
                 className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-all"
               >
-                <Zap className="size-3.5 text-primary" />
+                <IndianRupee className="size-3.5 text-primary" />
                 Upgrade Plan
               </Link>
             </div>
@@ -528,7 +529,7 @@ function Dashboard() {
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-border/60">
                   <h2 className="text-base font-display font-semibold text-foreground flex items-center gap-2">
-                    <Sparkles className="size-4 text-primary" />
+                    <IndianRupee className="size-4 text-primary" />
                     Membership Plan
                   </h2>
                   {subActive ? (
@@ -631,7 +632,7 @@ function Dashboard() {
                   to="/creator/plans"
                   className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
                 >
-                  <Zap className="size-3.5" />
+                  <IndianRupee className="size-3.5" />
                   {queuedSubs.length > 0
                     ? "Manage Subscription"
                     : isTrial && subActive

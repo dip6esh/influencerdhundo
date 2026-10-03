@@ -1,22 +1,17 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { Card, SectionEyebrow } from "@/components/ui-kit";
+import { Card, SectionEyebrow, IndiaFlag } from "@/components/ui-kit";
 import {
   ArrowUpRight,
   Building2,
   CheckCircle2,
   Compass,
-  Gift,
-  Handshake,
   HeartHandshake,
-  Layers,
   MapPin,
   MessageCircle,
   Percent,
   ShieldCheck,
-  Sparkles,
   Target,
-  Users,
-  Zap,
+  User,
 } from "lucide-react";
 
 export const Route = createFileRoute("/about")({
@@ -49,8 +44,11 @@ function AboutPage() {
         <div className="pointer-events-none absolute top-1/2 -left-24 size-80 rounded-full bg-accent/15 blur-3xl" />
 
         <div className="relative mx-auto max-w-5xl px-5 text-center">
-          <SectionEyebrow className="justify-center">About Influencer Dhundo</SectionEyebrow>
-          <h1 className="mt-3 text-3xl font-display font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl text-balance">
+          <div className="inline-flex items-center gap-2 rounded-full bg-background/90 backdrop-blur-xs px-3.5 py-1.5 text-xs font-semibold text-foreground ring-1 ring-border shadow-xs mb-3">
+            <IndiaFlag className="w-4 h-3 rounded-[2px]" />
+            <span>India&apos;s Hyperlocal Creator Discovery Platform</span>
+          </div>
+          <h1 className="mt-2 text-3xl font-display font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl text-balance">
             Connecting Local Businesses with Creators,{" "}
             <span className="text-saffrondeep">Directly &amp; Transparently.</span>
           </h1>
@@ -71,7 +69,7 @@ function AboutPage() {
               to="/creator/register"
               className="inline-flex items-center gap-2 rounded-xl bg-background px-6 py-3.5 text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all shadow-xs"
             >
-              <Sparkles className="size-4 text-primary" />
+              <User className="size-4 text-primary" />
               Join as a Creator
             </Link>
           </div>
@@ -225,7 +223,7 @@ function AboutPage() {
           <Card className="glass-card rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 flex flex-col justify-between">
             <div>
               <div className="flex size-12 items-center justify-center rounded-2xl bg-saffrondeep/10 text-saffrondeep mb-4">
-                <Sparkles className="size-6" />
+                <User className="size-6" />
               </div>
               <h3 className="text-xl font-display font-bold text-foreground">For Creators &amp; Influencers</h3>
               <p className="text-xs sm:text-sm text-muted-foreground mt-2 leading-relaxed">

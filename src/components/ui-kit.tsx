@@ -643,3 +643,30 @@ export function StatusPill({ status }: { status: string }) {
     </span>
   );
 }
+
+export function IndiaFlag({ className }: { className?: string }) {
+  return (
+    <svg
+      viewBox="0 0 225 150"
+      className={cn("inline-block shrink-0 rounded-[2px] shadow-2xs overflow-hidden border border-black/10", className ?? "w-4 h-3")}
+      aria-label="Flag of India"
+    >
+      <rect width="225" height="50" fill="#FF9933" />
+      <rect y="50" width="225" height="50" fill="#FFFFFF" />
+      <rect y="100" width="225" height="50" fill="#138808" />
+      <circle cx="112.5" cy="75" r="20" fill="none" stroke="#000080" strokeWidth="3" />
+      <circle cx="112.5" cy="75" r="3.5" fill="#000080" />
+      {Array.from({ length: 24 }).map((_, i) => (
+        <line
+          key={i}
+          x1="112.5"
+          y1="75"
+          x2={112.5 + 20 * Math.cos((i * 15 * Math.PI) / 180)}
+          y2={75 + 20 * Math.sin((i * 15 * Math.PI) / 180)}
+          stroke="#000080"
+          strokeWidth="1.2"
+        />
+      ))}
+    </svg>
+  );
+}
