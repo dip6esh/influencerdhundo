@@ -15,7 +15,7 @@ import {
   Layers,
   MapPin,
   Plane,
-  Sparkles,
+  User,
   Users,
 } from "lucide-react";
 
@@ -215,7 +215,7 @@ function CreatorProfile() {
           {/* 2. ABOUT THE CREATOR */}
           <div className="space-y-2.5">
             <div className="flex items-center gap-2 text-foreground font-display font-semibold text-base">
-              <Sparkles className="size-4 text-primary" />
+              <User className="size-4 text-primary" />
               <h2>About the Creator</h2>
             </div>
             <div className="rounded-2xl bg-background/60 border border-border/60 p-4 sm:p-5">
