@@ -147,8 +147,11 @@ function Dashboard() {
   }, [mine, sub, subActive, queuedSubs.length, setCreatorStatus]);
 
   // Referral Calculations
-  // Referral is only unlocked for paid subscribers — trial users cannot share their code
-  const isReferralUnlocked = (subActive || queuedSubs.length > 0) && !isTrial;
+  // Referral is unlocked for paid subscribers or creators who have a paid plan in queue
+  const hasPaidQueued = queuedSubs.some(
+    (s) => s.planId !== "trial-3d" && !s.duration?.toLowerCase().includes("3 day"),
+  );
+  const isReferralUnlocked = (subActive && !isTrial) || hasPaidQueued;
   const referralCode = mine?.referralCode || "";
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://influencerdhundo.com";
   const referralLink = referralCode ? `${baseUrl}/creator/register?ref=${referralCode}` : "";
@@ -227,19 +230,39 @@ function Dashboard() {
                   <p className="text-sm font-semibold text-foreground flex items-center gap-2">
                     <span>Upcoming Plan in Queue: {queuedSubs[0].duration}</span>
                     <span className="rounded-full bg-accent/30 text-tealdeep px-2 py-0.5 text-[11px] font-bold">
-                      Queued
+                      Paid Plan Queued
                     </span>
                   </p>
                   <p className="text-xs text-muted-foreground">
-                    Your {queuedSubs[0].duration} plan is queued and will <strong>automatically activate</strong> on{" "}
-                    {new Date(queuedSubs[0].startedAt).toLocaleDateString("en-IN", {
-                      month: "short",
-                      day: "numeric",
-                      year: "numeric",
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}{" "}
-                    when your current plan expires.
+                    {isTrial && subActive && subExpiry ? (
+                      <>
+                        You are currently on your 3-Day Free Trial (
+                        <strong className="text-foreground">{formatTimeRemaining(subExpiry)} remaining</strong>
+                        ). Your upgraded <strong>{queuedSubs[0].duration}</strong> plan is queued and will{" "}
+                        <strong>automatically activate</strong> on{" "}
+                        {subExpiry.toLocaleDateString("en-IN", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        as soon as the trial ends.
+                      </>
+                    ) : (
+                      <>
+                        Your <strong>{queuedSubs[0].duration}</strong> plan is queued and will{" "}
+                        <strong>automatically activate</strong> on{" "}
+                        {new Date(queuedSubs[0].startedAt).toLocaleDateString("en-IN", {
+                          month: "short",
+                          day: "numeric",
+                          year: "numeric",
+                          hour: "2-digit",
+                          minute: "2-digit",
+                        })}{" "}
+                        when your current plan expires.
+                      </>
+                    )}
                   </p>
                 </div>
               </div>
@@ -252,8 +275,8 @@ function Dashboard() {
             </div>
           ) : null}
 
-          {/* TRIAL BANNER / EXPIRED BANNER */}
-          {sub && isTrial && subActive && subExpiry ? (
+          {/* TRIAL BANNER — ONLY SHOWN IF NO PAID PLAN IS IN QUEUE */}
+          {sub && isTrial && subActive && subExpiry && queuedSubs.length === 0 ? (
             <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 border border-primary/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
