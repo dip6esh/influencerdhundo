@@ -433,9 +433,14 @@ export function SiteFooter() {
           {/* Legal & Trust */}
           <div className="space-y-3">
             <p className="text-xs font-bold uppercase tracking-wider text-foreground">
-              Legal &amp; Policy
+              Company &amp; Legal
             </p>
             <ul className="space-y-2 text-xs">
+              <li>
+                <Link to="/about" className="text-muted-foreground hover:text-foreground transition-colors">
+                  About Us
+                </Link>
+              </li>
               <li>
                 <Link to="/privacy" className="text-muted-foreground hover:text-foreground transition-colors">
                   Privacy Policy
