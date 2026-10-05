@@ -21,6 +21,7 @@ import {
   CITIES,
   COLLAB_TYPES,
   CONTENT_TYPES,
+  GENDERS,
   LANGUAGES,
   TRAVEL_RANGES,
   TURNAROUNDS,
@@ -63,6 +64,7 @@ type Form = {
   name: string;
   displayName: string;
   birthDate: string;
+  gender: string;
   email: string;
   mobile: string;
   city: string;
@@ -97,6 +99,7 @@ const initialForm: Form = {
   name: "",
   displayName: "",
   birthDate: "",
+  gender: "",
   email: "",
   mobile: "",
   city: "",
@@ -212,6 +215,7 @@ function Register() {
         name: existing.name,
         displayName: existing.displayName,
         birthDate: existing.birthDate ?? "",
+        gender: existing.gender ?? "",
         email: existing.contact.email,
         mobile: existing.contact.phone,
         city: existing.city,
@@ -333,6 +337,7 @@ function Register() {
       turnaround: form.turnaround || "3–5 days",
       status: existing?.status ?? "Inactive",
       birthDate: form.birthDate || undefined,
+      gender: form.gender || undefined,
       referralCode: existing?.referralCode,
       referredBy: referrerInfo?.id ?? existing?.referredBy,
       contact: {
@@ -360,6 +365,7 @@ function Register() {
       if (age === null || isNaN(age)) return "Please enter a valid date of birth.";
       if (age < 13) return "Creators must be at least 13 years old.";
       if (age > 100) return "Please enter a valid date of birth.";
+      if (!form.gender) return "Please select your gender.";
       if (!form.mobile.trim() || form.mobile.replace(/\D/g, "").length < 10)
         return "Please enter a valid 10-digit mobile number.";
       if (!form.city) return "Select your city.";
@@ -883,21 +889,34 @@ function Register() {
                       />
                     </Field>
                   </div>
-                  <Field
-                    label="Date of birth"
-                    hint={
-                      form.birthDate && calculateAge(form.birthDate) !== null
-                        ? `Age: ${calculateAge(form.birthDate)} years old (auto-updated every year)`
-                        : "Required to calculate your age accurately for brand listings"
-                    }
-                  >
-                    <DatePicker
-                      value={form.birthDate}
-                      maxDate={new Date().toISOString().split("T")[0]}
-                      onChange={(val) => set("birthDate", val)}
-                      placeholder="Select your date of birth"
-                    />
-                  </Field>
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field
+                      label="Date of birth"
+                      hint={
+                        form.birthDate && calculateAge(form.birthDate) !== null
+                          ? `Age: ${calculateAge(form.birthDate)} years old (auto-updated every year)`
+                          : "Required to calculate your age accurately for brand listings"
+                      }
+                    >
+                      <DatePicker
+                        value={form.birthDate}
+                        maxDate={new Date().toISOString().split("T")[0]}
+                        onChange={(val) => set("birthDate", val)}
+                        placeholder="Select your date of birth"
+                      />
+                    </Field>
+                    <Field
+                      label="Gender"
+                      hint="Helps businesses find relevant creators for targeted campaigns"
+                    >
+                      <DropdownSelect
+                        value={form.gender}
+                        onChange={(val) => set("gender", val)}
+                        placeholder="Select gender"
+                        options={GENDERS}
+                      />
+                    </Field>
+                  </div>
                   <div className="grid gap-4 sm:grid-cols-3">
                     <Field label="City">
                       <DropdownSelect
@@ -1195,6 +1214,12 @@ function Register() {
                           <dd className="mt-1 font-medium">
                             {calculateAge(draft.birthDate)} years old
                           </dd>
+                        </div>
+                      ) : null}
+                      {draft.gender ? (
+                        <div>
+                          <dt className="label-caps">Gender</dt>
+                          <dd className="mt-1 font-medium">{draft.gender}</dd>
                         </div>
                       ) : null}
                       <div>

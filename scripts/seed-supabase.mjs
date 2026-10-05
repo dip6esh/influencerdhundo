@@ -58,6 +58,7 @@ const DEFAULT_CREATORS = [
     turnaround: "3–5 days",
     status: "Active",
     featured: true,
+    gender: "Female",
     contact: { phone: "+91 98201 12345", whatsapp: "+91 98201 12345", email: "collabs@aditieats.in" },
   },
   {
@@ -84,6 +85,7 @@ const DEFAULT_CREATORS = [
     turnaround: "1–2 days",
     status: "Active",
     featured: true,
+    gender: "Male",
     contact: { phone: "+91 98202 23456", whatsapp: "+91 98202 23456", email: "rohan@rohanfits.com" },
   },
   {
@@ -110,6 +112,7 @@ const DEFAULT_CREATORS = [
     turnaround: "3–5 days",
     status: "Active",
     featured: false,
+    gender: "Female",
     contact: { phone: "+91 98203 34567", whatsapp: "+91 98203 34567", email: "sneha@snehaglam.com" },
   },
   {
@@ -136,6 +139,7 @@ const DEFAULT_CREATORS = [
     turnaround: "5–7 days",
     status: "Active",
     featured: false,
+    gender: "Male",
     contact: { phone: "+91 98204 45678", whatsapp: "+91 98204 45678", email: "kabir@kabirtech.in" },
   },
 ];

@@ -11,6 +11,7 @@ import {
   TextInput,
 } from "@/components/ui-kit";
 import { Slider } from "@/components/ui/slider";
+import { cn } from "@/lib/utils";
 import { useAppState } from "@/lib/app-state";
 import {
   CATEGORIES,
@@ -54,6 +55,8 @@ function Discover() {
     resetDiscoverFilters,
   } = useAppState();
 
+  const isBarter = filters.collabType === "Barter";
+
   const [showMore, setShowMore] = useState(() => {
     return (
       Boolean(filters.locality) ||
@@ -87,8 +90,7 @@ function Discover() {
     Boolean(filters.otherCategory) ||
     filters.followerRange[0] > 500 ||
     filters.followerRange[1] < 50000 ||
-    filters.budgetRange[0] > 0 ||
-    filters.budgetRange[1] < 50000 ||
+    (!isBarter && (filters.budgetRange[0] > 0 || filters.budgetRange[1] < 50000)) ||
     filters.contentTypes.length > 0 ||
     Boolean(filters.collabType) ||
     Boolean(filters.language) ||
@@ -220,19 +222,41 @@ function Discover() {
                   </div>
 
                   {/* BUDGET RANGE (0 - 50,000) */}
-                  <div className="rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60 flex flex-col justify-between">
+                  <div
+                    className={cn(
+                      "rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60 flex flex-col justify-between transition-all duration-200",
+                      isBarter && "opacity-55 bg-muted/20 border-border/40 cursor-not-allowed",
+                    )}
+                  >
                     <div className="flex items-center justify-between mb-3">
-                      <Label>Budget Range</Label>
-                      <span className="text-xs font-semibold text-saffrondeep px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-                        {filters.budgetRange[0] === 0 && filters.budgetRange[1] >= 50000
-                          ? "Any budget"
-                          : filters.budgetRange[1] >= 50000
-                            ? `${formatPrice(filters.budgetRange[0])} – ₹50,000+`
-                            : `${formatPrice(filters.budgetRange[0])} – ${formatPrice(filters.budgetRange[1])}`}
+                      <div className="flex items-center gap-2">
+                        <Label className={isBarter ? "text-muted-foreground" : ""}>Budget Range</Label>
+                        {isBarter && (
+                          <span className="text-[10px] uppercase font-semibold tracking-wider text-muted-foreground bg-secondary px-2 py-0.5 rounded-md">
+                            Disabled
+                          </span>
+                        )}
+                      </div>
+                      <span
+                        className={cn(
+                          "text-xs font-semibold px-3 py-1 rounded-full border transition-all",
+                          isBarter
+                            ? "bg-secondary text-muted-foreground border-border/60"
+                            : "text-saffrondeep bg-primary/10 border-primary/20",
+                        )}
+                      >
+                        {isBarter
+                          ? "Not applicable (Barter)"
+                          : filters.budgetRange[0] === 0 && filters.budgetRange[1] >= 50000
+                            ? "Any budget"
+                            : filters.budgetRange[1] >= 50000
+                              ? `${formatPrice(filters.budgetRange[0])} – ₹50,000+`
+                              : `${formatPrice(filters.budgetRange[0])} – ${formatPrice(filters.budgetRange[1])}`}
                       </span>
                     </div>
                     <div className="pt-2 pb-1 px-1">
                       <Slider
+                        disabled={isBarter}
                         value={filters.budgetRange}
                         onValueChange={(val) =>
                           setFilters({
@@ -245,7 +269,7 @@ function Discover() {
                         step={500}
                         minStepsBetweenThumbs={1}
                       />
-                      <div className="flex justify-between text-[11px] text-muted-foreground mt-2 font-medium">
+                      <div className={cn("flex justify-between text-[11px] text-muted-foreground mt-2 font-medium", isBarter && "opacity-50")}>
                         <span>₹0</span>
                         <span>₹10K</span>
                         <span>₹20K</span>

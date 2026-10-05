@@ -24,11 +24,11 @@ export const Route = createFileRoute("/")({
         content:
           "Influencer Dhundo brings local creators and local businesses together. No agency, no commission, no middleman. Just find each other and make it happen.",
       },
-      { property: "og:title", content: "Influencer Dhundo — Small creators. Small businesses. Big possibilities." },
+      { property: "og:title", content: "Influencer Dhundo — A Business + Relevant Influencers = Big Possibilities." },
       {
         property: "og:description",
         content:
-          "Where small influencers meet small businesses to make it big. Discover creators around your business. Connect directly. Start collaborating.",
+          "Where businesses find relevant Influencers to collaborate. Discover creators around your business. Connect directly. Start collaborating.",
       },
     ],
   }),
@@ -91,7 +91,7 @@ function Landing() {
 
         <div className="relative mx-auto max-w-5xl px-5 pt-10 pb-14 md:pt-16 md:pb-20">
           <h1 className="max-w-[22ch] text-[2.8rem] leading-[0.95] text-balance font-display font-semibold tracking-tight md:text-[4.5rem]">
-            Where small influencers meet small businesses to make it big.
+            Where businesses find relevant Influencers to collaborate
           </h1>
           <p className="mt-5 max-w-[44ch] text-base text-pretty text-muted-foreground md:text-lg">
             Discover creators around your business. Connect directly. Start collaborating.
@@ -315,7 +315,7 @@ function Landing() {
         <div className="pointer-events-none absolute -bottom-20 -left-10 size-64 rounded-full bg-accent/20 blur-3xl" />
         <div className="relative mx-auto max-w-5xl px-5 py-14 md:py-20">
           <h2 className="max-w-[22ch] text-3xl font-display font-semibold leading-tight text-balance text-background md:text-5xl">
-            Small creators. Small businesses. Big possibilities.
+            A Business + Relevant Influencers = Big Possibilities.
           </h2>
           <p className="mt-4 text-base text-background/60 md:text-lg">
             Let's get started.

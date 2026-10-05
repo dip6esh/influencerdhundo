@@ -53,6 +53,13 @@ export const LANGUAGES = [
 
 export const COLLAB_TYPES = ["Paid", "Barter", "Both"] as const;
 
+export const GENDERS = [
+  "Female",
+  "Male",
+  "Non-binary / Other",
+  "Prefer not to say",
+] as const;
+
 export const TRAVEL_RANGES = [
   "Up to 2 km",
   "Up to 5 km",
@@ -297,6 +304,7 @@ export type Creator = {
   status: CreatorStatus;
   featured?: boolean | undefined;
   birthDate?: string | undefined;
+  gender?: (typeof GENDERS)[number] | string | undefined;
   contact: { phone: string; whatsapp: string; email: string };
   // Referral system
   referralCode?: string | undefined;
@@ -333,6 +341,7 @@ export const CREATORS: Creator[] = [
     status: "Active",
     featured: true,
     birthDate: "2000-05-14",
+    gender: "Female",
     contact: {
       phone: "+91 98200 11223",
       whatsapp: "+91 98200 11223",
@@ -364,6 +373,7 @@ export const CREATORS: Creator[] = [
     turnaround: "1–2 days",
     status: "Active",
     birthDate: "1998-11-20",
+    gender: "Male",
     contact: {
       phone: "+91 98670 44551",
       whatsapp: "+91 98670 44551",
@@ -394,6 +404,7 @@ export const CREATORS: Creator[] = [
     turnaround: "3–5 days",
     status: "Active",
     birthDate: "2002-08-09",
+    gender: "Female",
     contact: {
       phone: "+91 90040 87612",
       whatsapp: "+91 90040 87612",
@@ -429,6 +440,7 @@ export const CREATORS: Creator[] = [
     status: "Active",
     featured: true,
     birthDate: "1996-03-25",
+    gender: "Male",
     contact: {
       phone: "+91 94140 23098",
       whatsapp: "+91 94140 23098",
@@ -459,6 +471,7 @@ export const CREATORS: Creator[] = [
     acceptsProducts: "Yes",
     turnaround: "5–7 days",
     status: "Active",
+    gender: "Female",
     contact: {
       phone: "+91 98450 66712",
       whatsapp: "+91 98450 66712",
@@ -489,6 +502,7 @@ export const CREATORS: Creator[] = [
     acceptsProducts: "Depends",
     turnaround: "Same day",
     status: "Active",
+    gender: "Male",
     contact: {
       phone: "+91 77980 45512",
       whatsapp: "+91 77980 45512",
@@ -519,6 +533,7 @@ export const CREATORS: Creator[] = [
     acceptsProducts: "No",
     turnaround: "7+ days",
     status: "Active",
+    gender: "Female",
     contact: {
       phone: "+91 99490 77120",
       whatsapp: "+91 99490 77120",
@@ -548,6 +563,7 @@ export const CREATORS: Creator[] = [
     acceptsProducts: "Yes",
     turnaround: "3–5 days",
     status: "Expired",
+    gender: "Male",
     contact: {
       phone: "+91 98110 33447",
       whatsapp: "+91 98110 33447",
@@ -627,7 +643,7 @@ export function filterCreators(creators: Creator[], f: Filters) {
       if (c.followers < min) return false;
       if (max < 50000 && c.followers > max) return false;
     }
-    if (f.budgetRange) {
+    if (f.collabType !== "Barter" && f.budgetRange) {
       const [min, max] = f.budgetRange;
       if (c.startingPrice < min) return false;
       if (max < 50000 && c.startingPrice > max) return false;

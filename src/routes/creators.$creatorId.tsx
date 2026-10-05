@@ -157,6 +157,12 @@ function CreatorProfile() {
                       <span>{age} yrs old</span>
                     </>
                   )}
+                  {creator.gender && (
+                    <>
+                      <span>•</span>
+                      <span>{creator.gender}</span>
+                    </>
+                  )}
                 </p>
 
                 {/* Social Channels Row */}

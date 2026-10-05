@@ -413,12 +413,18 @@ function Dashboard() {
                       <p className="text-sm font-mono font-medium text-tealdeep mt-0.5">
                         {mine.instagram.startsWith("@") ? mine.instagram : `@${mine.instagram}`}
                       </p>
-                      <p className="text-xs text-muted-foreground mt-1 flex items-center gap-1.5">
+                      <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
                         <span>📍 {[mine.locality, mine.city].filter(Boolean).join(", ") || "Location not set"}</span>
                         {calculateAge(mine.birthDate) !== null && (
                           <>
                             <span>•</span>
                             <span>{calculateAge(mine.birthDate)} yrs old</span>
+                          </>
+                        )}
+                        {mine.gender && (
+                          <>
+                            <span>•</span>
+                            <span>{mine.gender}</span>
                           </>
                         )}
                       </p>

@@ -41,6 +41,7 @@ export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: 
           <p className="mt-0.5 truncate text-xs text-white/80">
             {[creator.locality, creator.city].filter(Boolean).join(", ")}
             {age !== null ? ` · ${age} yrs` : ""}
+            {creator.gender ? ` · ${creator.gender}` : ""}
           </p>
         </div>
       </div>

@@ -1,4 +1,4 @@
-import { createClient } from "@supabase/supabase-js";
+import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Creator, CreatorStatus } from "./directory-data";
 import type { BusinessAccount, Report, Subscription } from "./app-state";
 
@@ -9,12 +9,16 @@ export const SUPABASE_ANON_KEY =
   import.meta.env["VITE_SUPABASE_ANON_KEY"] ||
   "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZmNvaWxzd3lhZ3dpZmFyb25oIiwicm9sZSI6ImFub24iLCJpYXQiOjE3OTA4MzkwOTUsImV4cCI6MjEwNjQxNTA5NX0.1M5rC0is9q0dWdjC5bBDVWWVZo7BFLe0S7vKlWbFZBw";
 
-export const supabase = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-  auth: {
-    persistSession: true,
-    autoRefreshToken: true,
+export const supabase: SupabaseClient<any, "public", any> = createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY,
+  {
+    auth: {
+      persistSession: true,
+      autoRefreshToken: true,
+    },
   },
-});
+);
 
 // Database record types
 export interface CreatorRow {
@@ -44,6 +48,7 @@ export interface CreatorRow {
   status: CreatorStatus;
   featured: boolean;
   birth_date?: string | null;
+  gender?: string | null;
   contact: { phone: string; whatsapp: string; email: string };
   // Referral system
   referral_code?: string | null;
@@ -83,6 +88,7 @@ export function creatorToRow(c: Creator, authUserId?: string): CreatorRow {
     status: c.status || "Active",
     featured: !!c.featured,
     birth_date: c.birthDate || null,
+    gender: c.gender || null,
     contact: c.contact || { phone: "", whatsapp: "", email: "" },
     referral_code: c.referralCode ?? null,
     referred_by: c.referredBy ?? null,
@@ -119,6 +125,7 @@ export function rowToCreator(row: CreatorRow): Creator {
     status: row.status || "Active",
     featured: Boolean(row.featured),
     birthDate: row.birth_date ?? undefined,
+    gender: row.gender ?? undefined,
     contact: row.contact || { phone: "", whatsapp: "", email: "" },
     referralCode: row.referral_code ?? undefined,
     referredBy: row.referred_by ?? undefined,

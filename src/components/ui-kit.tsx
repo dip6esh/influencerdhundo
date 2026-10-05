@@ -656,17 +656,22 @@ export function IndiaFlag({ className }: { className?: string }) {
       <rect y="100" width="225" height="50" fill="#138808" />
       <circle cx="112.5" cy="75" r="20" fill="none" stroke="#000080" strokeWidth="3" />
       <circle cx="112.5" cy="75" r="3.5" fill="#000080" />
-      {Array.from({ length: 24 }).map((_, i) => (
-        <line
-          key={i}
-          x1="112.5"
-          y1="75"
-          x2={112.5 + 20 * Math.cos((i * 15 * Math.PI) / 180)}
-          y2={75 + 20 * Math.sin((i * 15 * Math.PI) / 180)}
-          stroke="#000080"
-          strokeWidth="1.2"
-        />
-      ))}
+      {Array.from({ length: 24 }).map((_, i) => {
+        const rad = (i * 15 * Math.PI) / 180;
+        const x2 = Number((112.5 + 20 * Math.cos(rad)).toFixed(2));
+        const y2 = Number((75 + 20 * Math.sin(rad)).toFixed(2));
+        return (
+          <line
+            key={i}
+            x1="112.5"
+            y1="75"
+            x2={x2}
+            y2={y2}
+            stroke="#000080"
+            strokeWidth="1.2"
+          />
+        );
+      })}
     </svg>
   );
 }

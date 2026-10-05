@@ -28,6 +28,7 @@ CREATE TABLE IF NOT EXISTS public.creators (
   status TEXT NOT NULL DEFAULT 'Active',
   featured BOOLEAN NOT NULL DEFAULT FALSE,
   birth_date DATE,
+  gender TEXT,
   contact JSONB NOT NULL DEFAULT '{"phone":"","whatsapp":"","email":""}'::jsonb,
   -- Referral system fields
   referral_code TEXT UNIQUE,

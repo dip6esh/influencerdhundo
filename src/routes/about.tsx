@@ -49,7 +49,7 @@ function AboutPage() {
             <span>India&apos;s Hyperlocal Creator Discovery Platform</span>
           </div>
           <h1 className="mt-2 text-3xl font-display font-bold tracking-tight text-foreground sm:text-5xl md:text-6xl text-balance">
-            Connecting Local Businesses with Creators,{" "}
+            Connecting Businesses with relevant Influencers,{" "}
             <span className="text-saffrondeep">Directly &amp; Transparently.</span>
           </h1>
           <p className="mx-auto mt-5 max-w-2xl text-base text-pretty text-muted-foreground sm:text-lg md:text-xl">

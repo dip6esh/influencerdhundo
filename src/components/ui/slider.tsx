@@ -6,7 +6,7 @@ import { cn } from "@/lib/utils";
 const Slider = React.forwardRef<
   React.ElementRef<typeof SliderPrimitive.Root>,
   React.ComponentPropsWithoutRef<typeof SliderPrimitive.Root>
->(({ className, ...props }, ref) => {
+>(({ className, disabled, ...props }, ref) => {
   const values = Array.isArray(props.value)
     ? props.value
     : Array.isArray(props.defaultValue)
@@ -16,11 +16,16 @@ const Slider = React.forwardRef<
   return (
     <SliderPrimitive.Root
       ref={ref}
-      className={cn("relative flex w-full touch-none select-none items-center py-2 cursor-pointer", className)}
+      disabled={disabled}
+      className={cn(
+        "relative flex w-full touch-none select-none items-center py-2 cursor-pointer",
+        disabled && "opacity-50 cursor-not-allowed pointer-events-none",
+        className,
+      )}
       {...props}
     >
-      <SliderPrimitive.Track className="relative h-2 w-full grow overflow-hidden rounded-full bg-border">
-        <SliderPrimitive.Range className="absolute h-full bg-primary" />
+      <SliderPrimitive.Track className={cn("relative h-2 w-full grow overflow-hidden rounded-full bg-border", disabled && "bg-muted")}>
+        <SliderPrimitive.Range className={cn("absolute h-full bg-primary", disabled && "bg-muted-foreground/30")} />
       </SliderPrimitive.Track>
       {values.map((_, i) => (
         <SliderPrimitive.Thumb
