@@ -351,7 +351,7 @@ function PricingSection() {
 
   const planPerMonth: Record<string, string> = {
     "1m": "₹799/mo",
-    "3m": "₹666/mo",
+    "3m": "₹366/mo",
     "6m": "₹566/mo",
     "1y": "₹666/mo",
   };
@@ -382,7 +382,7 @@ function PricingSection() {
                 <span>FOR BUSINESSES &amp; BRANDS — 100% FREE</span>
               </div>
               <h3 className="text-2xl font-display font-bold md:text-3xl text-foreground">
-                Finding &amp; Contacting Local Creators Costs ₹0
+                Finding &amp; Contacting Influencers Costs ₹0
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
                 Whether you're a cafe, retail shop, boutique, salon, clinic, or growing brand, there are <strong>zero platform fees and 0% commission</strong>. Search creators around your locality, explore their pricing, and reach out directly on WhatsApp or Call.
@@ -546,10 +546,18 @@ function PricingSection() {
                     : "border border-border/80"
                 }`}
               >
-                {/* Popular Badge */}
+                {/* Limited Launch Offer Top Badge */}
                 {isPopular ? (
-                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3 py-0.5 text-[11px] font-bold text-primary-foreground shadow-sm uppercase tracking-wide">
-                    Top Pick
+                  <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3.5 py-0.5 text-[11px] font-bold text-primary-foreground shadow-sm uppercase tracking-wide whitespace-nowrap">
+                    Limited Launch Offer
+                  </div>
+                ) : null}
+
+                {/* 45% OFF Corner Circle */}
+                {isPopular ? (
+                  <div className="absolute -top-3.5 -right-3.5 z-10 flex size-12 flex-col items-center justify-center rounded-full bg-primary text-primary-foreground font-bold shadow-md">
+                    <span className="text-[12px] font-extrabold tracking-tight leading-none">45%</span>
+                    <span className="text-[8.5px] uppercase font-bold tracking-wider leading-none mt-0.5 opacity-90">OFF</span>
                   </div>
                 ) : null}
 
@@ -563,15 +571,28 @@ function PricingSection() {
                     </span>
                   </div>
 
-                  <div className="mt-4 flex items-baseline gap-1.5">
-                    <span className="font-display text-3xl font-bold tracking-tight text-foreground">
-                      {formatPrice(plan.price)}
-                    </span>
-                  </div>
-
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    Effective rate: <span className="font-semibold text-foreground">{planPerMonth[plan.id]}</span>
-                  </p>
+                  {isPopular ? (
+                    <>
+                      <div className="mt-4 flex items-baseline gap-2">
+                        <span className="font-display text-3xl font-bold tracking-tight text-foreground">₹1,099</span>
+                        <span className="text-base font-semibold text-muted-foreground line-through">₹1,999</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Effective rate: <span className="font-semibold text-foreground">₹366/mo</span>
+                      </p>
+                    </>
+                  ) : (
+                    <>
+                      <div className="mt-4 flex items-baseline gap-1.5">
+                        <span className="font-display text-3xl font-bold tracking-tight text-foreground">
+                          {formatPrice(plan.price)}
+                        </span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Effective rate: <span className="font-semibold text-foreground">{planPerMonth[plan.id]}</span>
+                      </p>
+                    </>
+                  )}
                 </div>
 
                 <div className="my-5 h-px bg-border/80" />

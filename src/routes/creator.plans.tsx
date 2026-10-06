@@ -82,8 +82,10 @@ function Plans() {
   const selectedPlan = PLANS.find((p) => p.id === selectedPlanId) || PLANS[1];
   const isTrialApplied = !trialAlreadyUsed && appliedPromo?.toUpperCase() === PROMO_CODE_3DAYS;
 
-  // Price calculations
-  const originalPrice = selectedPlan.price;
+  // Price calculations — 3m plan has a limited launch offer price of ₹1,099 (was ₹1,999)
+  const LAUNCH_OFFER_3M_PRICE = 1099;
+  const effectivePlanPrice = selectedPlan.id === "3m" ? LAUNCH_OFFER_3M_PRICE : selectedPlan.price;
+  const originalPrice = effectivePlanPrice;
   const discountAmount = isTrialApplied ? originalPrice : 0;
   const finalPrice = isTrialApplied ? 0 : originalPrice;
 
@@ -280,9 +282,15 @@ function Plans() {
                         }`}
                       >
                         {p.id === "3m" && (
-                          <span className="absolute top-3 right-3 rounded-full bg-primary px-2.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary-foreground">
-                            Popular
-                          </span>
+                          <>
+                            <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm whitespace-nowrap">
+                              Limited Launch Offer
+                            </div>
+                            <div className="absolute -top-2.5 -right-2.5 z-10 flex size-10 flex-col items-center justify-center rounded-full bg-primary text-primary-foreground font-bold shadow-md leading-none">
+                              <span className="text-[10px] font-extrabold tracking-tight">45%</span>
+                              <span className="text-[7.5px] uppercase font-bold tracking-wider opacity-90">OFF</span>
+                            </div>
+                          </>
                         )}
                         <p
                           className={
@@ -296,13 +304,24 @@ function Plans() {
                         <p className="mt-1.5 font-display text-2xl font-semibold">
                           {p.duration}
                         </p>
-                        <p
-                          className={`mt-2 text-xl font-bold ${
-                            isSelected ? "text-primary" : "text-saffrondeep"
-                          }`}
-                        >
-                          {formatPrice(p.price)}
-                        </p>
+                        {p.id === "3m" ? (
+                          <div className="mt-2 flex items-baseline gap-2">
+                            <span className={`text-xl font-bold ${isSelected ? "text-primary" : "text-saffrondeep"}`}>
+                              ₹1,099
+                            </span>
+                            <span className={`text-sm line-through ${isSelected ? "text-background/60" : "text-muted-foreground"}`}>
+                              ₹1,999
+                            </span>
+                          </div>
+                        ) : (
+                          <p
+                            className={`mt-2 text-xl font-bold ${
+                              isSelected ? "text-primary" : "text-saffrondeep"
+                            }`}
+                          >
+                            {formatPrice(p.price)}
+                          </p>
+                        )}
                       </button>
                     );
                   })}
@@ -428,11 +447,19 @@ function Plans() {
                     </span>
                   </div>
 
-                  <div className="flex justify-between">
+                  <div className="flex justify-between items-center">
                     <span className="text-muted-foreground">Plan price</span>
-                    <span className="font-medium">
-                      {formatPrice(originalPrice)}
-                    </span>
+                    {selectedPlan.id === "3m" && !isTrialApplied ? (
+                      <div className="flex items-center gap-2">
+                        <span className="text-xs text-muted-foreground line-through">{formatPrice(selectedPlan.price)}</span>
+                        <span className="font-medium text-saffrondeep">{formatPrice(originalPrice)}</span>
+                        <span className="text-[10px] font-bold text-saffrondeep bg-primary/10 px-1.5 py-0.5 rounded-full">45% off</span>
+                      </div>
+                    ) : (
+                      <span className="font-medium">
+                        {formatPrice(originalPrice)}
+                      </span>
+                    )}
                   </div>
 
                   {hasActivePlan && queueStartTime ? (
