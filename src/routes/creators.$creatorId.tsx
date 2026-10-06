@@ -150,7 +150,7 @@ function CreatorProfile() {
                     {creator.displayName || creator.name}
                   </h1>
                   <span className="inline-flex items-center rounded-full bg-accent/20 px-2.5 py-0.5 text-xs font-semibold text-tealdeep border border-accent/30">
-                    Verified Creator
+                    Active Creator
                   </span>
                 </div>
 
