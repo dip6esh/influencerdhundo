@@ -27,7 +27,9 @@ import {
   TURNAROUNDS,
   calculateAge,
   formatFollowers,
+  formatInstagramHandle,
   formatPrice,
+  normalizeInstagramHandle,
   type Creator,
 } from "@/lib/directory-data";
 import defaultPhoto from "@/assets/creator-aditi.jpg";
@@ -311,11 +313,13 @@ function Register() {
       state: form.state || "",
       pincode: form.pincode,
       followers: Number(form.followers) || 0,
-      instagram: form.instagram.startsWith("@")
-        ? form.instagram
-        : form.instagram
-          ? `@${form.instagram}`
-          : "@yourhandle",
+      instagram: normalizeInstagramHandle(form.instagram)
+        ? `@${normalizeInstagramHandle(form.instagram)}`
+        : form.instagram.startsWith("@")
+          ? form.instagram
+          : form.instagram
+            ? `@${form.instagram}`
+            : "@yourhandle",
       otherSocials: [
         form.facebook ? { platform: "Facebook", handle: form.facebook } : null,
         form.youtube ? { platform: "YouTube", handle: form.youtube } : null,
@@ -373,7 +377,9 @@ function Register() {
       if (wordCount(form.about) > 300) return "About must be 300 words or less.";
     }
     if (step === 2) {
-      if (!form.instagram.trim()) return "Instagram profile is required.";
+      const cleanHandle = normalizeInstagramHandle(form.instagram);
+      if (!form.instagram.trim() || !cleanHandle)
+        return "Please enter a valid Instagram username or profile link.";
       if (!form.followers || Number(form.followers) <= 0)
         return "Enter your Instagram follower count.";
     }
@@ -967,11 +973,18 @@ function Register() {
               {step === 2 ? (
                 <div className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Instagram profile" hint="Required">
+                    <Field
+                      label="Instagram profile (Username or Link)"
+                      hint={
+                        normalizeInstagramHandle(form.instagram)
+                          ? `Detected handle: @${normalizeInstagramHandle(form.instagram)}`
+                          : "Enter handle (e.g. @aditi.eats) or paste full profile link"
+                      }
+                    >
                       <TextInput
                         value={form.instagram}
                         onChange={(e) => set("instagram", e.target.value)}
-                        placeholder="@aditi.eats"
+                        placeholder="@aditi.eats or https://instagram.com/aditi.eats"
                       />
                     </Field>
                     <Field label="Instagram followers" hint="Required">

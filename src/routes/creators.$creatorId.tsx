@@ -1,8 +1,16 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useState } from "react";
 import { Button, Card, Field, Select, Tag, TextArea } from "@/components/ui-kit";
+import { InstagramIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
-import { REPORT_REASONS, calculateAge, formatFollowers, formatPrice } from "@/lib/directory-data";
+import {
+  REPORT_REASONS,
+  calculateAge,
+  formatFollowers,
+  formatInstagramHandle,
+  formatPrice,
+  getInstagramUrl,
+} from "@/lib/directory-data";
 
 import {
   Briefcase,
@@ -168,18 +176,16 @@ function CreatorProfile() {
                 {/* Social Channels Row */}
                 <div className="mt-3 flex flex-wrap items-center gap-2">
                   <a
-                    href={`https://instagram.com/${creator.instagram.replace("@", "")}`}
+                    href={getInstagramUrl(creator.instagram)}
                     target="_blank"
                     rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/80 hover:bg-secondary hover:ring-border text-foreground transition-all shadow-xs"
+                    className="inline-flex items-center gap-1.5 rounded-xl bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/80 hover:bg-secondary hover:ring-border text-foreground transition-all shadow-xs group"
                   >
-                    <span className="grid size-4 place-items-center rounded-[4px] bg-gradient-to-tr from-amber-500 via-rose-500 to-purple-600 text-[9px] font-bold text-white">
-                      IG
-                    </span>
+                    <InstagramIcon className="size-4 shrink-0 transition-transform group-hover:scale-110" />
                     <span className="font-mono font-semibold">
-                      {creator.instagram.startsWith("@") ? creator.instagram : `@${creator.instagram}`}
+                      {formatInstagramHandle(creator.instagram) || creator.instagram}
                     </span>
-                    <ExternalLink className="size-3 text-muted-foreground ml-0.5" />
+                    <ExternalLink className="size-3 text-muted-foreground ml-0.5 group-hover:text-foreground transition-colors" />
                   </a>
 
                   {creator.otherSocials?.map((s) => (
@@ -313,43 +319,70 @@ function CreatorProfile() {
               <h2>Collaboration Details &amp; Terms</h2>
             </div>
 
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 sm:gap-3.5">
               {/* Collab Type */}
-              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Briefcase className="size-3.5 text-primary" /> Collab Type
-                </span>
-                <p className="text-base font-bold text-foreground mt-0.5">{creator.collabType || "Paid"}</p>
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 flex items-center gap-3.5 shadow-xs">
+                <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Briefcase className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Collaboration Type
+                  </span>
+                  <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 whitespace-nowrap">
+                    {creator.collabType || "Paid"}
+                  </p>
+                </div>
               </div>
 
               {/* Turnaround */}
-              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Clock className="size-3.5 text-primary" /> Turnaround
-                </span>
-                <p className="text-base font-bold text-foreground mt-0.5">{creator.turnaround || "3–5 days"}</p>
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 flex items-center gap-3.5 shadow-xs">
+                <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Clock className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Typical Turnaround
+                  </span>
+                  <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 whitespace-nowrap">
+                    {creator.turnaround || "3–5 days"}
+                  </p>
+                </div>
               </div>
 
               {/* Accepts Products */}
-              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Gift className="size-3.5 text-primary" /> Accepts Products
-                </span>
-                <p className="text-base font-bold text-foreground truncate mt-0.5" title={creator.acceptsProductsDetails}>
-                  {creator.acceptsProducts === "Depends" && creator.acceptsProductsDetails
-                    ? `Depends (${creator.acceptsProductsDetails})`
-                    : creator.acceptsProducts || "Depends"}
-                </p>
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 flex items-center gap-3.5 shadow-xs">
+                <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Gift className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Accepts Products / Deliveries
+                  </span>
+                  <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 truncate" title={creator.acceptsProductsDetails}>
+                    {creator.acceptsProducts || "Depends"}
+                    {creator.acceptsProducts === "Depends" && creator.acceptsProductsDetails && (
+                      <span className="text-xs font-normal text-muted-foreground ml-1.5">
+                        ({creator.acceptsProductsDetails})
+                      </span>
+                    )}
+                  </p>
+                </div>
               </div>
 
-              {/* Travel */}
-              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 space-y-1">
-                <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                  <Plane className="size-3.5 text-primary" /> Travel Availability
-                </span>
-                <p className="text-base font-bold text-foreground truncate mt-0.5" title={creator.travelRange}>
-                  {creator.travels ? (creator.travelRange ?? "Yes") : "Does not travel"}
-                </p>
+              {/* Travel Availability */}
+              <div className="rounded-2xl bg-background/60 border border-border/60 p-4 flex items-center gap-3.5 shadow-xs">
+                <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center shrink-0">
+                  <Plane className="size-4" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
+                    Travel Availability
+                  </span>
+                  <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 whitespace-nowrap">
+                    {creator.travels ? (creator.travelRange ?? "Anywhere within my city") : "Does not travel"}
+                  </p>
+                </div>
               </div>
             </div>
           </div>

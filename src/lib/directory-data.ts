@@ -664,3 +664,68 @@ export function filterCreators(creators: Creator[], f: Filters) {
     return true;
   });
 }
+
+/**
+ * Normalizes an Instagram input string (which may be a username, @handle,
+ * or full URL with query parameters/tracking strings) into a clean username.
+ * Example inputs handled:
+ * - "abeyarchit" -> "abeyarchit"
+ * - "@abeyarchit" -> "abeyarchit"
+ * - "https://www.instagram.com/abeyarchit?stkn=MW1yZDdwMGt6bjFnZA%3D%3D&utm_source=qr]" -> "abeyarchit"
+ * - "https://instagram.com/abeyarchit/" -> "abeyarchit"
+ * - "instagram.com/abeyarchit" -> "abeyarchit"
+ */
+export function normalizeInstagramHandle(input?: string | null): string {
+  if (!input) return "";
+  let clean = input.trim();
+  // Strip enclosing quotes, brackets, parentheses, trailing punctuation
+  clean = clean.replace(/^[@\s"'\(\[]+|[@\s"'\]\)\.,;]+$/g, "");
+
+  if (!clean) return "";
+
+  try {
+    const urlCandidate =
+      clean.startsWith("http://") || clean.startsWith("https://")
+        ? clean
+        : clean.includes("instagram.com")
+          ? `https://${clean}`
+          : "";
+
+    if (urlCandidate) {
+      const parsed = new URL(urlCandidate);
+      const segments = parsed.pathname.split("/").filter(Boolean);
+      const firstSegment = segments[0];
+      if (firstSegment) {
+        const segment = firstSegment.replace(/^@/, "").trim();
+        return segment.replace(/[^a-zA-Z0-9._]/g, "");
+      }
+    }
+  } catch {
+    const match = clean.match(/instagram\.com\/([a-zA-Z0-9._]+)/i);
+    const matchedHandle = match?.[1];
+    if (matchedHandle) {
+      return matchedHandle.replace(/[^a-zA-Z0-9._]/g, "");
+    }
+  }
+
+  // If it's a simple handle or contains query strings
+  const firstPart = clean.replace(/^@+/, "").split(/[?#/\s]/)[0] ?? "";
+  return firstPart.replace(/[^a-zA-Z0-9._]/g, "");
+}
+
+/**
+ * Returns a valid Instagram profile URL.
+ */
+export function getInstagramUrl(input?: string | null): string {
+  const handle = normalizeInstagramHandle(input);
+  return handle ? `https://www.instagram.com/${handle}/` : "https://www.instagram.com";
+}
+
+/**
+ * Returns a formatted Instagram handle (e.g. "@username").
+ */
+export function formatInstagramHandle(input?: string | null): string {
+  const handle = normalizeInstagramHandle(input);
+  return handle ? `@${handle}` : "";
+}
+

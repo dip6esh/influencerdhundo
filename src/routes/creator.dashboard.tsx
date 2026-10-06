@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
+import { InstagramIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
 import {
   calculateAge,
@@ -9,6 +10,7 @@ import {
   formatTimeRemaining,
   generateReferralCode,
   getActiveSubscription,
+  getInstagramUrl,
   getQueuedSubscriptions,
   getSubscriptionExpiry,
   isSubscriptionActive,
@@ -25,6 +27,7 @@ import {
   Gift,
   History,
   IndianRupee,
+  Instagram,
   Layers,
   Loader2,
   MessageCircle,
@@ -400,7 +403,7 @@ function Dashboard() {
                       )}
                     </div>
                     <div>
-                      <div className="flex items-center gap-2">
+                      <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-lg sm:text-xl font-display font-bold text-foreground">
                           {mine.displayName || mine.name}
                         </h2>
@@ -409,11 +412,20 @@ function Dashboard() {
                             Verified Creator
                           </span>
                         )}
+                        {mine.instagram && (
+                          <a
+                            href={getInstagramUrl(mine.instagram)}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex size-6 items-center justify-center rounded-lg hover:opacity-90 shadow-xs transition-all hover:scale-110 active:scale-95 cursor-pointer"
+                            title="Open Instagram profile"
+                            aria-label="Open Instagram profile"
+                          >
+                            <InstagramIcon className="size-5 shrink-0" />
+                          </a>
+                        )}
                       </div>
-                      <p className="text-sm font-mono font-medium text-tealdeep mt-0.5">
-                        {mine.instagram.startsWith("@") ? mine.instagram : `@${mine.instagram}`}
-                      </p>
-                      <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
+                      <p className="text-xs text-muted-foreground mt-1.5 flex flex-wrap items-center gap-1.5">
                         <span>📍 {[mine.locality, mine.city].filter(Boolean).join(", ") || "Location not set"}</span>
                         {calculateAge(mine.birthDate) !== null && (
                           <>

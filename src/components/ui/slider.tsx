@@ -16,7 +16,7 @@ const Slider = React.forwardRef<
   return (
     <SliderPrimitive.Root
       ref={ref}
-      disabled={disabled}
+      disabled={disabled || false}
       className={cn(
         "relative flex w-full touch-none select-none items-center py-2 cursor-pointer",
         disabled && "opacity-50 cursor-not-allowed pointer-events-none",

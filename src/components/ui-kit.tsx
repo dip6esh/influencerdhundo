@@ -67,8 +67,14 @@ export function Tag({
   );
 }
 
-export function Label({ children }: { children: ReactNode }) {
-  return <span className="label-caps block">{children}</span>;
+export function Label({
+  children,
+  className,
+}: {
+  children: ReactNode;
+  className?: string;
+}) {
+  return <span className={cn("label-caps block", className)}>{children}</span>;
 }
 
 export function Field({
