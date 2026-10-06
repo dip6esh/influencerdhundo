@@ -12,7 +12,6 @@ import {
   CheckCheck,
   ArrowRight,
   Building2,
-  Users,
   Search,
 } from "lucide-react";
 
@@ -364,7 +363,7 @@ function PricingSection() {
         <div className="max-w-3xl">
           <SectionEyebrow>Transparent Pricing &amp; Access</SectionEyebrow>
           <h2 className="mt-3 text-3xl font-display font-semibold leading-tight text-balance md:text-5xl">
-            Free for businesses. Affordable for creators.
+            Free for businesses.
           </h2>
           <p className="mt-4 text-base text-pretty text-muted-foreground md:text-lg">
             Searching, filtering, and contacting local influencers is 100% free with zero commission. Charges are only for creators who want to be listed in the public directory.
@@ -445,10 +444,6 @@ function PricingSection() {
 
         {/* ── SECTION HEADER FOR CREATOR PRICING ── */}
         <div className="mt-16 md:mt-20 max-w-2xl">
-          <div className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3.5 py-1 text-xs font-bold text-saffrondeep border border-primary/25 mb-2.5">
-            <Users className="size-3.5" />
-            <span>FOR CREATORS &amp; INFLUENCERS</span>
-          </div>
           <h2 className="text-3xl font-display font-semibold leading-tight text-balance md:text-5xl">
             Simple, honest plans for creators.
           </h2>
