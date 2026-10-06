@@ -40,18 +40,13 @@ import { Eye, EyeOff, Loader2 } from "lucide-react";
 export const Route = createFileRoute("/creator/register")({
   head: () => ({
     meta: [
-      { title: "Create your creator profile — influencer Dhundo" },
+      { title: "Create your creator profile — Influencer Dhundo" },
       {
         name: "description",
         content:
           "Build your creator profile for free in a few minutes: location, categories, content formats, languages, collaboration preferences and starting price.",
       },
-      { property: "og:title", content: "Create your creator profile" },
-      {
-        property: "og:description",
-        content:
-          "Get discovered by local businesses looking for creators in your area. Creating a profile is free.",
-      },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: Register,

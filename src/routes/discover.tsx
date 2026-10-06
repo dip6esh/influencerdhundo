@@ -29,17 +29,20 @@ import {
 export const Route = createFileRoute("/discover")({
   head: () => ({
     meta: [
-      { title: "Find local creators — influencer Dhundo" },
+      { title: "Find local creators — Influencer Dhundo" },
       {
         name: "description",
         content:
           "Search local creators by city, locality, category, follower size, budget, content type, language and collaboration preferences.",
       },
-      { property: "og:title", content: "Find local creators — influencer Dhundo" },
+      { property: "og:title", content: "Find local creators — Influencer Dhundo" },
       {
         property: "og:description",
         content: "Tell us what you're looking for and see matching local creators.",
       },
+    ],
+    links: [
+      { rel: "canonical", href: "https://www.influencerdhundo.com/discover" },
     ],
   }),
   component: Discover,

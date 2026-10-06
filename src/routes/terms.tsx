@@ -9,6 +9,9 @@ export const Route = createFileRoute("/terms")({
         content: "Terms and Conditions governing the use of Influencer Dhundo platform, subscriptions, and services.",
       },
     ],
+    links: [
+      { rel: "canonical", href: "https://www.influencerdhundo.com/terms" },
+    ],
   }),
   component: TermsPage,
 });

@@ -31,6 +31,9 @@ export const Route = createFileRoute("/")({
           "Where businesses find relevant Influencers to collaborate. Discover creators around your business. Connect directly. Start collaborating.",
       },
     ],
+    links: [
+      { rel: "canonical", href: "https://www.influencerdhundo.com/" },
+    ],
   }),
   component: Landing,
 });

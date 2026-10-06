@@ -29,17 +29,13 @@ import {
 export const Route = createFileRoute("/creator/plans")({
   head: () => ({
     meta: [
-      { title: "Creator subscription & payment — influencer Dhundo" },
+      { title: "Creator subscription & payment — Influencer Dhundo" },
       {
         name: "description",
         content:
           "Activate your creator profile to get discovered by local businesses. Choose a subscription plan or use promo code TRYFREE3DAYS for a 3-day free trial.",
       },
-      { property: "og:title", content: "Creator subscription & payment" },
-      {
-        property: "og:description",
-        content: "Make your creator profile live in the directory with transparent pricing or a free trial.",
-      },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: Plans,

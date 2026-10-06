@@ -13,18 +13,13 @@ import {
 export const Route = createFileRoute("/admin")({
   head: () => ({
     meta: [
-      { title: "Admin — influencer Dhundo" },
+      { title: "Admin — Influencer Dhundo" },
       {
         name: "description",
         content:
           "Platform admin view: manage creators, statuses, featured profiles, categories, locations, subscriptions, businesses and reported profiles.",
       },
-      { property: "og:title", content: "Admin — influencer Dhundo" },
-      {
-        property: "og:description",
-        content: "Manage creators, subscriptions, businesses and reports.",
-      },
-      { name: "robots", content: "noindex" },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: Admin,

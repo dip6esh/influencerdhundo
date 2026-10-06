@@ -30,6 +30,9 @@ export const Route = createFileRoute("/about")({
           "Empowering local businesses and creators with seamless discovery and 100% direct collaborations.",
       },
     ],
+    links: [
+      { rel: "canonical", href: "https://www.influencerdhundo.com/about" },
+    ],
   }),
   component: AboutPage,
 });

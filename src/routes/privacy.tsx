@@ -9,6 +9,9 @@ export const Route = createFileRoute("/privacy")({
         content: "Privacy Policy for Influencer Dhundo - how we collect, use, and protect your information.",
       },
     ],
+    links: [
+      { rel: "canonical", href: "https://www.influencerdhundo.com/privacy" },
+    ],
   }),
   component: PrivacyPage,
 });

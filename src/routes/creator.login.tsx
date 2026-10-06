@@ -13,6 +13,7 @@ export const Route = createFileRoute("/creator/login")({
         name: "description",
         content: "Log in to your creator profile to edit your details, view stats, and manage plans.",
       },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: CreatorLogin,

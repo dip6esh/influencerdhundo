@@ -10,6 +10,7 @@ export const Route = createFileRoute("/login")({
         name: "description",
         content: "Log in to your Influencer Dhundo business account or creator profile.",
       },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: LoginPage,

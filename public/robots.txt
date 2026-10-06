@@ -1,14 +1,23 @@
-User-agent: Googlebot
-Allow: /
-
-User-agent: Bingbot
-Allow: /
-
-User-agent: Twitterbot
-Allow: /
-
-User-agent: facebookexternalhit
-Allow: /
+# Influencer Dhundo — robots.txt
+# https://www.influencerdhundo.com
 
 User-agent: *
 Allow: /
+Allow: /discover
+Allow: /about
+Allow: /privacy
+Allow: /terms
+Allow: /refund-policy
+
+# Block all auth, private, and creator profile pages
+Disallow: /creators/
+Disallow: /creator/dashboard
+Disallow: /creator/plans
+Disallow: /creator/register
+Disallow: /creator/login
+Disallow: /business/signup
+Disallow: /business/login
+Disallow: /login
+Disallow: /admin
+
+Sitemap: https://www.influencerdhundo.com/sitemap.xml

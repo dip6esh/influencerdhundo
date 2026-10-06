@@ -30,17 +30,13 @@ import {
 export const Route = createFileRoute("/creators/$creatorId")({
   head: () => ({
     meta: [
-      { title: "Creator profile — influencer Dhundo" },
+      { title: "Creator profile — Influencer Dhundo" },
       {
         name: "description",
         content:
           "See a local creator's location, audience, content formats, collaboration preferences and starting price.",
       },
-      { property: "og:title", content: "Creator profile — influencer Dhundo" },
-      {
-        property: "og:description",
-        content: "Explore a local creator's profile and connect with them directly.",
-      },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   validateSearch: (

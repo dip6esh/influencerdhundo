@@ -16,6 +16,7 @@ export const Route = createFileRoute("/business/login")({
         name: "description",
         content: "Log in to your business account to access direct creator contacts.",
       },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: BusinessLogin,

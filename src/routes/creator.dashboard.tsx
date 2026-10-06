@@ -40,17 +40,13 @@ import {
 export const Route = createFileRoute("/creator/dashboard")({
   head: () => ({
     meta: [
-      { title: "Your creator dashboard — influencer Dhundo" },
+      { title: "Your creator dashboard — Influencer Dhundo" },
       {
         name: "description",
         content:
           "Check your profile status, subscription and public listing visibility as a creator.",
       },
-      { property: "og:title", content: "Your creator dashboard" },
-      {
-        property: "og:description",
-        content: "Manage your creator profile, plan and visibility.",
-      },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: Dashboard,

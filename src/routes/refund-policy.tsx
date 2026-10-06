@@ -9,6 +9,9 @@ export const Route = createFileRoute("/refund-policy")({
         content: "Refund and Cancellation Policy for Influencer Dhundo creator subscriptions and services.",
       },
     ],
+    links: [
+      { rel: "canonical", href: "https://www.influencerdhundo.com/refund-policy" },
+    ],
   }),
   component: RefundPolicyPage,
 });

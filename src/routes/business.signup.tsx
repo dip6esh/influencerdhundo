@@ -18,11 +18,7 @@ export const Route = createFileRoute("/business/signup")({
         content:
           "Create a free business account to view creator contact details. No subscription, no lengthy profile.",
       },
-      { property: "og:title", content: "Free business account — Influencer Dhundo" },
-      {
-        property: "og:description",
-        content: "Sign up free with password to access creator contact numbers.",
-      },
+      { name: "robots", content: "noindex, nofollow" },
     ],
   }),
   component: BusinessSignup,
