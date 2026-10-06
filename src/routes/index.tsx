@@ -13,6 +13,7 @@ import {
   ArrowRight,
   Building2,
   Users,
+  Search,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -360,13 +361,99 @@ function PricingSection() {
     <section id="pricing" className="border-t border-border bg-secondary/40 py-16 md:py-24 scroll-mt-14">
       <div className="mx-auto max-w-5xl px-5">
         {/* SECTION HEADER */}
-        <div className="max-w-2xl">
-          <SectionEyebrow>Transparent Pricing &amp; Free Trial</SectionEyebrow>
+        <div className="max-w-3xl">
+          <SectionEyebrow>Transparent Pricing &amp; Access</SectionEyebrow>
           <h2 className="mt-3 text-3xl font-display font-semibold leading-tight text-balance md:text-5xl">
-            Simple, honest plans for creators.
+            Free for businesses. Affordable for creators.
           </h2>
           <p className="mt-4 text-base text-pretty text-muted-foreground md:text-lg">
-            No commissions on your brand deals. Keep 100% of what you earn. Choose a plan or start with our 3-day free trial.
+            Searching, filtering, and contacting local influencers is 100% free with zero commission. Charges are only for creators who want to be listed in the public directory.
+          </p>
+        </div>
+
+        {/* ── FOR BUSINESSES: 100% FREE SECTION ── */}
+        <div className="mt-10 relative overflow-hidden rounded-3xl bg-gradient-to-br from-card via-background to-secondary/80 p-7 md:p-9 border-2 border-accent/40 shadow-xl">
+          <div className="pointer-events-none absolute -top-12 -right-12 size-52 rounded-full bg-accent/20 blur-3xl" />
+          <div className="pointer-events-none absolute -bottom-10 -left-10 size-48 rounded-full bg-primary/15 blur-2xl" />
+
+          <div className="relative flex flex-col lg:flex-row items-start lg:items-center justify-between gap-8">
+            <div className="space-y-3.5 max-w-xl">
+              <div className="inline-flex items-center gap-2 rounded-full bg-accent/20 px-3.5 py-1 text-xs font-bold text-tealdeep border border-accent/30">
+                <Building2 className="size-3.5" />
+                <span>FOR BUSINESSES &amp; BRANDS — 100% FREE</span>
+              </div>
+              <h3 className="text-2xl font-display font-bold md:text-3xl text-foreground">
+                Finding &amp; Contacting Local Creators Costs ₹0
+              </h3>
+              <p className="text-sm text-muted-foreground leading-relaxed">
+                Whether you're a cafe, retail shop, boutique, salon, clinic, or growing brand, there are <strong>zero platform fees and 0% commission</strong>. Search creators around your locality, explore their pricing, and reach out directly on WhatsApp or Call.
+              </p>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2.5 pt-1">
+                {[
+                  "Free unlimited creator search & filters",
+                  "Free business account & profile",
+                  "Direct WhatsApp & phone numbers",
+                  "0% commission or agency markup on deals",
+                ].map((perk) => (
+                  <div key={perk} className="flex items-center gap-2 text-xs font-medium text-foreground">
+                    <Check className="size-4 text-tealdeep shrink-0 font-bold" />
+                    <span>{perk}</span>
+                  </div>
+                ))}
+              </div>
+            </div>
+
+            {/* Business Free Tile */}
+            <div className="w-full lg:w-80 shrink-0 flex flex-col gap-4 bg-background/95 rounded-2xl p-6 border border-border/80 shadow-md">
+              <div className="space-y-1">
+                <span className="text-[11px] font-semibold text-muted-foreground uppercase tracking-wider">
+                  Business Directory Access
+                </span>
+                <div className="flex items-baseline gap-2 pt-0.5">
+                  <span className="font-display text-4xl font-bold tracking-tight text-foreground">
+                    ₹0
+                  </span>
+                  <span className="text-xs font-bold text-tealdeep bg-accent/20 px-2.5 py-0.5 rounded-full border border-accent/30">
+                    Free Forever
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground pt-1">
+                  Free to search and join. Charges apply only to creators who want to be listed.
+                </p>
+              </div>
+
+              <div className="pt-2 flex flex-col gap-2.5">
+                <Link
+                  to="/discover"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3.5 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-sm active:scale-98"
+                >
+                  <Search className="size-4" />
+                  <span>Search Creators Free</span>
+                </Link>
+                <Link
+                  to="/business/signup"
+                  className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-secondary px-5 py-2.5 font-display text-xs font-semibold text-foreground hover:bg-secondary/80 ring-1 ring-border transition-all"
+                >
+                  <span>Join as a Business (Free)</span>
+                  <ArrowRight className="size-3.5" />
+                </Link>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        {/* ── SECTION HEADER FOR CREATOR PRICING ── */}
+        <div className="mt-16 md:mt-20 max-w-2xl">
+          <div className="inline-flex items-center gap-2 rounded-full bg-primary/15 px-3.5 py-1 text-xs font-bold text-saffrondeep border border-primary/25 mb-2.5">
+            <Users className="size-3.5" />
+            <span>FOR CREATORS &amp; INFLUENCERS</span>
+          </div>
+          <h2 className="text-3xl font-display font-semibold leading-tight text-balance md:text-5xl">
+            Simple, honest plans for creators.
+          </h2>
+          <p className="mt-3.5 text-base text-pretty text-muted-foreground md:text-lg">
+            Charges are only for creators who want to be listed and verified in the public directory. No commissions on your brand deals — keep 100% of what you earn. Choose a plan or start with our 3-day free trial.
           </p>
         </div>
 
@@ -623,29 +710,6 @@ function PricingSection() {
           </div>
         </div>
 
-        {/* ── FOR BUSINESSES CALLOUT ── */}
-        <div className="mt-8 rounded-2xl bg-secondary/80 p-5 border border-border flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-3">
-            <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-              <Building2 className="size-5" />
-            </div>
-            <div>
-              <p className="text-sm font-semibold text-foreground">
-                Are you a business looking to hire creators?
-              </p>
-              <p className="text-xs text-muted-foreground">
-                Browsing, filtering and contacting creators in your locality is 100% free with no agency commissions.
-              </p>
-            </div>
-          </div>
-          <Link
-            to="/discover"
-            className="inline-flex shrink-0 items-center gap-1.5 rounded-xl bg-background px-4 py-2 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
-          >
-            <span>Explore Creators</span>
-            <ArrowRight className="size-3" />
-          </Link>
-        </div>
       </div>
     </section>
   );
