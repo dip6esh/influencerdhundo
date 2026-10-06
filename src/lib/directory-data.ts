@@ -38,16 +38,26 @@ export const CONTENT_TYPES = [
 ] as const;
 
 export const LANGUAGES = [
-  "Hindi",
+  "Assamese",
+  "Bengali",
+  "Bhojpuri",
+  "Dogri",
   "English",
-  "Marathi",
   "Gujarati",
+  "Hindi",
+  "Kannada",
+  "Kashmiri",
+  "Konkani",
+  "Maithili",
+  "Malayalam",
+  "Marathi",
+  "Meitei",
+  "Odia",
+  "Punjabi",
+  "Rajasthani",
+  "Sanskrit",
   "Tamil",
   "Telugu",
-  "Kannada",
-  "Malayalam",
-  "Bengali",
-  "Punjabi",
   "Urdu",
 ] as const;
 

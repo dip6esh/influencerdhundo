@@ -343,6 +343,7 @@ function Discover() {
                             setFilters({ ...filters, language: val })
                           }
                           placeholder="Any language"
+                          searchPlaceholder="Search language..."
                           options={LANGUAGES}
                         />
                       </Field>
