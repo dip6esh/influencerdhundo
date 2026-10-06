@@ -208,6 +208,36 @@ export const CITIES = [
   "Warangal",
 ] as const;
 
+export const STATES = [
+  "Andhra Pradesh",
+  "Assam",
+  "Bihar",
+  "Chandigarh",
+  "Chhattisgarh",
+  "Delhi",
+  "Goa",
+  "Gujarat",
+  "Haryana",
+  "Himachal Pradesh",
+  "Jammu and Kashmir",
+  "Jharkhand",
+  "Karnataka",
+  "Kerala",
+  "Madhya Pradesh",
+  "Maharashtra",
+  "Manipur",
+  "Meghalaya",
+  "Odisha",
+  "Puducherry",
+  "Punjab",
+  "Rajasthan",
+  "Tamil Nadu",
+  "Telangana",
+  "Uttar Pradesh",
+  "Uttarakhand",
+  "West Bengal",
+] as const;
+
 export const SIZE_BANDS = [
   { label: "Under 1K", min: 0, max: 1000 },
   { label: "1K–5K", min: 1000, max: 5000 },

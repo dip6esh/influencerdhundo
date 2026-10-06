@@ -23,6 +23,7 @@ import {
   CONTENT_TYPES,
   GENDERS,
   LANGUAGES,
+  STATES,
   TRAVEL_RANGES,
   TURNAROUNDS,
   calculateAge,
@@ -923,7 +924,16 @@ function Register() {
                       />
                     </Field>
                   </div>
-                  <div className="grid gap-4 sm:grid-cols-3">
+                  <div className="grid gap-4 sm:grid-cols-2">
+                    <Field label="State">
+                      <DropdownSelect
+                        value={form.state}
+                        onChange={(val) => set("state", val)}
+                        placeholder="Select state"
+                        searchPlaceholder="Search state..."
+                        options={STATES}
+                      />
+                    </Field>
                     <Field label="City">
                       <DropdownSelect
                         value={form.city}
@@ -933,11 +943,13 @@ function Register() {
                         options={CITIES}
                       />
                     </Field>
+                  </div>
+                  <div className="grid gap-4 sm:grid-cols-2">
                     <Field label="Locality">
                       <TextInput
                         value={form.locality}
                         onChange={(e) => set("locality", e.target.value)}
-                        placeholder="Thane West"
+                        placeholder="e.g. Thane West, Indiranagar"
                       />
                     </Field>
                     <Field label="Pincode">
@@ -950,13 +962,6 @@ function Register() {
                       />
                     </Field>
                   </div>
-                  <Field label="State">
-                    <TextInput
-                      value={form.state}
-                      onChange={(e) => set("state", e.target.value)}
-                      placeholder="Maharashtra"
-                    />
-                  </Field>
                   <Field
                     label="About you"
                     hint={`${wordCount(form.about)}/300 words — tell businesses briefly about yourself and the content you create.`}
