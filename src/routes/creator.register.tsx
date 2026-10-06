@@ -929,6 +929,7 @@ function Register() {
                         value={form.city}
                         onChange={(val) => set("city", val)}
                         placeholder="Select city"
+                        searchPlaceholder="Search city..."
                         options={CITIES}
                       />
                     </Field>

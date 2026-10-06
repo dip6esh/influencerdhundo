@@ -13,6 +13,7 @@ import {
   ChevronDown,
   ChevronLeft,
   ChevronRight,
+  Search,
   X,
 } from "lucide-react";
 import { cn } from "@/lib/utils";
@@ -116,15 +117,21 @@ export function DropdownSelect<T extends string = string>({
   placeholder,
   options,
   className,
+  searchable,
+  searchPlaceholder = "Search...",
 }: {
   value: T;
   onChange: (value: T) => void;
   placeholder?: string;
   options: { label: string; value: T }[] | readonly T[] | T[];
   className?: string;
+  searchable?: boolean;
+  searchPlaceholder?: string;
 }) {
   const [open, setOpen] = useState(false);
+  const [searchQuery, setSearchQuery] = useState("");
   const ref = useRef<HTMLDivElement>(null);
+  const searchInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent | TouchEvent) => {
@@ -140,9 +147,28 @@ export function DropdownSelect<T extends string = string>({
     };
   }, []);
 
+  useEffect(() => {
+    if (open) {
+      setSearchQuery("");
+      setTimeout(() => {
+        searchInputRef.current?.focus();
+      }, 50);
+    } else {
+      setSearchQuery("");
+    }
+  }, [open]);
+
   const normalizedOptions = options.map((opt) =>
     typeof opt === "string" ? { label: opt, value: opt as T } : opt,
   );
+
+  const isSearchable = searchable ?? normalizedOptions.length > 6;
+
+  const filteredOptions = isSearchable && searchQuery.trim()
+    ? normalizedOptions.filter((opt) =>
+        opt.label.toLowerCase().includes(searchQuery.trim().toLowerCase()),
+      )
+    : normalizedOptions;
 
   const selectedOption = normalizedOptions.find((o) => o.value === value);
   const displayLabel = selectedOption ? selectedOption.label : placeholder || "Select...";
@@ -172,49 +198,87 @@ export function DropdownSelect<T extends string = string>({
       </button>
 
       {open && (
-        <div className="absolute top-full left-0 z-50 mt-1.5 max-h-64 w-full overflow-y-auto rounded-xl border border-border bg-background/95 p-1.5 shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150">
-          {placeholder && (
-            <button
-              type="button"
-              onClick={(e) => {
-                e.stopPropagation();
-                onChange("" as T);
-                setOpen(false);
-              }}
-              className={cn(
-                "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left cursor-pointer",
-                value === ""
-                  ? "bg-primary/15 text-saffrondeep font-semibold"
-                  : "text-muted-foreground hover:bg-secondary hover:text-foreground",
-              )}
-            >
-              <span>{placeholder}</span>
-              {value === "" && <Check className="size-4 text-saffrondeep" />}
-            </button>
+        <div className="absolute top-full left-0 z-50 mt-1.5 max-h-72 w-full overflow-hidden rounded-xl border border-border bg-background shadow-2xl backdrop-blur-md animate-in fade-in zoom-in-95 duration-150 flex flex-col">
+          {isSearchable && (
+            <div className="p-2 border-b border-border/80 bg-secondary/30 shrink-0">
+              <div className="relative flex items-center">
+                <Search className="absolute left-2.5 size-3.5 text-muted-foreground pointer-events-none" />
+                <input
+                  ref={searchInputRef}
+                  type="text"
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  onClick={(e) => e.stopPropagation()}
+                  placeholder={searchPlaceholder}
+                  className="w-full rounded-lg bg-background pl-8 pr-7 py-1.5 text-xs text-foreground placeholder:text-muted-foreground outline-none ring-1 ring-border/80 focus:ring-2 focus:ring-primary transition-all"
+                />
+                {searchQuery && (
+                  <button
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      setSearchQuery("");
+                      searchInputRef.current?.focus();
+                    }}
+                    className="absolute right-2 text-muted-foreground hover:text-foreground cursor-pointer p-0.5"
+                  >
+                    <X className="size-3" />
+                  </button>
+                )}
+              </div>
+            </div>
           )}
-          {normalizedOptions.map((opt) => {
-            const isSelected = value === opt.value;
-            return (
+
+          <div className="max-h-56 overflow-y-auto p-1.5 space-y-0.5">
+            {!searchQuery && placeholder && (
               <button
-                key={opt.value}
                 type="button"
                 onClick={(e) => {
                   e.stopPropagation();
-                  onChange(opt.value);
+                  onChange("" as T);
                   setOpen(false);
                 }}
                 className={cn(
                   "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left cursor-pointer",
-                  isSelected
+                  value === ""
                     ? "bg-primary/15 text-saffrondeep font-semibold"
-                    : "text-foreground hover:bg-secondary",
+                    : "text-muted-foreground hover:bg-secondary hover:text-foreground",
                 )}
               >
-                <span>{opt.label}</span>
-                {isSelected && <Check className="size-4 text-saffrondeep" />}
+                <span>{placeholder}</span>
+                {value === "" && <Check className="size-4 text-saffrondeep" />}
               </button>
-            );
-          })}
+            )}
+            {filteredOptions.length === 0 ? (
+              <div className="py-6 px-3 text-center text-xs text-muted-foreground">
+                No results found matching "{searchQuery}"
+              </div>
+            ) : (
+              filteredOptions.map((opt) => {
+                const isSelected = value === opt.value;
+                return (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      onChange(opt.value);
+                      setOpen(false);
+                    }}
+                    className={cn(
+                      "flex w-full items-center justify-between rounded-lg px-3 py-2 text-sm font-medium transition-colors text-left cursor-pointer",
+                      isSelected
+                        ? "bg-primary/15 text-saffrondeep font-semibold"
+                        : "text-foreground hover:bg-secondary",
+                    )}
+                  >
+                    <span>{opt.label}</span>
+                    {isSelected && <Check className="size-4 text-saffrondeep" />}
+                  </button>
+                );
+              })
+            )}
+          </div>
         </div>
       )}
     </div>

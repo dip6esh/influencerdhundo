@@ -128,6 +128,7 @@ function Discover() {
                       value={filters.city}
                       onChange={(val) => setFilters({ ...filters, city: val })}
                       placeholder="Any city"
+                      searchPlaceholder="Search city..."
                       options={CITIES}
                     />
                   </Field>
@@ -182,7 +183,31 @@ function Discover() {
                   </div>
                 )}
 
-                {/* SECTION 2: DUAL RANGE SLIDERS (FOLLOWER SIZE & BUDGET) */}
+                {/* SECTION 2: COLLABORATION TYPE (SELECTABLE BUTTONS) */}
+                <div>
+                  <Label>Collaboration type</Label>
+                  <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
+                    {[
+                      { label: "Any type", value: "" },
+                      ...COLLAB_TYPES.map((c) => ({ label: c, value: c })),
+                    ].map((item) => (
+                      <button
+                        key={item.value}
+                        type="button"
+                        onClick={() => setFilters({ ...filters, collabType: item.value })}
+                        className={`rounded-xl py-2.5 px-3 text-xs font-semibold transition-all border text-center cursor-pointer ${
+                          filters.collabType === item.value
+                            ? "bg-primary text-primary-foreground border-saffrondeep shadow-sm"
+                            : "bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
+                        }`}
+                      >
+                        {item.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* SECTION 3: DUAL RANGE SLIDERS (FOLLOWER SIZE & BUDGET) */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2">
                   {/* FOLLOWER SIZE RANGE */}
                   <div className="rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60 flex flex-col justify-between">
@@ -278,30 +303,6 @@ function Discover() {
                         <span>₹50K+</span>
                       </div>
                     </div>
-                  </div>
-                </div>
-
-                {/* SECTION 3: COLLABORATION TYPE (SELECTABLE BUTTONS) */}
-                <div>
-                  <Label>Collaboration type</Label>
-                  <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
-                    {[
-                      { label: "Any type", value: "" },
-                      ...COLLAB_TYPES.map((c) => ({ label: c, value: c })),
-                    ].map((item) => (
-                      <button
-                        key={item.value}
-                        type="button"
-                        onClick={() => setFilters({ ...filters, collabType: item.value })}
-                        className={`rounded-xl py-2.5 px-3 text-xs font-semibold transition-all border text-center cursor-pointer ${
-                          filters.collabType === item.value
-                            ? "bg-primary text-primary-foreground border-saffrondeep shadow-sm"
-                            : "bg-background text-muted-foreground border-border hover:border-foreground/30 hover:text-foreground"
-                        }`}
-                      >
-                        {item.label}
-                      </button>
-                    ))}
                   </div>
                 </div>
 
