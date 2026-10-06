@@ -896,3 +896,103 @@ export function formatInstagramHandle(input?: string | null): string {
   return handle ? `@${handle}` : "";
 }
 
+/**
+ * List of verified, trusted personal consumer email domains.
+ * Custom domains, disposable/throwaway, and unverified business domains are blocked.
+ */
+export const TRUSTED_EMAIL_DOMAINS = [
+  // Google
+  "gmail.com",
+  "googlemail.com",
+  // Microsoft
+  "outlook.com",
+  "outlook.in",
+  "hotmail.com",
+  "hotmail.co.in",
+  "live.com",
+  "live.in",
+  "msn.com",
+  // Yahoo
+  "yahoo.com",
+  "yahoo.co.in",
+  "yahoo.in",
+  "ymail.com",
+  "rocketmail.com",
+  // Apple
+  "icloud.com",
+  "me.com",
+  "mac.com",
+  // Trusted Standard Providers
+  "zoho.com",
+  "zoho.in",
+  "proton.me",
+  "protonmail.com",
+  "rediffmail.com",
+  "aol.com",
+  "gmx.com",
+  "mail.com",
+] as const;
+
+/**
+ * Validates that an email address has a valid format and is from a trusted domain.
+ */
+export function validateTrustedEmail(email?: string | null): { valid: boolean; error?: string; suggestion?: string } {
+  if (!email || !email.trim()) {
+    return { valid: false, error: "Please enter your email address." };
+  }
+
+  const clean = email.trim().toLowerCase();
+
+  // Basic syntax check
+  const emailRegex = /^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$/;
+  if (!emailRegex.test(clean)) {
+    return { valid: false, error: "Please enter a valid email address (e.g. name@gmail.com)." };
+  }
+
+  const parts = clean.split("@");
+  if (parts.length !== 2 || !parts[1]) {
+    return { valid: false, error: "Please enter a valid email address." };
+  }
+
+  const domain = parts[1].toLowerCase();
+
+  // Common typo checks for helpful suggestions
+  const typoSuggestions: Record<string, string> = {
+    "gnail.com": "gmail.com",
+    "gmai.com": "gmail.com",
+    "gamil.com": "gmail.com",
+    "gmial.com": "gmail.com",
+    "gmaill.com": "gmail.com",
+    "gmaik.com": "gmail.com",
+    "gmaol.com": "gmail.com",
+    "yaho.com": "yahoo.com",
+    "yahooo.com": "yahoo.com",
+    "yhaoo.com": "yahoo.com",
+    "outlok.com": "outlook.com",
+    "outloo.com": "outlook.com",
+    "hotmial.com": "hotmail.com",
+    "hotmaill.com": "hotmail.com",
+    "icld.com": "icloud.com",
+    "zohomail.com": "zoho.com",
+  };
+
+  const isTrusted = TRUSTED_EMAIL_DOMAINS.includes(
+    domain as (typeof TRUSTED_EMAIL_DOMAINS)[number],
+  );
+
+  if (!isTrusted) {
+    if (typoSuggestions[domain]) {
+      return {
+        valid: false,
+        error: `Invalid email domain '@${domain}'. Did you mean '@${typoSuggestions[domain]}'?`,
+        suggestion: `${parts[0]}@${typoSuggestions[domain]}`,
+      };
+    }
+    return {
+      valid: false,
+      error: `Domain '@${domain}' is not allowed. Only trusted providers like @gmail.com, @yahoo.com, @outlook.com, @icloud.com, @zoho.com are accepted.`,
+    };
+  }
+
+  return { valid: true };
+}

@@ -81,17 +81,25 @@ export function Label({
 export function Field({
   label,
   hint,
+  error,
+  className,
   children,
 }: {
   label: string;
-  hint?: string;
+  hint?: string | undefined;
+  error?: string | undefined;
+  className?: string | undefined;
   children: ReactNode;
 }) {
   return (
-    <div className="block">
+    <div className={cn("block", className)}>
       <Label>{label}</Label>
       <div className="mt-2">{children}</div>
-      {hint ? <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p> : null}
+      {error ? (
+        <p className="mt-1.5 text-xs font-semibold text-rose">{error}</p>
+      ) : hint ? (
+        <p className="mt-1.5 text-xs text-muted-foreground">{hint}</p>
+      ) : null}
     </div>
   );
 }

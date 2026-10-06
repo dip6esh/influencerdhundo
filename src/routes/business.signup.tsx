@@ -3,6 +3,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import { supabase, supabaseDb } from "@/lib/supabase";
+import { validateTrustedEmail } from "@/lib/directory-data";
 import { Building2, Eye, EyeOff, Loader2 } from "lucide-react";
 
 export const Route = createFileRoute("/business/signup")({
@@ -49,6 +50,47 @@ function BusinessSignup() {
   const [awaitingVerification, setAwaitingVerification] = useState(false);
   const [verifyError, setVerifyError] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
+  const [emailLiveError, setEmailLiveError] = useState<string | null>(null);
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
+
+  const handleEmailChange = (val: string) => {
+    setForm((prev) => ({ ...prev, email: val }));
+    const clean = val.trim();
+    if (!clean) {
+      setEmailLiveError(null);
+      setEmailSuggestion(null);
+      return;
+    }
+    if (clean.includes("@") && clean.split("@")[1]?.includes(".")) {
+      const res = validateTrustedEmail(clean);
+      if (!res.valid) {
+        setEmailLiveError(res.error || "Invalid email domain");
+        setEmailSuggestion(res.suggestion || null);
+      } else {
+        setEmailLiveError(null);
+        setEmailSuggestion(null);
+      }
+    } else {
+      setEmailLiveError(null);
+      setEmailSuggestion(null);
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (!form.email.trim()) {
+      setEmailLiveError(null);
+      setEmailSuggestion(null);
+      return;
+    }
+    const res = validateTrustedEmail(form.email);
+    if (!res.valid) {
+      setEmailLiveError(res.error || "Invalid email");
+      setEmailSuggestion(res.suggestion || null);
+    } else {
+      setEmailLiveError(null);
+      setEmailSuggestion(null);
+    }
+  };
 
   // Listen for cross-tab auth state changes (e.g. email confirmation clicked)
   useEffect(() => {
@@ -103,8 +145,9 @@ function BusinessSignup() {
     if (!cleanMobile || cleanMobile.length < 10) {
       return "Please enter a valid 10-digit mobile number.";
     }
-    if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) {
-      return "Please enter a valid email address.";
+    const emailCheck = validateTrustedEmail(form.email);
+    if (!emailCheck.valid) {
+      return emailCheck.error!;
     }
     if (form.password.length < 8) {
       return "Password must be at least 8 characters.";
@@ -347,14 +390,36 @@ function BusinessSignup() {
                       placeholder="9820011223"
                     />
                   </Field>
-                  <Field label="Email address" hint="This will be your login email">
+                  <Field
+                    label="Email address"
+                    hint="Trusted providers only (Gmail, Yahoo, Outlook, etc.)"
+                    error={emailLiveError || undefined}
+                  >
                     <TextInput
                       value={form.email}
                       type="email"
                       maxLength={255}
-                      onChange={(e) => setForm({ ...form, email: e.target.value })}
-                      placeholder="rahul@cafemocha.com"
+                      onChange={(e) => handleEmailChange(e.target.value)}
+                      onBlur={handleEmailBlur}
+                      placeholder="rahul@gmail.com"
+                      className={emailLiveError ? "ring-2 ring-rose focus:ring-rose" : ""}
                     />
+                    {emailSuggestion && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span>Suggestion:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            setForm((prev) => ({ ...prev, email: emailSuggestion }));
+                            setEmailLiveError(null);
+                            setEmailSuggestion(null);
+                          }}
+                          className="font-semibold text-primary underline hover:text-primary/80 cursor-pointer"
+                        >
+                          Use {emailSuggestion}
+                        </button>
+                      </div>
+                    )}
                   </Field>
                 </div>
 

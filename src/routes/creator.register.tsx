@@ -31,6 +31,7 @@ import {
   formatInstagramHandle,
   formatPrice,
   normalizeInstagramHandle,
+  validateTrustedEmail,
   type Creator,
 } from "@/lib/directory-data";
 import defaultPhoto from "@/assets/creator-aditi.jpg";
@@ -292,8 +293,47 @@ function Register() {
     };
   }, [awaitingVerification]);
 
-  const set = <K extends keyof Form>(key: K, value: Form[K]) =>
+  const [emailLiveError, setEmailLiveError] = useState<string | null>(null);
+  const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
+
+  const set = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm((f) => ({ ...f, [key]: value }));
+    if (key === "email") {
+      const emailStr = String(value || "").trim();
+      if (!emailStr) {
+        setEmailLiveError(null);
+        setEmailSuggestion(null);
+      } else if (emailStr.includes("@") && emailStr.split("@")[1]?.includes(".")) {
+        const res = validateTrustedEmail(emailStr);
+        if (!res.valid) {
+          setEmailLiveError(res.error || "Invalid email");
+          setEmailSuggestion(res.suggestion || null);
+        } else {
+          setEmailLiveError(null);
+          setEmailSuggestion(null);
+        }
+      } else {
+        setEmailLiveError(null);
+        setEmailSuggestion(null);
+      }
+    }
+  };
+
+  const handleEmailBlur = () => {
+    if (!form.email.trim()) {
+      setEmailLiveError(null);
+      setEmailSuggestion(null);
+      return;
+    }
+    const res = validateTrustedEmail(form.email);
+    if (!res.valid) {
+      setEmailLiveError(res.error || "Invalid email");
+      setEmailSuggestion(res.suggestion || null);
+    } else {
+      setEmailLiveError(null);
+      setEmailSuggestion(null);
+    }
+  };
 
   const toggle = (key: "categories" | "contentTypes" | "languages", value: string) =>
     setForm((f) => ({
@@ -358,7 +398,8 @@ function Register() {
     if (step === 0) {
       // Account step — only for new sign-ups
       if (existing) return "";
-      if (!/^\S+@\S+\.\S+$/.test(form.email.trim())) return "Enter a valid email address.";
+      const emailCheck = validateTrustedEmail(form.email);
+      if (!emailCheck.valid) return emailCheck.error!;
       if (form.password.length < 8) return "Password must be at least 8 characters.";
       if (form.password !== form.confirmPassword) return "Passwords do not match.";
       return "";
@@ -702,15 +743,37 @@ function Register() {
                     </p>
                   </div>
 
-                  <Field label="Email address" hint="This will be your login email">
+                  <Field
+                    label="Email address"
+                    hint="Trusted providers only (Gmail, Yahoo, Outlook, etc.)"
+                    error={emailLiveError || undefined}
+                  >
                     <TextInput
                       type="email"
                       value={form.email}
                       maxLength={255}
                       onChange={(e) => set("email", e.target.value)}
-                      placeholder="you@email.com"
+                      onBlur={handleEmailBlur}
+                      placeholder="you@gmail.com"
+                      className={emailLiveError ? "ring-2 ring-rose focus:ring-rose" : ""}
                       autoFocus
                     />
+                    {emailSuggestion && (
+                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                        <span>Suggestion:</span>
+                        <button
+                          type="button"
+                          onClick={() => {
+                            set("email", emailSuggestion);
+                            setEmailLiveError(null);
+                            setEmailSuggestion(null);
+                          }}
+                          className="font-semibold text-primary underline hover:text-primary/80 cursor-pointer"
+                        >
+                          Use {emailSuggestion}
+                        </button>
+                      </div>
+                    )}
                   </Field>
 
                   <Field label="Password" hint="At least 8 characters">
