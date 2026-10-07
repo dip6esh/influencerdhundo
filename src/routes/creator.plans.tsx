@@ -12,6 +12,7 @@ import {
   isSubscriptionActive,
 } from "@/lib/directory-data";
 import {
+  AlertCircle,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -25,6 +26,12 @@ import {
   Tag,
   Zap,
 } from "lucide-react";
+import {
+  createRazorpayOrderFn,
+  verifyRazorpayPaymentFn,
+  openRazorpayCheckout,
+} from "@/lib/razorpay";
+import { supabaseDb, type DiscountCode } from "@/lib/supabase";
 
 export const Route = createFileRoute("/creator/plans")({
   head: () => ({
@@ -69,30 +76,55 @@ function Plans() {
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>("3m");
   const [promoCodeInput, setPromoCodeInput] = useState("");
-  const [appliedPromo, setAppliedPromo] = useState<string | null>(null);
+  const [appliedDiscount, setAppliedDiscount] = useState<{
+    code: string;
+    percent: number;
+    type: "percentage" | "flat";
+    value: number;
+    isTrial?: boolean;
+    validUntil?: string;
+    note?: string;
+  } | null>(null);
   const [promoError, setPromoError] = useState("");
+  const [validatingPromo, setValidatingPromo] = useState(false);
   const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [processing, setProcessing] = useState(false);
+  const [paymentError, setPaymentError] = useState("");
   const [success, setSuccess] = useState(false);
 
   const selectedPlan = PLANS.find((p) => p.id === selectedPlanId) || PLANS[1];
-  const isTrialApplied = !trialAlreadyUsed && appliedPromo?.toUpperCase() === PROMO_CODE_3DAYS;
+  const isTrialApplied = Boolean(appliedDiscount?.isTrial && !trialAlreadyUsed);
 
   // Price calculations — 3m plan has a limited launch offer price of ₹1,099 (was ₹1,999)
   const LAUNCH_OFFER_3M_PRICE = 1099;
-  const effectivePlanPrice = selectedPlan.id === "3m" ? LAUNCH_OFFER_3M_PRICE : selectedPlan.price;
-  const originalPrice = effectivePlanPrice;
-  const discountAmount = isTrialApplied ? originalPrice : 0;
-  const finalPrice = isTrialApplied ? 0 : originalPrice;
+  const getBasePlanPrice = (planId: string, price: number) =>
+    planId === "3m" ? LAUNCH_OFFER_3M_PRICE : price;
 
-  const handleApplyPromo = () => {
+  const basePrice = getBasePlanPrice(selectedPlan.id, selectedPlan.price);
+
+  // Dynamic discount calculation across all plans
+  const calculateDiscountForPrice = (price: number) => {
+    if (isTrialApplied) return price; // 100% off for 3-day trial
+    if (!appliedDiscount) return 0;
+    if (appliedDiscount.type === "flat") {
+      return Math.min(price, appliedDiscount.value);
+    }
+    return Math.round((price * appliedDiscount.percent) / 100);
+  };
+
+  const discountAmount = calculateDiscountForPrice(basePrice);
+  const finalPrice = isTrialApplied ? 0 : Math.max(0, basePrice - discountAmount);
+
+  const handleApplyPromo = async () => {
     setPromoError("");
+    setPaymentError("");
     const cleaned = promoCodeInput.trim().toUpperCase();
     if (!cleaned) {
       setPromoError("Please enter a coupon code.");
       return;
     }
 
+    // 1. Check built-in 3-day free trial code
     if (cleaned === PROMO_CODE_3DAYS) {
       if (trialAlreadyUsed) {
         setPromoError(
@@ -100,20 +132,58 @@ function Plans() {
         );
         return;
       }
-      setAppliedPromo(PROMO_CODE_3DAYS);
+      setAppliedDiscount({
+        code: PROMO_CODE_3DAYS,
+        percent: 100,
+        type: "percentage",
+        value: 100,
+        isTrial: true,
+        note: "3 Days Free Trial",
+      });
       setPromoCodeInput("");
-    } else {
-      setPromoError("Invalid coupon code. Try 'TRYFREE3DAYS' for a 3-day free trial.");
+      return;
+    }
+
+    // 2. Validate admin-created discount code from Supabase
+    setValidatingPromo(true);
+    try {
+      const res = await supabaseDb.validateDiscountCode(cleaned);
+      if (!res.valid) {
+        setPromoError(res.error || "Invalid coupon code.");
+        return;
+      }
+
+      const dc = res.discountCode;
+      setAppliedDiscount({
+        code: dc.code,
+        percent: dc.discountPercent,
+        type: dc.discountType,
+        value: dc.discountValue,
+        validUntil: dc.validUntil,
+        note:
+          dc.discountPercent === 100
+            ? "100% OFF (Free Pass)"
+            : dc.discountType === "flat"
+            ? `₹${dc.discountValue} OFF`
+            : `${dc.discountPercent}% OFF on all plans`,
+      });
+      setPromoCodeInput("");
+    } catch {
+      setPromoError("Failed to validate promo code. Please try again.");
+    } finally {
+      setValidatingPromo(false);
     }
   };
 
   const handleRemovePromo = () => {
-    setAppliedPromo(null);
+    setAppliedDiscount(null);
     setPromoError("");
+    setPaymentError("");
   };
 
   const handleActivate = async () => {
     if (!mine) return;
+    setPaymentError("");
     setProcessing(true);
 
     try {
@@ -121,35 +191,125 @@ function Plans() {
         setPromoError(
           "You have already used the free trial. Please choose a paid subscription plan.",
         );
-        setAppliedPromo(null);
+        setAppliedDiscount(null);
         setProcessing(false);
         return;
       }
 
-      // Simulate payment gateway response
-      await new Promise((r) => setTimeout(r, 900));
+      // 1. FREE PASS (₹0 / 100% Discount / Trial): Instant activation without payment gateway
+      if (isTrialApplied || finalPrice === 0) {
+        const planIdToActivate = isTrialApplied ? "trial-3d" : selectedPlan.id;
+        const durationToActivate = isTrialApplied ? "3 Days Free Trial" : selectedPlan.duration;
 
-      if (isTrialApplied) {
         await activateSubscription({
           creatorId: mine.id,
-          planId: "trial-3d",
-          duration: "3 Days Free Trial",
+          planId: planIdToActivate,
+          duration: durationToActivate,
           price: 0,
         });
-      } else {
-        await activateSubscription({
+
+        // If a 100% discount code was used, increment usage count
+        if (appliedDiscount?.code && !isTrialApplied) {
+          await supabaseDb.incrementDiscountCodeUsage(appliedDiscount.code);
+        }
+
+        setSuccess(true);
+        setTimeout(() => {
+          navigate({ to: "/creator/dashboard" });
+        }, 1500);
+        return;
+      }
+
+      // 2. PAID PLAN: Create Razorpay Order securely on server with discount code applied
+      const orderRes = await createRazorpayOrderFn({
+        data: {
+          creatorId: mine.id,
+          creatorName: mine.displayName || mine.name,
+          creatorEmail: mine.contact?.email,
+          creatorContact: mine.contact?.phone,
+          planId: selectedPlan.id,
+          discountCode: appliedDiscount?.code,
+        },
+      });
+
+      if (!orderRes || !orderRes.success || !orderRes.orderId) {
+        throw new Error(orderRes?.error || "Failed to initialize Razorpay payment order.");
+      }
+
+      // 3. Open Razorpay Checkout Modal for the discounted amount
+      await openRazorpayCheckout({
+        keyId: orderRes.keyId || import.meta.env["VITE_RAZORPAY_KEY_ID"] || "",
+        orderId: orderRes.orderId,
+        amount: Number(orderRes.amount),
+        currency: orderRes.currency || "INR",
+        name: "Influencer Dhundo",
+        description: `Creator Pass: ${selectedPlan.duration} (${formatPrice(finalPrice)})`,
+        prefill: {
+          name: mine.displayName || mine.name,
+          email: mine.contact?.email || "",
+          contact: mine.contact?.phone || "",
+        },
+        notes: {
           creatorId: mine.id,
           planId: selectedPlan.id,
           duration: selectedPlan.duration,
-          price: selectedPlan.price,
-        });
-      }
+          discountCode: appliedDiscount?.code || "none",
+        },
+        onSuccess: async (response) => {
+          try {
+            // 4. Verify payment digital signature on backend
+            const verifyRes = await verifyRazorpayPaymentFn({
+              data: {
+                orderId: response.razorpay_order_id,
+                paymentId: response.razorpay_payment_id,
+                signature: response.razorpay_signature,
+                creatorId: mine.id,
+                planId: selectedPlan.id,
+                duration: selectedPlan.duration,
+                discountCode: appliedDiscount?.code,
+                amountPaid: finalPrice,
+              },
+            });
 
-      setSuccess(true);
-      setTimeout(() => {
-        navigate({ to: "/creator/dashboard" });
-      }, 1500);
-    } catch {
+            if (!verifyRes || !verifyRes.success || !verifyRes.isVerified) {
+              setPaymentError(
+                verifyRes?.error ||
+                  "Payment verification failed. If money was debited, please contact support with Order ID: " +
+                    response.razorpay_order_id,
+              );
+              setProcessing(false);
+              return;
+            }
+
+            // 5. Activate or queue subscription in application state
+            await activateSubscription({
+              creatorId: mine.id,
+              planId: selectedPlan.id,
+              duration: selectedPlan.duration,
+              price: finalPrice,
+            });
+
+            setSuccess(true);
+            setTimeout(() => {
+              navigate({ to: "/creator/dashboard" });
+            }, 1500);
+          } catch (verifyErr: any) {
+            console.error("Verification error:", verifyErr);
+            setPaymentError(verifyErr.message || "Payment verification failed. Please contact support.");
+            setProcessing(false);
+          }
+        },
+        onDismiss: () => {
+          setProcessing(false);
+        },
+        onError: (err) => {
+          setPaymentError(err?.description || "Payment cancelled or failed. Please try again.");
+          setProcessing(false);
+        },
+      });
+    } catch (err: any) {
+      console.error("Payment activation error:", err);
+      setPaymentError(err.message || "Failed to start payment. Please try again.");
       setProcessing(false);
     }
   };
@@ -204,7 +364,7 @@ function Plans() {
           ) : null}
 
           {/* QUICK PROMO NOTICE BANNER — only shown if trial not yet used and no active plan */}
-          {!hasActivePlan && !appliedPromo && !trialAlreadyUsed ? (
+          {!hasActivePlan && !appliedDiscount && !trialAlreadyUsed ? (
             <div className="mt-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 p-4 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -222,7 +382,14 @@ function Plans() {
               <button
                 type="button"
                 onClick={() => {
-                  setAppliedPromo(PROMO_CODE_3DAYS);
+                  setAppliedDiscount({
+                    code: PROMO_CODE_3DAYS,
+                    percent: 100,
+                    type: "percentage",
+                    value: 100,
+                    isTrial: true,
+                    note: "3 Days Free Trial",
+                  });
                   setPromoError("");
                 }}
                 className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-all cursor-pointer"
@@ -263,13 +430,17 @@ function Plans() {
                 <div className="grid gap-3 sm:grid-cols-2">
                   {PLANS.map((p) => {
                     const isSelected = selectedPlanId === p.id && !isTrialApplied;
+                    const standardPrice = getBasePlanPrice(p.id, p.price);
+                    const planDiscount = calculateDiscountForPrice(standardPrice);
+                    const planFinalPrice = isTrialApplied ? 0 : Math.max(0, standardPrice - planDiscount);
+
                     return (
                       <button
                         key={p.id}
                         type="button"
                         onClick={() => {
                           setSelectedPlanId(p.id);
-                          if (isTrialApplied) setAppliedPromo(null);
+                          if (isTrialApplied) setAppliedDiscount(null);
                         }}
                         className={`relative rounded-2xl p-5 text-left transition-all border cursor-pointer ${
                           isSelected
@@ -277,7 +448,7 @@ function Plans() {
                             : "glass-card hover:border-foreground/40 bg-card text-foreground"
                         }`}
                       >
-                        {p.id === "3m" && (
+                        {p.id === "3m" && !appliedDiscount && (
                           <>
                             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm whitespace-nowrap">
                               Limited Launch Offer
@@ -287,6 +458,15 @@ function Plans() {
                               <span className="text-[7.5px] uppercase font-bold tracking-wider opacity-90">OFF</span>
                             </div>
                           </>
+                        )}
+                        {appliedDiscount && (
+                          <div className="absolute -top-2.5 -right-2.5 z-10 flex h-6 items-center justify-center rounded-full bg-tealdeep px-2 text-[10px] font-bold text-white shadow-md">
+                            {appliedDiscount.percent === 100
+                              ? "FREE"
+                              : appliedDiscount.type === "flat"
+                              ? `-₹${appliedDiscount.value}`
+                              : `${appliedDiscount.percent}% OFF`}
+                          </div>
                         )}
                         <p
                           className={
@@ -300,7 +480,16 @@ function Plans() {
                         <p className="mt-1.5 font-display text-2xl font-semibold">
                           {p.duration}
                         </p>
-                        {p.id === "3m" ? (
+                        {appliedDiscount && !isTrialApplied ? (
+                          <div className="mt-2 flex items-baseline gap-2">
+                            <span className={`text-xl font-bold ${isSelected ? "text-primary" : "text-tealdeep"}`}>
+                              {formatPrice(planFinalPrice)}
+                            </span>
+                            <span className={`text-sm line-through ${isSelected ? "text-background/60" : "text-muted-foreground"}`}>
+                              {formatPrice(standardPrice)}
+                            </span>
+                          </div>
+                        ) : p.id === "3m" ? (
                           <div className="mt-2 flex items-baseline gap-2">
                             <span className={`text-xl font-bold ${isSelected ? "text-primary" : "text-saffrondeep"}`}>
                               ₹1,099
@@ -331,25 +520,28 @@ function Plans() {
                   <h3 className="text-sm font-semibold">2. Discount or promo code</h3>
                 </div>
 
-                {appliedPromo ? (
+                {appliedDiscount ? (
                   <div className="rounded-xl bg-accent/10 border border-accent/30 p-4 flex items-center justify-between gap-3">
                     <div className="flex items-center gap-2.5">
                       <CheckCircle2 className="size-5 text-tealdeep shrink-0" />
                       <div>
                         <p className="text-xs font-bold text-tealdeep font-mono tracking-wide">
-                          {appliedPromo} APPLIED
+                          {appliedDiscount.code} APPLIED
                         </p>
                         <p className="text-xs text-muted-foreground mt-0.5">
-                          {isTrialApplied
-                            ? "3 Days Free Trial (100% Free · ₹0)"
-                            : "Discount applied"}
+                          {appliedDiscount.note || "Discount applied on all plans"}
+                          {appliedDiscount.validUntil && (
+                            <span className="block text-[11px] text-muted-foreground/80">
+                              Valid until {new Date(appliedDiscount.validUntil).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
                     <button
                       type="button"
                       onClick={handleRemovePromo}
-                      className="text-xs text-muted-foreground hover:text-rose underline underline-offset-2"
+                      className="text-xs text-muted-foreground hover:text-rose underline underline-offset-2 font-medium"
                     >
                       Remove
                     </button>
@@ -361,15 +553,16 @@ function Plans() {
                         value={promoCodeInput}
                         onChange={(e) => setPromoCodeInput(e.target.value)}
                         onKeyDown={(e) => e.key === "Enter" && handleApplyPromo()}
-                        placeholder={trialAlreadyUsed ? "Enter promo code" : "e.g. TRYFREE3DAYS"}
+                        placeholder="Enter coupon or promo code"
                         className="font-mono uppercase tracking-wider"
                       />
                       <Button
                         variant="primary"
                         onClick={handleApplyPromo}
+                        disabled={validatingPromo}
                         className="shrink-0 px-5 font-semibold"
                       >
-                        Apply
+                        {validatingPromo ? "Applying..." : "Apply"}
                       </Button>
                     </div>
 
@@ -377,11 +570,11 @@ function Plans() {
                       <p className="text-xs font-medium text-rose">{promoError}</p>
                     ) : !trialAlreadyUsed ? (
                       <p className="text-xs text-muted-foreground">
-                        Try code <button type="button" onClick={() => { setPromoCodeInput("TRYFREE3DAYS"); }} className="font-mono font-semibold text-foreground underline underline-offset-2 hover:text-primary">TRYFREE3DAYS</button> to unlock 3 days free trial.
+                        Have a referral or promo code? Enter it above to get instant discounts.
                       </p>
                     ) : (
                       <p className="text-xs text-muted-foreground">
-                        Enter a valid promo code if you have one.
+                        Enter any valid discount code to apply savings across all plans.
                       </p>
                     )}
                   </div>
@@ -444,19 +637,31 @@ function Plans() {
                   </div>
 
                   <div className="flex justify-between items-center">
-                    <span className="text-muted-foreground">Plan price</span>
-                    {selectedPlan.id === "3m" && !isTrialApplied ? (
+                    <span className="text-muted-foreground">Base plan price</span>
+                    {selectedPlan.id === "3m" && !appliedDiscount ? (
                       <div className="flex items-center gap-2">
                         <span className="text-xs text-muted-foreground line-through">{formatPrice(selectedPlan.price)}</span>
-                        <span className="font-medium text-saffrondeep">{formatPrice(originalPrice)}</span>
+                        <span className="font-medium text-saffrondeep">{formatPrice(basePrice)}</span>
                         <span className="text-[10px] font-bold text-saffrondeep bg-primary/10 px-1.5 py-0.5 rounded-full">45% off</span>
                       </div>
                     ) : (
                       <span className="font-medium">
-                        {formatPrice(originalPrice)}
+                        {formatPrice(basePrice)}
                       </span>
                     )}
                   </div>
+
+                  {appliedDiscount && discountAmount > 0 ? (
+                    <div className="flex justify-between text-tealdeep font-medium">
+                      <span className="flex items-center gap-1 text-xs">
+                        <Tag className="size-3.5 text-tealdeep" />
+                        <span>Promo Discount ({appliedDiscount.code})</span>
+                      </span>
+                      <span className="font-semibold">
+                        - {formatPrice(discountAmount)}
+                      </span>
+                    </div>
+                  ) : null}
 
                   {hasActivePlan && queueStartTime ? (
                     <div className="flex justify-between items-center text-tealdeep font-medium">
@@ -468,17 +673,6 @@ function Plans() {
                       </span>
                     </div>
                   ) : null}
-
-                  {isTrialApplied ? (
-                    <div className="flex justify-between text-tealdeep font-medium">
-                      <span className="flex items-center gap-1">
-                        <Gift className="size-3.5 text-primary" /> Promo (TRYFREE3DAYS)
-                      </span>
-                      <span className="font-semibold">
-                        - {formatPrice(discountAmount)}
-                      </span>
-                    </div>
-                  ) : null}
                 </div>
 
                 <div className="mt-5 flex items-baseline justify-between">
@@ -486,7 +680,7 @@ function Plans() {
                     <p className="text-xs text-muted-foreground uppercase font-semibold">
                       Total Payable
                     </p>
-                    {isTrialApplied ? (
+                    {finalPrice === 0 ? (
                       <span className="inline-block mt-0.5 text-[11px] font-semibold text-tealdeep">
                         100% Free · No card required
                       </span>
@@ -516,6 +710,13 @@ function Plans() {
                   </div>
                 ) : (
                   <div className="mt-6 space-y-3">
+                    {paymentError ? (
+                      <div className="rounded-xl bg-rose/10 border border-rose/30 p-3.5 flex items-start gap-2.5 text-xs text-rose">
+                        <AlertCircle className="size-4 shrink-0 mt-0.5" />
+                        <span className="leading-relaxed">{paymentError}</span>
+                      </div>
+                    ) : null}
+
                     <Button
                       variant={isTrialApplied ? "ink" : "primary"}
                       className="w-full justify-center py-4 text-base font-semibold shadow-md gap-2"

@@ -7,6 +7,14 @@
         "VITE_SUPABASE_URL": "https://ixfcoilswyagwifaronh.supabase.co",
         "SUPABASE_SERVICE_ROLE_KEY": "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZmNvaWxzd3lhZ3dpZmFyb25oIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDgzOTA5NSwiZXhwIjoyMTA2NDE1MDk1fQ.W8MofXjLgVJ15yXzDP_Cn7Y-lxBSl7RLPFgcuGhArbI"
       }
+    },
+    "razorpay": {
+      "command": "node",
+      "args": ["scripts/razorpay-mcp-server.mjs"],
+      "env": {
+        "VITE_RAZORPAY_KEY_ID": "rzp_test_Tkup89MPqtTk0q",
+        "RAZORPAY_KEY_SECRET": "BKAwHYTU1NiSextw0mfQFfV4"
+      }
     }
   }
 }

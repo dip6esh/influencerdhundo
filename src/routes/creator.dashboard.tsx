@@ -16,14 +16,17 @@ import {
   isSubscriptionActive,
   isSubscriptionQueued,
 } from "@/lib/directory-data";
-import { supabaseDb } from "@/lib/supabase";
+import { supabaseDb, type PaymentRecord } from "@/lib/supabase";
 import {
   AlertCircle,
   ArrowUpRight,
   CalendarClock,
   Check,
+  CheckCheck,
   Clock,
   Copy,
+  CreditCard,
+  FileText,
   Gift,
   History,
   IndianRupee,
@@ -31,7 +34,9 @@ import {
   Layers,
   Loader2,
   MessageCircle,
+  Receipt,
   Share2,
+  ShieldCheck,
   Sparkles,
   Users,
   Zap,
@@ -74,6 +79,9 @@ function Dashboard() {
   const [loading, setLoading] = useState(!myCreatorId);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
+  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [loadingPayments, setLoadingPayments] = useState(false);
+  const [copiedPaymentId, setCopiedPaymentId] = useState<string | null>(null);
   const mine = creators.find((c) => c.id === myCreatorId);
 
   // Subscriptions & Queued plans calculation
@@ -106,6 +114,25 @@ function Dashboard() {
       mounted = false;
     };
   }, []);
+
+  // Fetch payments records for this creator
+  useEffect(() => {
+    let isMounted = true;
+    async function loadPayments() {
+      if (!mine?.id) return;
+      setLoadingPayments(true);
+      try {
+        const records = await supabaseDb.fetchPaymentsForCreator(mine.id);
+        if (isMounted) setPayments(records);
+      } finally {
+        if (isMounted) setLoadingPayments(false);
+      }
+    }
+    loadPayments();
+    return () => {
+      isMounted = false;
+    };
+  }, [mine?.id]);
 
   // Fetch referral events when creator ID is ready
   useEffect(() => {
@@ -602,6 +629,14 @@ function Dashboard() {
                       )}
                     </div>
 
+                    {/* NO AUTO-DEBIT BADGE */}
+                    <div className="rounded-xl bg-accent/10 border border-accent/25 p-2.5 flex items-start gap-2 text-xs text-muted-foreground">
+                      <ShieldCheck className="size-4 text-tealdeep shrink-0 mt-0.5" />
+                      <span className="text-[11px] leading-snug">
+                        <strong className="text-foreground">One-Time Pass:</strong> No recurring auto-debit. You choose when to manually renew.
+                      </span>
+                    </div>
+
                     {/* QUEUED PLANS SUB-SECTION */}
                     {queuedSubs.length > 0 && (
                       <div className="mt-3 pt-3 border-t border-border/60">
@@ -929,6 +964,140 @@ function Dashboard() {
                   </div>
                 )}
               </div>
+            </Card>
+          </div>
+
+          {/* ── BILLING & PAYMENT RECEIPTS HISTORY ─────────────────────────────────── */}
+          <div className="mt-10">
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60">
+                <div>
+                  <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-saffrondeep border border-primary/25 mb-2">
+                    <Receipt className="size-3.5 text-primary" />
+                    Billing &amp; Payment Receipts
+                  </div>
+                  <h2 className="text-2xl font-display font-semibold tracking-tight">
+                    Payment History &amp; Receipts
+                  </h2>
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    All your one-time subscription pass payments processed securely via Razorpay.
+                  </p>
+                </div>
+
+                <div className="shrink-0 flex items-center gap-2">
+                  <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground border border-border">
+                    <ShieldCheck className="size-3.5 text-tealdeep" />
+                    100% Secure via Razorpay
+                  </span>
+                </div>
+              </div>
+
+              {loadingPayments ? (
+                <div className="py-12 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
+                  <Loader2 className="size-4 animate-spin text-primary" />
+                  Loading payment history...
+                </div>
+              ) : payments.length > 0 ? (
+                <div className="mt-6 overflow-x-auto rounded-2xl border border-border/80 bg-background/60">
+                  <table className="w-full text-left text-xs table-fixed min-w-[620px]">
+                    <thead className="border-b border-border bg-secondary/50 font-semibold text-muted-foreground uppercase tracking-wider">
+                      <tr>
+                        <th className="w-32 px-4 py-3">Date</th>
+                        <th className="w-40 px-4 py-3">Plan</th>
+                        <th className="w-28 px-4 py-3">Amount</th>
+                        <th className="w-48 px-4 py-3">Payment Ref ID</th>
+                        <th className="w-28 px-4 py-3">Status</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60">
+                      {payments.map((p) => {
+                        const planLabel =
+                          p.planId === "1m"
+                            ? "1 Month Pass"
+                            : p.planId === "3m"
+                              ? "3 Months (Launch Offer)"
+                              : p.planId === "6m"
+                                ? "6 Months Pass"
+                                : p.planId === "1y"
+                                  ? "1 Year Pass"
+                                  : p.planId;
+
+                        const displayRef = p.razorpayPaymentId || p.razorpayOrderId;
+                        const isCopied = copiedPaymentId === displayRef;
+
+                        return (
+                          <tr key={p.id} className="hover:bg-secondary/30 transition-colors">
+                            <td className="px-4 py-3.5 text-muted-foreground whitespace-nowrap">
+                              {new Date(p.createdAt).toLocaleDateString("en-IN", {
+                                month: "short",
+                                day: "numeric",
+                                year: "numeric",
+                              })}
+                            </td>
+                            <td className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
+                              {planLabel}
+                            </td>
+                            <td className="px-4 py-3.5 font-bold text-saffrondeep whitespace-nowrap">
+                              {formatPrice(p.amount)}
+                            </td>
+                            <td className="px-4 py-3.5">
+                              <div className="flex items-center gap-1.5">
+                                <span className="font-mono text-[11px] text-muted-foreground truncate max-w-[140px]">
+                                  {displayRef}
+                                </span>
+                                {displayRef && (
+                                  <button
+                                    type="button"
+                                    onClick={() => {
+                                      navigator.clipboard.writeText(displayRef);
+                                      setCopiedPaymentId(displayRef);
+                                      setTimeout(() => setCopiedPaymentId(null), 2000);
+                                    }}
+                                    title="Copy transaction ID"
+                                    className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                                  >
+                                    {isCopied ? (
+                                      <CheckCheck className="size-3 text-tealdeep" />
+                                    ) : (
+                                      <Copy className="size-3" />
+                                    )}
+                                  </button>
+                                )}
+                              </div>
+                            </td>
+                            <td className="px-4 py-3.5 whitespace-nowrap">
+                              <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep text-[11px]">
+                                <Check className="size-3" />
+                                Paid
+                              </span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+              ) : (
+                <div className="mt-6 rounded-2xl border border-dashed border-border/80 p-8 text-center bg-background/40">
+                  <div className="inline-flex items-center justify-center size-10 rounded-full bg-secondary text-muted-foreground mb-2">
+                    <Receipt className="size-5" />
+                  </div>
+                  <p className="text-sm font-semibold text-foreground">
+                    No paid transactions yet
+                  </p>
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
+                    When you purchase a subscription pass, your official Razorpay payment receipts,
+                    amounts, and transaction references will appear here.
+                  </p>
+                  <Link
+                    to="/creator/plans"
+                    className="inline-flex items-center gap-1.5 mt-4 rounded-xl bg-foreground text-background px-4 py-2 text-xs font-semibold hover:bg-foreground/90 transition-all shadow-xs"
+                  >
+                    <span>View Subscription Plans</span>
+                    <ArrowUpRight className="size-3.5" />
+                  </Link>
+                </div>
+              )}
             </Card>
           </div>
         </div>

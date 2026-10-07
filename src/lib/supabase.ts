@@ -21,6 +21,19 @@ export const supabase: SupabaseClient<any, "public", any> = createClient(
 );
 
 // Database record types
+export interface PaymentRecord {
+  id: string;
+  creatorId: string;
+  razorpayOrderId: string;
+  razorpayPaymentId?: string | undefined;
+  razorpaySignature?: string | undefined;
+  amount: number;
+  currency: string;
+  planId: string;
+  status: string;
+  createdAt: string;
+}
+
 export interface CreatorRow {
   id: string;
   auth_user_id?: string | null;
@@ -315,6 +328,34 @@ export const supabaseDb = {
       }));
     } catch (e) {
       console.warn("Supabase fetchAllSubscriptions error:", e);
+      return [];
+    }
+  },
+
+  /** Fetch all payments audit records for a creator from Supabase, ordered by newest first. */
+  async fetchPaymentsForCreator(creatorId: string): Promise<PaymentRecord[]> {
+    try {
+      const { data, error } = await supabase
+        .from("payments")
+        .select("*")
+        .eq("creator_id", creatorId)
+        .order("created_at", { ascending: false });
+
+      if (error || !data) return [];
+      return data.map((row) => ({
+        id: row.id as string,
+        creatorId: row.creator_id as string,
+        razorpayOrderId: row.razorpay_order_id as string,
+        razorpayPaymentId: (row.razorpay_payment_id as string) || undefined,
+        razorpaySignature: (row.razorpay_signature as string) || undefined,
+        amount: Number(row.amount),
+        currency: (row.currency as string) || "INR",
+        planId: row.plan_id as string,
+        status: (row.status as string) || "captured",
+        createdAt: row.created_at as string,
+      }));
+    } catch (e) {
+      console.warn("Supabase fetchPaymentsForCreator error:", e);
       return [];
     }
   },
@@ -952,6 +993,103 @@ export const supabaseDb = {
     }
   },
 
+  // ── Admin Auth ─────────────────────────────────────────────────────────────
+
+  /** Register a new admin account (email + password). Inserts a row into admin_accounts. */
+  async signUpAdmin(
+    email: string,
+    password: string,
+    name: string,
+  ): Promise<{ success: true; adminId: string } | { error: string }> {
+    try {
+      const { data, error } = await supabase.auth.signUp({ email, password });
+      if (error) return { error: error.message };
+      if (!data.user) return { error: "Sign up failed. Please try again." };
+
+      const { data: inserted, error: dbErr } = await supabase
+        .from("admin_accounts")
+        .insert({ auth_user_id: data.user.id, email, name })
+        .select("id")
+        .single();
+
+      if (dbErr || !inserted) {
+        // Clean up: sign user out since profile insert failed
+        await supabase.auth.signOut();
+        return {
+          error:
+            dbErr?.message ??
+            "Failed to create admin profile. This email may already be registered.",
+        };
+      }
+
+      return { success: true, adminId: (inserted as { id: string }).id };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  },
+
+  /** Sign in an existing admin with email + password. Returns their admin profile row. */
+  async signInAdmin(
+    email: string,
+    password: string,
+  ): Promise<{ id: string; email: string; name: string } | { error: string }> {
+    try {
+      const { data, error } = await supabase.auth.signInWithPassword({
+        email,
+        password,
+      });
+      if (error) return { error: error.message };
+      if (!data.user) return { error: "Login failed. Please try again." };
+
+      const { data: rows, error: dbErr } = await supabase
+        .from("admin_accounts")
+        .select("id, email, name")
+        .eq("auth_user_id", data.user.id)
+        .limit(1);
+
+      if (dbErr || !rows || rows.length === 0) {
+        await supabase.auth.signOut();
+        return {
+          error: "No admin profile found for this account.",
+        };
+      }
+      const row = rows[0] as { id: string; email: string; name: string };
+      return { id: row.id, email: row.email, name: row.name };
+    } catch (e) {
+      return { error: String(e) };
+    }
+  },
+
+  /** Sign out the currently logged-in admin. */
+  async signOutAdmin(): Promise<void> {
+    await supabase.auth.signOut();
+  },
+
+  /** Return the admin profile for the currently active Supabase session, or null. */
+  async getAdminSession(): Promise<{
+    id: string;
+    email: string;
+    name: string;
+  } | null> {
+    try {
+      const { data } = await supabase.auth.getSession();
+      const uid = data.session?.user?.id;
+      if (!uid) return null;
+
+      const { data: rows } = await supabase
+        .from("admin_accounts")
+        .select("id, email, name")
+        .eq("auth_user_id", uid)
+        .limit(1);
+
+      if (!rows || rows.length === 0) return null;
+      const row = rows[0] as { id: string; email: string; name: string };
+      return { id: row.id, email: row.email, name: row.name };
+    } catch {
+      return null;
+    }
+  },
+
   /** Start free trial for a creator — sets trial_started_at and subscription_expires_at */
   async startFreeTrial(creatorId: string): Promise<boolean> {
     try {
@@ -971,6 +1109,211 @@ export const supabaseDb = {
       return false;
     }
   },
+
+  // ── Discount & Promo Codes ─────────────────────────────────────────────────
+
+  /** Fetch all discount codes (for Admin Dashboard) */
+  async fetchDiscountCodes(): Promise<DiscountCode[]> {
+    try {
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error || !data) return [];
+      return data.map((row: any) => ({
+        id: row.id,
+        code: row.code,
+        discountPercent: Number(row.discount_percent) || 0,
+        discountType: (row.discount_type as "percentage" | "flat") || "percentage",
+        discountValue: Number(row.discount_value) || 0,
+        validityDays: Number(row.validity_days) || 1,
+        validFrom: row.valid_from,
+        validUntil: row.valid_until,
+        isActive: Boolean(row.is_active),
+        usageCount: Number(row.usage_count) || 0,
+        maxUses: row.max_uses != null ? Number(row.max_uses) : undefined,
+        notes: row.notes || "",
+        createdAt: row.created_at,
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  /** Create a new discount code */
+  async createDiscountCode(input: {
+    code: string;
+    discountPercent: number;
+    discountType?: "percentage" | "flat" | undefined;
+    discountValue?: number | undefined;
+    validityDays: number;
+    maxUses?: number | undefined;
+    notes?: string | undefined;
+  }): Promise<{ success: boolean; error?: string; code?: DiscountCode }> {
+    try {
+      const cleanCode = input.code.trim().toUpperCase().replace(/\s+/g, "");
+      if (!cleanCode) return { success: false, error: "Code name cannot be empty." };
+
+      const now = new Date();
+      const validUntil = new Date(now.getTime() + input.validityDays * 24 * 60 * 60 * 1000);
+      const discountType = input.discountType || "percentage";
+      const discountPercent = input.discountPercent;
+      const discountValue = input.discountValue ?? discountPercent;
+
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .insert({
+          code: cleanCode,
+          discount_percent: discountPercent,
+          discount_type: discountType,
+          discount_value: discountValue,
+          validity_days: input.validityDays,
+          valid_from: now.toISOString(),
+          valid_until: validUntil.toISOString(),
+          is_active: true,
+          usage_count: 0,
+          max_uses: input.maxUses || null,
+          notes: input.notes || "",
+        })
+        .select("*")
+        .single();
+
+      if (error || !data) {
+        return { success: false, error: error?.message || "Failed to create discount code." };
+      }
+
+      return {
+        success: true,
+        code: {
+          id: data.id,
+          code: data.code,
+          discountPercent: Number(data.discount_percent),
+          discountType: data.discount_type,
+          discountValue: Number(data.discount_value),
+          validityDays: Number(data.validity_days),
+          validFrom: data.valid_from,
+          validUntil: data.valid_until,
+          isActive: Boolean(data.is_active),
+          usageCount: Number(data.usage_count),
+          maxUses: data.max_uses != null ? Number(data.max_uses) : undefined,
+          notes: data.notes || "",
+          createdAt: data.created_at,
+        },
+      };
+    } catch (e: any) {
+      return { success: false, error: e?.message || String(e) };
+    }
+  },
+
+  /** Toggle active status of a discount code */
+  async toggleDiscountCodeActive(id: string, isActive: boolean): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("discount_codes")
+        .update({ is_active: isActive, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Delete a discount code */
+  async deleteDiscountCode(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from("discount_codes").delete().eq("id", id);
+      return !error;
+    } catch {
+      return false;
+    }
+  },
+
+  /** Validate a discount code for checkout (returns code details or error) */
+  async validateDiscountCode(
+    codeStr: string,
+  ): Promise<
+    | { valid: true; discountCode: DiscountCode }
+    | { valid: false; error: string }
+  > {
+    try {
+      const cleanCode = codeStr.trim().toUpperCase();
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .select("*")
+        .eq("code", cleanCode)
+        .limit(1);
+
+      if (error || !data || data.length === 0) {
+        return { valid: false, error: "Invalid coupon code." };
+      }
+
+      const row = data[0];
+      const now = new Date().getTime();
+      const validUntil = new Date(row.valid_until).getTime();
+      const validFrom = new Date(row.valid_from).getTime();
+
+      if (!row.is_active) {
+        return { valid: false, error: "This coupon code is no longer active." };
+      }
+
+      if (now < validFrom || now > validUntil) {
+        return {
+          valid: false,
+          error: `This coupon code has expired (valid until ${new Date(row.valid_until).toLocaleDateString("en-IN")}).`,
+        };
+      }
+
+      if (row.max_uses != null && Number(row.usage_count) >= Number(row.max_uses)) {
+        return { valid: false, error: "This coupon code has reached its maximum redemption limit." };
+      }
+
+      return {
+        valid: true,
+        discountCode: {
+          id: row.id,
+          code: row.code,
+          discountPercent: Number(row.discount_percent),
+          discountType: row.discount_type || "percentage",
+          discountValue: Number(row.discount_value),
+          validityDays: Number(row.validity_days),
+          validFrom: row.valid_from,
+          validUntil: row.valid_until,
+          isActive: Boolean(row.is_active),
+          usageCount: Number(row.usage_count),
+          maxUses: row.max_uses != null ? Number(row.max_uses) : undefined,
+          notes: row.notes || "",
+          createdAt: row.created_at,
+        },
+      };
+    } catch (e: any) {
+      return { valid: false, error: "Failed to validate coupon code." };
+    }
+  },
+
+  /** Increment usage count after a successful redemption */
+  async incrementDiscountCodeUsage(codeStr: string): Promise<boolean> {
+    try {
+      const cleanCode = codeStr.trim().toUpperCase();
+      const { data } = await supabase
+        .from("discount_codes")
+        .select("id, usage_count")
+        .eq("code", cleanCode)
+        .maybeSingle();
+
+      if (data) {
+        const nextCount = Number(data.usage_count || 0) + 1;
+        await supabase
+          .from("discount_codes")
+          .update({ usage_count: nextCount, updated_at: new Date().toISOString() })
+          .eq("id", data.id);
+        return true;
+      }
+      return false;
+    } catch {
+      return false;
+    }
+  },
 };
 
 // ── Referral Event type ────────────────────────────────────────────────────
@@ -982,6 +1325,23 @@ export type ReferralEvent = {
   daysDelta: number; // +3 or -3
   eventType: "earned" | "reversed";
   note: string;
+  createdAt: string;
+};
+
+// ── Discount Code type ─────────────────────────────────────────────────────
+export type DiscountCode = {
+  id: string;
+  code: string;
+  discountPercent: number;
+  discountType: "percentage" | "flat";
+  discountValue: number;
+  validityDays: number;
+  validFrom: string;
+  validUntil: string;
+  isActive: boolean;
+  usageCount: number;
+  maxUses?: number | undefined;
+  notes?: string;
   createdAt: string;
 };
 

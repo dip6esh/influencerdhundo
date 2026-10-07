@@ -193,4 +193,53 @@ DO $$ BEGIN
   IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='status') THEN
     ALTER TABLE public.subscriptions ADD COLUMN status TEXT NOT NULL DEFAULT 'active';
   END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='razorpay_order_id') THEN
+    ALTER TABLE public.subscriptions ADD COLUMN razorpay_order_id TEXT;
+  END IF;
+  IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name='subscriptions' AND column_name='razorpay_payment_id') THEN
+    ALTER TABLE public.subscriptions ADD COLUMN razorpay_payment_id TEXT;
+  END IF;
 END $$;
+
+-- 7. PAYMENTS TABLE (Razorpay audit log)
+CREATE TABLE IF NOT EXISTS public.payments (
+  id TEXT PRIMARY KEY DEFAULT gen_random_uuid()::text,
+  creator_id TEXT NOT NULL,
+  razorpay_order_id TEXT NOT NULL,
+  razorpay_payment_id TEXT,
+  razorpay_signature TEXT,
+  amount INTEGER NOT NULL,
+  currency TEXT NOT NULL DEFAULT 'INR',
+  plan_id TEXT NOT NULL,
+  status TEXT NOT NULL DEFAULT 'captured',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
+ALTER TABLE public.payments ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can manage payments"
+  ON public.payments FOR ALL USING (true) WITH CHECK (true);
+
+-- 8. DISCOUNT & REFERRAL PROMO CODES TABLE
+CREATE TABLE IF NOT EXISTS public.discount_codes (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  code TEXT UNIQUE NOT NULL,
+  discount_percent NUMERIC NOT NULL DEFAULT 0,
+  discount_type TEXT NOT NULL DEFAULT 'percentage', -- 'percentage' | 'flat'
+  discount_value NUMERIC NOT NULL DEFAULT 0,
+  validity_days INTEGER NOT NULL DEFAULT 1,
+  valid_from TIMESTAMPTZ NOT NULL DEFAULT now(),
+  valid_until TIMESTAMPTZ NOT NULL,
+  is_active BOOLEAN NOT NULL DEFAULT true,
+  usage_count INTEGER NOT NULL DEFAULT 0,
+  max_uses INTEGER DEFAULT NULL,
+  notes TEXT DEFAULT '',
+  created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
+);
+
+ALTER TABLE public.discount_codes ENABLE ROW LEVEL SECURITY;
+CREATE POLICY "Public can read active discount codes"
+  ON public.discount_codes FOR SELECT USING (true);
+CREATE POLICY "Admins full access to discount codes"
+  ON public.discount_codes FOR ALL USING (true) WITH CHECK (true);
+

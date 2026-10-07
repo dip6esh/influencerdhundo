@@ -13,6 +13,7 @@ import { useEffect, type ReactNode } from "react";
 import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppStateProvider } from "@/lib/app-state";
+import { AdminStateProvider } from "@/lib/admin-state";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
 
 function NotFoundComponent() {
@@ -128,16 +129,18 @@ function RootComponent() {
 
   return (
     <QueryClientProvider client={queryClient}>
-      <AppStateProvider>
-        <div className="flex min-h-screen flex-col bg-background text-foreground">
-          <SiteHeader />
-          <main className="flex-1">
-            {/* Required: nested routes render here. */}
-            <Outlet />
-          </main>
-          <SiteFooter />
-        </div>
-      </AppStateProvider>
+      <AdminStateProvider>
+        <AppStateProvider>
+          <div className="flex min-h-screen flex-col bg-background text-foreground">
+            <SiteHeader />
+            <main className="flex-1">
+              {/* Required: nested routes render here. */}
+              <Outlet />
+            </main>
+            <SiteFooter />
+          </div>
+        </AppStateProvider>
+      </AdminStateProvider>
     </QueryClientProvider>
   );
 }
