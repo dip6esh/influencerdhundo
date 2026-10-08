@@ -253,17 +253,19 @@ export const STATES = [
 
 export const SIZE_BANDS = [
   { label: "Under 1K", min: 0, max: 1000 },
-  { label: "1K–5K", min: 1000, max: 5000 },
-  { label: "5K–10K", min: 5000, max: 10000 },
+  { label: "1K–10K", min: 1000, max: 10000 },
   { label: "10K–50K", min: 10000, max: 50000 },
-  { label: "50K+", min: 50000, max: Infinity },
+  { label: "50K–150K", min: 50000, max: 150000 },
+  { label: "150K–300K", min: 150000, max: 300000 },
+  { label: "300K+", min: 300000, max: Infinity },
 ] as const;
 
 export const BUDGET_BANDS = [
   { label: "Under ₹1,000", max: 1000 },
-  { label: "Under ₹2,000", max: 2000 },
   { label: "Under ₹5,000", max: 5000 },
-  { label: "Under ₹10,000", max: 10000 },
+  { label: "Under ₹15,000", max: 15000 },
+  { label: "Under ₹50,000", max: 50000 },
+  { label: "Under ₹1,00,000", max: 100000 },
   { label: "Any budget", max: Infinity },
 ] as const;
 
@@ -784,8 +786,8 @@ export const EMPTY_FILTERS: Filters = {
   pincode: "",
   category: "",
   otherCategory: "",
-  followerRange: [500, 50000],
-  budgetRange: [0, 50000],
+  followerRange: [500, 300000],
+  budgetRange: [0, 100000],
   contentTypes: [],
   collabType: "",
   language: "",
@@ -822,12 +824,12 @@ export function filterCreators(creators: Creator[], f: Filters) {
     if (f.followerRange) {
       const [min, max] = f.followerRange;
       if (c.followers < min) return false;
-      if (max < 50000 && c.followers > max) return false;
+      if (max < 300000 && c.followers > max) return false;
     }
     if (f.collabType !== "Barter" && f.budgetRange) {
       const [min, max] = f.budgetRange;
       if (c.startingPrice < min) return false;
-      if (max < 50000 && c.startingPrice > max) return false;
+      if (max < 100000 && c.startingPrice > max) return false;
     }
     if (f.collabType) {
       if (

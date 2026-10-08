@@ -104,8 +104,8 @@ function Discover() {
     Boolean(filters.category) ||
     Boolean(filters.otherCategory) ||
     filters.followerRange[0] > 500 ||
-    filters.followerRange[1] < 50000 ||
-    (!isBarter && (filters.budgetRange[0] > 0 || filters.budgetRange[1] < 50000)) ||
+    filters.followerRange[1] < 300000 ||
+    (!isBarter && (filters.budgetRange[0] > 0 || filters.budgetRange[1] < 100000)) ||
     filters.contentTypes.length > 0 ||
     Boolean(filters.collabType) ||
     Boolean(filters.language) ||
@@ -229,10 +229,10 @@ function Discover() {
                     <div className="flex items-center justify-between mb-3">
                       <Label>Follower Size</Label>
                       <span className="text-xs font-semibold text-saffrondeep px-3 py-1 rounded-full bg-primary/10 border border-primary/20">
-                        {filters.followerRange[0] === 500 && filters.followerRange[1] >= 50000
+                        {filters.followerRange[0] === 500 && filters.followerRange[1] >= 300000
                           ? "Any size"
-                          : filters.followerRange[1] >= 50000
-                            ? `${formatFollowers(filters.followerRange[0])} – 50K+`
+                          : filters.followerRange[1] >= 300000
+                            ? `${formatFollowers(filters.followerRange[0])} – 300K+`
                             : `${formatFollowers(filters.followerRange[0])} – ${formatFollowers(filters.followerRange[1])}`}
                       </span>
                     </div>
@@ -242,26 +242,26 @@ function Discover() {
                         onValueChange={(val) =>
                           setFilters({
                             ...filters,
-                            followerRange: [val[0] ?? 500, val[1] ?? 50000],
+                            followerRange: [val[0] ?? 500, val[1] ?? 300000],
                           })
                         }
                         min={500}
-                        max={50000}
-                        step={500}
+                        max={300000}
+                        step={2500}
                         minStepsBetweenThumbs={1}
                       />
                       <div className="flex justify-between text-[11px] text-muted-foreground mt-2 font-medium">
                         <span>500</span>
-                        <span>10K</span>
-                        <span>20K</span>
-                        <span>30K</span>
-                        <span>40K</span>
-                        <span>50K+</span>
+                        <span>50K</span>
+                        <span>100K</span>
+                        <span>150K</span>
+                        <span>200K</span>
+                        <span>300K+</span>
                       </div>
                     </div>
                   </div>
 
-                  {/* BUDGET RANGE (0 - 50,000) */}
+                  {/* BUDGET RANGE (0 - 100,000) */}
                   <div
                     className={cn(
                       "rounded-xl bg-background/40 p-4 sm:p-5 border border-border/60 flex flex-col justify-between transition-all duration-200",
@@ -287,10 +287,10 @@ function Discover() {
                       >
                         {isBarter
                           ? "Not applicable (Barter)"
-                          : filters.budgetRange[0] === 0 && filters.budgetRange[1] >= 50000
+                          : filters.budgetRange[0] === 0 && filters.budgetRange[1] >= 100000
                             ? "Any budget"
-                            : filters.budgetRange[1] >= 50000
-                              ? `${formatPrice(filters.budgetRange[0])} – ₹50,000+`
+                            : filters.budgetRange[1] >= 100000
+                              ? `${formatPrice(filters.budgetRange[0])} – ₹1,00,000+`
                               : `${formatPrice(filters.budgetRange[0])} – ${formatPrice(filters.budgetRange[1])}`}
                       </span>
                     </div>
@@ -301,21 +301,20 @@ function Discover() {
                         onValueChange={(val) =>
                           setFilters({
                             ...filters,
-                            budgetRange: [val[0] ?? 0, val[1] ?? 50000],
+                            budgetRange: [val[0] ?? 0, val[1] ?? 100000],
                           })
                         }
                         min={0}
-                        max={50000}
-                        step={500}
+                        max={100000}
+                        step={1000}
                         minStepsBetweenThumbs={1}
                       />
                       <div className={cn("flex justify-between text-[11px] text-muted-foreground mt-2 font-medium", isBarter && "opacity-50")}>
                         <span>₹0</span>
-                        <span>₹10K</span>
-                        <span>₹20K</span>
-                        <span>₹30K</span>
-                        <span>₹40K</span>
-                        <span>₹50K+</span>
+                        <span>₹25K</span>
+                        <span>₹50K</span>
+                        <span>₹75K</span>
+                        <span>₹1,00,000+</span>
                       </div>
                     </div>
                   </div>

@@ -427,8 +427,13 @@ function Register() {
       const cleanHandle = normalizeInstagramHandle(form.instagram);
       if (!form.instagram.trim() || !cleanHandle)
         return "Please enter a valid Instagram username or profile link.";
-      if (!form.followers || Number(form.followers) <= 0)
-        return "Enter your Instagram follower count.";
+      const numFollowers = Number(form.followers);
+      if (!form.followers || isNaN(numFollowers) || numFollowers <= 0)
+        return "Please enter your Instagram follower count.";
+      if (numFollowers < 500)
+        return "Follower count must be at least 500.";
+      if (numFollowers > 300000)
+        return "Follower count cannot exceed 300,000 (300K).";
     }
     if (step === 3) {
       if (!form.categories.length) return "Select at least one category.";
@@ -437,7 +442,15 @@ function Register() {
     }
     if (step === 4) {
       if (!form.collabType) return "Select your collaboration type.";
-      if (!form.startingPrice) return "Enter your starting price.";
+      const price = Number(form.startingPrice);
+      if (form.collabType !== "Barter") {
+        if (!form.startingPrice || isNaN(price) || price <= 0)
+          return "Please enter your starting price.";
+      }
+      if (price < 0)
+        return "Starting price cannot be negative.";
+      if (price > 100000)
+        return "Starting price cannot exceed ₹1,00,000.";
       if (!form.travels) return "Tell us whether you travel for collaborations.";
       if (form.travels === "Yes" && !form.travelRange) return "Select your travel range.";
       if (!form.acceptsProducts)
@@ -1118,10 +1131,11 @@ function Register() {
                         placeholder="@aditi.eats or https://instagram.com/aditi.eats"
                       />
                     </Field>
-                    <Field label="Instagram followers" hint="Required">
+                    <Field label="Instagram followers" hint="Min 500, max 300,000 (300K) followers">
                       <TextInput
                         value={form.followers}
                         inputMode="numeric"
+                        maxLength={6}
                         onChange={(e) => set("followers", e.target.value.replace(/\D/g, ""))}
                         placeholder="12400"
                       />
@@ -1222,11 +1236,16 @@ function Register() {
 
                   <Field
                     label="Starting price (₹)"
-                    hint="Shown publicly as “Starting from ₹1,000”. Format-wise pricing is optional."
+                    hint={
+                      form.collabType === "Barter"
+                        ? "Optional for Barter collaborations (or enter base rate up to ₹1,00,000)."
+                        : "Enter starting rate up to ₹1,00,000. Shown publicly as “Starting from ₹1,000”."
+                    }
                   >
                     <TextInput
                       value={form.startingPrice}
                       inputMode="numeric"
+                      maxLength={6}
                       onChange={(e) => set("startingPrice", e.target.value.replace(/\D/g, ""))}
                       placeholder="1000"
                     />

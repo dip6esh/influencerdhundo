@@ -2097,6 +2097,22 @@ function EditCreatorModal({
       setSaveError("Creator Full Name is required.");
       return;
     }
+    if (form.followers < 500) {
+      setSaveError("Follower count must be at least 500.");
+      return;
+    }
+    if (form.followers > 300000) {
+      setSaveError("Follower count cannot exceed 300,000 (300K).");
+      return;
+    }
+    if (form.startingPrice < 0) {
+      setSaveError("Starting rate cannot be negative.");
+      return;
+    }
+    if (form.startingPrice > 100000) {
+      setSaveError("Starting rate cannot exceed ₹1,00,000.");
+      return;
+    }
     try {
       setSaving(true);
       setSaveError("");
@@ -2474,10 +2490,11 @@ function EditCreatorModal({
                     />
                   </Field>
 
-                  <Field label="Followers Count" hint="Total Instagram followers">
+                  <Field label="Followers Count" hint="500 to 300,000 (300K)">
                     <TextInput
                       type="number"
-                      min={0}
+                      min={500}
+                      max={300000}
                       value={form.followers}
                       onChange={(e) =>
                         setForm((prev) => ({
@@ -2561,7 +2578,14 @@ function EditCreatorModal({
             {activeTab === "pricing" && (
               <div className="space-y-4">
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Starting Rate (₹)" hint="Base fee for collaboration">
+                  <Field
+                    label="Starting Rate (₹)"
+                    hint={
+                      form.collabType === "Barter"
+                        ? "Optional for Barter collaborations (up to ₹1,00,000)"
+                        : "₹0 to ₹1,00,000 base collaboration fee"
+                    }
+                  >
                     <div className="relative">
                       <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground font-semibold">
                         ₹
@@ -2569,6 +2593,7 @@ function EditCreatorModal({
                       <TextInput
                         type="number"
                         min={0}
+                        max={100000}
                         value={form.startingPrice}
                         onChange={(e) =>
                           setForm((prev) => ({
