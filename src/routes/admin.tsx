@@ -2,13 +2,12 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button, Card, Field, SectionEyebrow, StatusPill, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
-import { useAdminState } from "@/lib/admin-state";
+import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
 import { supabaseDb, type DiscountCode } from "@/lib/supabase";
 import {
-  CATEGORIES,
-  CITIES,
   formatFollowers,
   formatPrice,
+  PLANS,
   type CreatorStatus,
 } from "@/lib/directory-data";
 import {
@@ -23,13 +22,16 @@ import {
   Check,
   Clock,
   Trash2,
-  Percent,
   Calendar,
-  Zap,
   Sparkles,
   RefreshCw,
   AlertCircle,
   CheckCircle2,
+  UserCheck,
+  Globe,
+  Mail,
+  Phone,
+  Layers,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -106,6 +108,14 @@ function AdminPage() {
     );
   }
 
+  return (
+    <AdminStateProvider>
+      <AdminPageContent />
+    </AdminStateProvider>
+  );
+}
+
+function AdminPageContent() {
   const { adminUser, adminLoading } = useAdminState();
 
   if (adminLoading) {
@@ -385,6 +395,14 @@ function AdminDashboard() {
   const [validityDays, setValidityDays] = useState<number>(7);
   const [maxUsesInput, setMaxUsesInput] = useState<string>("");
   const [notesInput, setNotesInput] = useState<string>("");
+  const [selectedApplicablePlans, setSelectedApplicablePlans] = useState<string[]>([
+    "1m",
+    "3m",
+    "6m",
+    "1y",
+  ]);
+  const [targetEmailInput, setTargetEmailInput] = useState<string>("");
+  const [targetPhoneInput, setTargetPhoneInput] = useState<string>("");
   const [creatingCode, setCreatingCode] = useState(false);
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
@@ -414,6 +432,20 @@ function AdminDashboard() {
     setNewCodeName(`${prefix}${num}`);
   };
 
+  const togglePlanSelection = (planId: string) => {
+    setSelectedApplicablePlans((prev) =>
+      prev.includes(planId) ? prev.filter((p) => p !== planId) : [...prev, planId],
+    );
+  };
+
+  const selectAllPlans = () => {
+    setSelectedApplicablePlans(PLANS.map((p) => p.id));
+  };
+
+  const clearAllPlans = () => {
+    setSelectedApplicablePlans([]);
+  };
+
   const handleCreateCode = async () => {
     setCreateError("");
     setCreateSuccess("");
@@ -434,6 +466,11 @@ function AdminDashboard() {
       return;
     }
 
+    if (selectedApplicablePlans.length === 0) {
+      setCreateError("Please select at least one subscription plan this promo applies to.");
+      return;
+    }
+
     setCreatingCode(true);
 
     try {
@@ -446,6 +483,9 @@ function AdminDashboard() {
         validityDays,
         maxUses: isNaN(maxUses as number) ? undefined : maxUses,
         notes: notesInput.trim(),
+        targetEmail: targetEmailInput.trim() || undefined,
+        targetPhone: targetPhoneInput.trim() || undefined,
+        applicablePlans: selectedApplicablePlans,
       });
 
       if (!res.success || !res.code) {
@@ -458,6 +498,8 @@ function AdminDashboard() {
       setNewCodeName("");
       setNotesInput("");
       setMaxUsesInput("");
+      setTargetEmailInput("");
+      setTargetPhoneInput("");
     } catch (e: any) {
       setCreateError(e.message || "Failed to create discount code.");
     } finally {
@@ -618,7 +660,7 @@ function AdminDashboard() {
               <div>
                 <h2 className="text-base font-semibold">Create Referral / Discount Code</h2>
                 <p className="text-xs text-muted-foreground">
-                  Create validity-based promo codes. Applies discounts across all creator subscription plans.
+                  Create targeted or general discount promo codes with custom validity, plan restrictions, and creator limits.
                 </p>
               </div>
             </div>
@@ -630,7 +672,7 @@ function AdminDashboard() {
                   <TextInput
                     value={newCodeName}
                     onChange={(e) => setNewCodeName(e.target.value.toUpperCase().replace(/\s+/g, ""))}
-                    placeholder="e.g. DIWALI50, LAUNCH100, BANGALORE30"
+                    placeholder="e.g. DIWALI50, VIPCREATOR, EXCLUSIVE100"
                     className="font-mono uppercase tracking-wider font-semibold"
                   />
                   <Button
@@ -645,110 +687,176 @@ function AdminDashboard() {
                 </div>
               </Field>
 
-              {/* DISCOUNT PERCENTAGE SELECTOR */}
-              <Field label="Discount Amount (% off all plans)">
-                <div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {[10, 20, 30, 40, 50, 75, 100].map((pct) => (
-                      <button
-                        key={pct}
-                        type="button"
-                        onClick={() => setDiscountPercent(pct)}
-                        className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                          discountPercent === pct
-                            ? "bg-tealdeep text-white shadow-xs"
-                            : "bg-background text-muted-foreground ring-1 ring-border hover:text-foreground"
-                        }`}
-                      >
-                        {pct === 100 ? "100% (Free Pass)" : `${pct}% OFF`}
-                      </button>
-                    ))}
-                  </div>
-                  <div className="flex items-center gap-2 max-w-xs">
+              {/* CLEAN 2-COLUMN: DISCOUNT PERCENTAGE & VALIDITY DURATION */}
+              <div className="grid gap-4 sm:grid-cols-2">
+                <Field label="Discount Percentage (%)" hint="Enter 100 for 100% Free Pass">
+                  <div className="relative">
                     <TextInput
                       type="number"
                       min={1}
                       max={100}
                       value={discountPercent}
                       onChange={(e) => setDiscountPercent(Number(e.target.value))}
-                      placeholder="Custom %"
-                      className="font-mono"
+                      placeholder="e.g. 20, 50, 100"
+                      className="font-mono pr-8"
                     />
-                    <span className="text-xs font-semibold text-muted-foreground">%</span>
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-muted-foreground">
+                      %
+                    </div>
+                  </div>
+                </Field>
+
+                <Field
+                  label="Validity Duration (Days)"
+                  hint={`Expires on ${previewExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}`}
+                >
+                  <div className="relative">
+                    <TextInput
+                      type="number"
+                      min={1}
+                      max={365}
+                      value={validityDays}
+                      onChange={(e) => setValidityDays(Number(e.target.value))}
+                      placeholder="e.g. 7, 30, 90"
+                      className="font-mono pr-14"
+                    />
+                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-muted-foreground">
+                      Days
+                    </div>
+                  </div>
+                </Field>
+              </div>
+
+              {/* APPLICABLE SUBSCRIPTION PLANS */}
+              <div className="rounded-2xl border border-border/80 bg-secondary/30 p-4 space-y-2.5">
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <Layers className="size-3.5 text-primary" />
+                    <span>Applicable Subscription Plans</span>
+                    <span className="text-muted-foreground font-normal">
+                      ({selectedApplicablePlans.length} selected)
+                    </span>
+                  </div>
+                  <div className="flex items-center gap-2">
+                    <button
+                      type="button"
+                      onClick={selectAllPlans}
+                      className="text-[11px] font-semibold text-primary hover:underline"
+                    >
+                      Select All
+                    </button>
+                    <span className="text-muted-foreground/50">·</span>
+                    <button
+                      type="button"
+                      onClick={clearAllPlans}
+                      className="text-[11px] font-semibold text-muted-foreground hover:text-foreground"
+                    >
+                      Clear
+                    </button>
                   </div>
                 </div>
-              </Field>
 
-              {/* VALIDITY DURATION SELECTOR (DAYS RANGE) */}
-              <Field label="Validity Duration (Day Range)">
-                <div>
-                  <div className="flex flex-wrap gap-2 mb-2">
-                    {[
-                      { days: 1, label: "1 Day (24 hrs)" },
-                      { days: 2, label: "2 Days" },
-                      { days: 3, label: "3 Days" },
-                      { days: 7, label: "7 Days (1 Wk)" },
-                      { days: 14, label: "14 Days" },
-                      { days: 30, label: "30 Days (1 Mo)" },
-                      { days: 90, label: "90 Days" },
-                    ].map((item) => (
+                <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                  {PLANS.map((plan) => {
+                    const isSelected = selectedApplicablePlans.includes(plan.id);
+                    return (
                       <button
-                        key={item.days}
+                        key={plan.id}
                         type="button"
-                        onClick={() => setValidityDays(item.days)}
-                        className={`rounded-xl px-3.5 py-1.5 text-xs font-semibold transition-all ${
-                          validityDays === item.days
-                            ? "bg-foreground text-background shadow-xs"
-                            : "bg-background text-muted-foreground ring-1 ring-border hover:text-foreground"
+                        onClick={() => togglePlanSelection(plan.id)}
+                        className={`flex flex-col items-start p-2.5 rounded-xl border text-left transition-all ${
+                          isSelected
+                            ? "border-tealdeep bg-tealdeep/10 text-foreground ring-1 ring-tealdeep/40 shadow-2xs"
+                            : "border-border bg-background/60 text-muted-foreground hover:border-foreground/30 hover:text-foreground"
                         }`}
                       >
-                        {item.label}
+                        <div className="flex items-center justify-between w-full">
+                          <span className="text-xs font-bold">{plan.name}</span>
+                          <span
+                            className={`size-4 rounded-full flex items-center justify-center text-[10px] ${
+                              isSelected
+                                ? "bg-tealdeep text-white"
+                                : "border border-border text-transparent"
+                            }`}
+                          >
+                            ✓
+                          </span>
+                        </div>
+                        <span className="text-[11px] text-muted-foreground mt-0.5">
+                          {plan.duration} · ₹{plan.price}
+                        </span>
                       </button>
-                    ))}
-                  </div>
-
-                  <div className="flex items-center gap-3">
-                    <div className="flex items-center gap-2 max-w-xs">
-                      <TextInput
-                        type="number"
-                        min={1}
-                        max={365}
-                        value={validityDays}
-                        onChange={(e) => setValidityDays(Number(e.target.value))}
-                        placeholder="Custom days"
-                        className="font-mono"
-                      />
-                      <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Days from now</span>
-                    </div>
-
-                    <div className="text-xs text-muted-foreground bg-secondary/70 px-3 py-2 rounded-xl flex items-center gap-1.5">
-                      <Clock className="size-3.5 text-primary" />
-                      <span>
-                        Expires: <strong className="text-foreground">{previewExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })} at {previewExpiry.toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })}</strong>
-                      </span>
-                    </div>
-                  </div>
+                    );
+                  })}
                 </div>
-              </Field>
+                {selectedApplicablePlans.length === 0 && (
+                  <p className="text-[11px] text-rose font-medium">
+                    ⚠️ Please select at least one plan for this promo code to be redeemable.
+                  </p>
+                )}
+              </div>
 
-              {/* MAX REDEMPTIONS (OPTIONAL) & NOTES */}
+              {/* RESTRICT TO SPECIFIC CREATOR (OPTIONAL) */}
+              <div className="rounded-2xl border border-border/80 bg-secondary/30 p-4 space-y-3">
+                <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                  <UserCheck className="size-3.5 text-primary" />
+                  <span>Restrict to Specific Creator (Optional)</span>
+                </div>
+                <p className="text-[11px] text-muted-foreground -mt-1">
+                  Leave blank to allow any registered creator to use this code. Fill in email or phone to lock this code exclusively to one creator.
+                </p>
+
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <Field label="Allowed Email Address" hint="Creator must be logged in with this email">
+                    <div className="relative">
+                      <TextInput
+                        type="email"
+                        value={targetEmailInput}
+                        onChange={(e) => setTargetEmailInput(e.target.value)}
+                        placeholder="e.g. creator@example.com"
+                        className="pl-8"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-muted-foreground">
+                        <Mail className="size-3.5" />
+                      </div>
+                    </div>
+                  </Field>
+
+                  <Field label="Allowed Phone Number" hint="Creator profile contact must match">
+                    <div className="relative">
+                      <TextInput
+                        type="tel"
+                        value={targetPhoneInput}
+                        onChange={(e) => setTargetPhoneInput(e.target.value)}
+                        placeholder="e.g. 9876543210"
+                        className="pl-8 font-mono"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-2.5 text-muted-foreground">
+                        <Phone className="size-3.5" />
+                      </div>
+                    </div>
+                  </Field>
+                </div>
+              </div>
+
+              {/* MAX REDEMPTIONS & NOTES */}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Max Redemptions (Optional)">
+                <Field label="Max Redemptions (Optional)" hint="Leave empty for unlimited">
                   <TextInput
                     type="number"
                     min={1}
                     value={maxUsesInput}
                     onChange={(e) => setMaxUsesInput(e.target.value)}
-                    placeholder="e.g. 50 (leave empty for unlimited)"
+                    placeholder="e.g. 50"
                     className="font-mono"
                   />
                 </Field>
 
-                <Field label="Notes / Campaign Tag (Optional)">
+                <Field label="Notes / Campaign Tag (Optional)" hint="For admin reference only">
                   <TextInput
                     value={notesInput}
                     onChange={(e) => setNotesInput(e.target.value)}
-                    placeholder="e.g. Bangalore food bloggers partner promo"
+                    placeholder="e.g. Special partnership / Bangalore bloggers"
                   />
                 </Field>
               </div>
@@ -815,10 +923,13 @@ function AdminDashboard() {
                   const isLimitReached = dc.maxUses != null && dc.usageCount >= dc.maxUses;
                   const isEffectivelyActive = dc.isActive && !isExpired && !isLimitReached;
 
+                  const applicablePlans = dc.applicablePlans || [];
+                  const isTargeted = Boolean(dc.targetEmail || dc.targetPhone);
+
                   return (
                     <Card key={dc.id} className="p-4.5 border border-border/80">
                       <div className="flex flex-wrap items-start justify-between gap-3">
-                        <div className="space-y-1.5 min-w-0">
+                        <div className="space-y-2 min-w-0">
                           <div className="flex flex-wrap items-center gap-2">
                             <span className="font-mono text-base font-bold tracking-wider text-foreground">
                               {dc.code}
@@ -847,7 +958,62 @@ function AdminDashboard() {
                                 Inactive
                               </span>
                             )}
+
+                            {isTargeted ? (
+                              <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1">
+                                <UserCheck className="size-3" />
+                                Restricted
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-semibold flex items-center gap-1">
+                                <Globe className="size-3" />
+                                All Creators
+                              </span>
+                            )}
                           </div>
+
+                          {/* APPLICABLE PLANS BADGES */}
+                          <div className="flex flex-wrap items-center gap-1.5 text-xs">
+                            <span className="text-muted-foreground flex items-center gap-1 text-[11px]">
+                              <Layers className="size-3 text-muted-foreground" />
+                              Plans:
+                            </span>
+                            {applicablePlans.length === 0 || applicablePlans.includes("all") ? (
+                              <span className="rounded-md bg-secondary/80 px-1.5 py-0.5 text-[11px] font-medium text-foreground">
+                                All Plans
+                              </span>
+                            ) : (
+                              applicablePlans.map((pId) => {
+                                const matched = PLANS.find((p) => p.id === pId);
+                                return (
+                                  <span
+                                    key={pId}
+                                    className="rounded-md bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-foreground"
+                                  >
+                                    {matched ? matched.name : pId}
+                                  </span>
+                                );
+                              })
+                            )}
+                          </div>
+
+                          {/* TARGET CREATOR RESTRICTIONS */}
+                          {isTargeted && (
+                            <div className="flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-amber-800 dark:text-amber-300 bg-amber-500/10 px-2.5 py-1 rounded-lg border border-amber-500/20">
+                              {dc.targetEmail && (
+                                <span className="flex items-center gap-1">
+                                  <Mail className="size-3" />
+                                  <span>{dc.targetEmail}</span>
+                                </span>
+                              )}
+                              {dc.targetPhone && (
+                                <span className="flex items-center gap-1">
+                                  <Phone className="size-3" />
+                                  <span>{dc.targetPhone}</span>
+                                </span>
+                              )}
+                            </div>
+                          )}
 
                           <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
                             <span className="flex items-center gap-1">
