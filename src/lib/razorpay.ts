@@ -94,7 +94,31 @@ export const createRazorpayOrderFn = createServerFn({ method: "POST" })
             const isLimitReached =
               row.max_uses != null && Number(row.usage_count) >= Number(row.max_uses);
 
-            if (!isExpired && !isInactive && !isLimitReached) {
+            // Check email restriction
+            const emailMismatch =
+              Boolean(row.target_email?.trim()) &&
+              (!data.creatorEmail ||
+                data.creatorEmail.trim().toLowerCase() !== row.target_email.trim().toLowerCase());
+
+            // Check plan restriction
+            const applicablePlans: string[] = Array.isArray(row.applicable_plans)
+              ? row.applicable_plans
+              : row.applicable_plans
+              ? [row.applicable_plans]
+              : [];
+            const planMismatch =
+              applicablePlans.length > 0 &&
+              !applicablePlans.includes("all") &&
+              !applicablePlans.includes(data.planId);
+
+            if (
+              !isExpired &&
+              !isInactive &&
+              !isLimitReached &&
+              !emailMismatch &&
+              !phoneMismatch &&
+              !planMismatch
+            ) {
               appliedDiscountPercent = Number(row.discount_percent) || 0;
               appliedDiscountCode = row.code;
 
