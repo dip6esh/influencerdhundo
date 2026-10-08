@@ -1588,6 +1588,61 @@ export const supabaseDb = {
       return false;
     }
   },
+
+  /** Fetch raw website visits within a time range (or all) */
+  async fetchWebsiteVisits(
+    range: "today" | "7d" | "30d" | "all" = "7d",
+    limit = 500,
+  ): Promise<WebsiteVisit[]> {
+    try {
+      let query = supabase
+        .from("website_visits")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (range !== "all") {
+        const now = new Date();
+        if (range === "today") {
+          now.setHours(0, 0, 0, 0);
+          query = query.gte("created_at", now.toISOString());
+        } else if (range === "7d") {
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          query = query.gte("created_at", sevenDaysAgo.toISOString());
+        } else if (range === "30d") {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          query = query.gte("created_at", thirtyDaysAgo.toISOString());
+        }
+      }
+
+      const { data, error } = await query;
+      if (error || !data) return [];
+
+      return data.map((row: any) => ({
+        id: row.id,
+        sessionId: row.session_id,
+        path: row.path,
+        fullUrl: row.full_url || undefined,
+        referrer: row.referrer || undefined,
+        referrerSource: row.referrer_source || "Direct",
+        city: row.city || "Unknown City",
+        region: row.region || "Unknown Region",
+        country: row.country || "India",
+        countryCode: row.country_code || "IN",
+        ipMasked: row.ip_masked || undefined,
+        deviceType: (row.device_type as "Mobile" | "Desktop" | "Tablet") || "Desktop",
+        browser: row.browser || "Other",
+        os: row.os || "Other",
+        screenResolution: row.screen_resolution || undefined,
+        creatorId: row.creator_id || undefined,
+        creatorName: row.creator_name || undefined,
+        createdAt: row.created_at,
+      }));
+    } catch (e) {
+      console.warn("Supabase fetchWebsiteVisits error:", e);
+      return [];
+    }
+  },
 };
 
 // ── Referral Event type ────────────────────────────────────────────────────
@@ -1621,4 +1676,40 @@ export type DiscountCode = {
   applicablePlans?: string[] | undefined;
   createdAt: string;
 };
+
+// ── Website Visit & Analytics types ───────────────────────────────────────
+export interface WebsiteVisit {
+  id: string;
+  sessionId: string;
+  path: string;
+  fullUrl?: string | undefined;
+  referrer?: string | undefined;
+  referrerSource: string;
+  city?: string | undefined;
+  region?: string | undefined;
+  country?: string | undefined;
+  countryCode?: string | undefined;
+  ipMasked?: string | undefined;
+  deviceType: "Mobile" | "Desktop" | "Tablet";
+  browser: string;
+  os: string;
+  screenResolution?: string | undefined;
+  creatorId?: string | undefined;
+  creatorName?: string | undefined;
+  createdAt: string;
+}
+
+export interface AnalyticsSummary {
+  totalViews: number;
+  uniqueVisitors: number;
+  topCities: { city: string; region: string; count: number; percentage: number }[];
+  topSources: { source: string; count: number; percentage: number }[];
+  topCreators: { creatorId: string; creatorName: string; count: number }[];
+  topPages: { path: string; count: number }[];
+  deviceBreakdown: { mobile: number; desktop: number; tablet: number };
+  osBreakdown: { os: string; count: number }[];
+  browserBreakdown: { browser: string; count: number }[];
+  recentVisits: WebsiteVisit[];
+}
+
 

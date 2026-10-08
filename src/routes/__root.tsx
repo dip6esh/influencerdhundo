@@ -4,6 +4,7 @@ import {
   Link,
   createRootRouteWithContext,
   useRouter,
+  useRouterState,
   HeadContent,
   Scripts,
   type ErrorComponentProps,
@@ -14,6 +15,7 @@ import appCss from "../styles.css?url";
 import { reportLovableError } from "../lib/lovable-error-reporting";
 import { AppStateProvider } from "@/lib/app-state";
 import { SiteFooter, SiteHeader } from "@/components/site-chrome";
+import { trackPageView } from "@/lib/analytics-tracker";
 
 function NotFoundComponent() {
   return (
@@ -73,6 +75,19 @@ function ErrorComponent({ error, reset }: ErrorComponentProps) {
   );
 }
 
+function RouteAnalyticsTracker() {
+  const routerState = useRouterState();
+  const currentPath = routerState.location.pathname;
+  const currentSearch = routerState.location.searchStr;
+
+  useEffect(() => {
+    const fullPath = currentSearch ? `${currentPath}${currentSearch}` : currentPath;
+    trackPageView(fullPath);
+  }, [currentPath, currentSearch]);
+
+  return null;
+}
+
 export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()({
   head: () => ({
     meta: [
@@ -129,6 +144,7 @@ function RootComponent() {
   return (
     <QueryClientProvider client={queryClient}>
       <AppStateProvider>
+        <RouteAnalyticsTracker />
         <div className="flex min-h-screen flex-col bg-background text-foreground">
           <SiteHeader />
           <main className="flex-1">
@@ -141,3 +157,4 @@ function RootComponent() {
     </QueryClientProvider>
   );
 }
+

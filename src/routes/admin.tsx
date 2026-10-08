@@ -1,9 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Chip, DatePicker, Field, SectionEyebrow, StatusPill, TextArea, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
-import { supabaseDb, type DiscountCode } from "@/lib/supabase";
+import { supabaseDb, type DiscountCode, type WebsiteVisit } from "@/lib/supabase";
 import {
   CATEGORIES,
   CITIES,
@@ -33,7 +33,6 @@ import {
   Clock,
   Trash2,
   Calendar,
-  CalendarDays,
   Pencil,
   X,
   Sparkles,
@@ -43,6 +42,7 @@ import {
   UserCheck,
   User,
   Globe,
+  Globe2,
   Mail,
   Phone,
   Layers,
@@ -51,6 +51,16 @@ import {
   Search,
   IndianRupee,
   Loader2,
+  BarChart3,
+  Smartphone,
+  Monitor,
+  Tablet,
+  MapPin,
+  Activity,
+  Share2,
+  ArrowUpRight,
+  Radio,
+  ExternalLink,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -69,6 +79,7 @@ export const Route = createFileRoute("/admin")({
 });
 
 const TABS = [
+  "Analytics",
   "Creators",
   "Discount Codes",
   "Subscriptions",
@@ -389,6 +400,996 @@ function AdminAuthBox() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
+// Analytics & Traffic Footprint View
+// ─────────────────────────────────────────────────────────────────────────────
+function formatTimeAgo(dateStr: string): string {
+  const diffMs = Date.now() - new Date(dateStr).getTime();
+  const diffSec = Math.floor(diffMs / 1000);
+  if (diffSec < 45) return "Just now";
+  const diffMin = Math.floor(diffSec / 60);
+  if (diffMin < 60) return `${diffMin}m ago`;
+  const diffHour = Math.floor(diffMin / 60);
+  if (diffHour < 24) return `${diffHour}h ago`;
+  const diffDay = Math.floor(diffHour / 24);
+  return `${diffDay}d ago`;
+}
+
+function getSourceStyle(source: string) {
+  const s = source.toLowerCase();
+  if (s.includes("instagram")) {
+    return {
+      bg: "bg-gradient-to-r from-pink-500/15 via-rose-500/15 to-amber-500/15 text-pink-600 dark:text-pink-400 border-pink-500/30",
+      dot: "bg-pink-500",
+      bar: "bg-gradient-to-r from-pink-500 to-rose-500",
+    };
+  }
+  if (s.includes("whatsapp")) {
+    return {
+      bg: "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30",
+      dot: "bg-emerald-500",
+      bar: "bg-emerald-500",
+    };
+  }
+  if (s.includes("google")) {
+    return {
+      bg: "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30",
+      dot: "bg-sky-500",
+      bar: "bg-sky-500",
+    };
+  }
+  if (s.includes("facebook")) {
+    return {
+      bg: "bg-blue-600/15 text-blue-600 dark:text-blue-400 border-blue-500/30",
+      dot: "bg-blue-600",
+      bar: "bg-blue-600",
+    };
+  }
+  if (s.includes("youtube")) {
+    return {
+      bg: "bg-red-500/15 text-red-600 dark:text-red-400 border-red-500/30",
+      dot: "bg-red-500",
+      bar: "bg-red-500",
+    };
+  }
+  if (s.includes("twitter") || s.includes("x.com")) {
+    return {
+      bg: "bg-foreground/10 text-foreground border-border",
+      dot: "bg-foreground",
+      bar: "bg-foreground",
+    };
+  }
+  return {
+    bg: "bg-secondary text-muted-foreground border-border",
+    dot: "bg-muted-foreground",
+    bar: "bg-primary",
+  };
+}
+
+function AnalyticsTabContent({
+  visits,
+  loading,
+  range,
+  setRange,
+  autoRefresh,
+  setAutoRefresh,
+  onRefresh,
+  creators,
+}: {
+  visits: WebsiteVisit[];
+  loading: boolean;
+  range: "today" | "7d" | "30d" | "all";
+  setRange: (r: "today" | "7d" | "30d" | "all") => void;
+  autoRefresh: boolean;
+  setAutoRefresh: (val: boolean) => void;
+  onRefresh: () => void;
+  creators: Creator[];
+}) {
+  const stats = useMemo(() => {
+    const totalViews = visits.length;
+    const uniqueSessionIds = new Set(visits.map((v) => v.sessionId));
+    const uniqueVisitors = uniqueSessionIds.size;
+
+    // Today vs Yesterday Traffic
+    const now = new Date();
+    const startOfToday = new Date(now.getFullYear(), now.getMonth(), now.getDate()).getTime();
+    const startOfYesterday = startOfToday - 24 * 60 * 60 * 1000;
+    const todayVisitsCount = visits.filter(
+      (v) => new Date(v.createdAt).getTime() >= startOfToday,
+    ).length;
+    const yesterdayVisitsCount = visits.filter((v) => {
+      const t = new Date(v.createdAt).getTime();
+      return t >= startOfYesterday && t < startOfToday;
+    }).length;
+    const dayTrendDiff = todayVisitsCount - yesterdayVisitsCount;
+    const dayTrendPct = yesterdayVisitsCount
+      ? Math.round(((todayVisitsCount - yesterdayVisitsCount) / yesterdayVisitsCount) * 100)
+      : todayVisitsCount > 0
+      ? 100
+      : 0;
+
+    // Devices
+    const mobileCount = visits.filter((v) => v.deviceType === "Mobile").length;
+    const desktopCount = visits.filter((v) => v.deviceType === "Desktop").length;
+    const tabletCount = visits.filter((v) => v.deviceType === "Tablet").length;
+    const mobilePct = totalViews ? Math.round((mobileCount / totalViews) * 100) : 0;
+    const desktopPct = totalViews ? Math.round((desktopCount / totalViews) * 100) : 0;
+    const tabletPct = totalViews ? Math.round((tabletCount / totalViews) * 100) : 0;
+
+    // Cities
+    const cityMap = new Map<string, { city: string; region: string; country: string; count: number }>();
+    visits.forEach((v) => {
+      const city = v.city || "Unknown City";
+      const region = v.region || "";
+      const country = v.country || "India";
+      const key = `${city}-${region}`;
+      const existing = cityMap.get(key) || { city, region, country, count: 0 };
+      existing.count += 1;
+      cityMap.set(key, existing);
+    });
+    const topCities = Array.from(cityMap.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 10)
+      .map((c) => ({
+        ...c,
+        percentage: totalViews ? Math.round((c.count / totalViews) * 100) : 0,
+      }));
+
+    // States / Regions
+    const regionMap = new Map<string, number>();
+    visits.forEach((v) => {
+      const reg = v.region && v.region !== "Unknown Region" ? v.region : "Other Region";
+      regionMap.set(reg, (regionMap.get(reg) || 0) + 1);
+    });
+    const topRegions = Array.from(regionMap.entries())
+      .map(([region, count]) => ({
+        region,
+        count,
+        percentage: totalViews ? Math.round((count / totalViews) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 6);
+
+    // Country (India vs International)
+    const indiaCount = visits.filter(
+      (v) => (v.country && v.country.toLowerCase() === "india") || v.countryCode === "IN",
+    ).length;
+    const intlCount = totalViews - indiaCount;
+    const indiaPct = totalViews ? Math.round((indiaCount / totalViews) * 100) : 100;
+    const intlPct = totalViews ? Math.round((intlCount / totalViews) * 100) : 0;
+
+    // Traffic Sources
+    const sourceMap = new Map<string, number>();
+    visits.forEach((v) => {
+      const src = v.referrerSource || "Direct";
+      sourceMap.set(src, (sourceMap.get(src) || 0) + 1);
+    });
+    const topSources = Array.from(sourceMap.entries())
+      .map(([source, count]) => ({
+        source,
+        count,
+        percentage: totalViews ? Math.round((count / totalViews) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Funnel Specific Counts
+    const funnelDiscovery = visits.filter((v) => v.path && v.path.startsWith("/discover")).length;
+    const funnelPricing = visits.filter(
+      (v) =>
+        v.path &&
+        (v.path.includes("/creator/plans") ||
+          v.path.includes("/business/pricing") ||
+          v.path.includes("pricing") ||
+          v.path.includes("plans")),
+    ).length;
+    const funnelCreatorReg = visits.filter(
+      (v) => v.path && (v.path.includes("/creator/register") || v.path.includes("/creator/signup")),
+    ).length;
+    const funnelBusinessReg = visits.filter(
+      (v) => v.path && (v.path.includes("/business/signup") || v.path.includes("/business/register")),
+    ).length;
+
+    // Top Creators Viewed
+    const creatorViewMap = new Map<string, { id: string; name: string; slug: string; count: number }>();
+    visits.forEach((v) => {
+      let cId = v.creatorId;
+      let cName = v.creatorName;
+      if (!cId && v.path && v.path.startsWith("/creators/")) {
+        const rawSlug = (v.path.replace("/creators/", "").split("?")[0] || "").trim();
+        if (rawSlug) {
+          const matched = creators.find(
+            (c) =>
+              c.id.toLowerCase() === rawSlug.toLowerCase() ||
+              c.displayName.toLowerCase() === rawSlug.toLowerCase() ||
+              c.name.toLowerCase().replace(/[^a-z0-9]+/g, "-") === rawSlug.toLowerCase() ||
+              getCreatorProfileSlug(c).toLowerCase() === rawSlug.toLowerCase(),
+          );
+          if (matched) {
+            cId = matched.id;
+            cName = matched.displayName || matched.name;
+          } else {
+            cId = rawSlug;
+            cName = rawSlug;
+          }
+        }
+      }
+
+      if (cId) {
+        const creatorObj = creators.find((c) => c.id === cId);
+        const name = cName || creatorObj?.displayName || creatorObj?.name || cId;
+        const slug = creatorObj ? getCreatorProfileSlug(creatorObj) : cId;
+        const existing = creatorViewMap.get(cId) || { id: cId, name, slug, count: 0 };
+        existing.count += 1;
+        creatorViewMap.set(cId, existing);
+      }
+    });
+    const topCreators = Array.from(creatorViewMap.values())
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // Top Pages
+    const pageMap = new Map<string, number>();
+    visits.forEach((v) => {
+      const cleanPath = v.path.split("?")[0] || "/";
+      pageMap.set(cleanPath, (pageMap.get(cleanPath) || 0) + 1);
+    });
+    const topPages = Array.from(pageMap.entries())
+      .map(([path, count]) => ({
+        path,
+        count,
+        percentage: totalViews ? Math.round((count / totalViews) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count)
+      .slice(0, 8);
+
+    // OS Breakdown
+    const osMap = new Map<string, number>();
+    visits.forEach((v) => {
+      const os = v.os || "Other";
+      osMap.set(os, (osMap.get(os) || 0) + 1);
+    });
+    const topOs = Array.from(osMap.entries())
+      .map(([os, count]) => ({
+        os,
+        count,
+        percentage: totalViews ? Math.round((count / totalViews) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    // Browser Breakdown
+    const browserMap = new Map<string, number>();
+    visits.forEach((v) => {
+      const b = v.browser || "Other";
+      browserMap.set(b, (browserMap.get(b) || 0) + 1);
+    });
+    const topBrowsers = Array.from(browserMap.entries())
+      .map(([browser, count]) => ({
+        browser,
+        count,
+        percentage: totalViews ? Math.round((count / totalViews) * 100) : 0,
+      }))
+      .sort((a, b) => b.count - a.count);
+
+    return {
+      totalViews,
+      uniqueVisitors,
+      todayVisitsCount,
+      yesterdayVisitsCount,
+      dayTrendDiff,
+      dayTrendPct,
+      mobileCount,
+      desktopCount,
+      tabletCount,
+      mobilePct,
+      desktopPct,
+      tabletPct,
+      topCities,
+      topRegions,
+      indiaCount,
+      intlCount,
+      indiaPct,
+      intlPct,
+      topSources,
+      topCreators,
+      topPages,
+      topOs,
+      topBrowsers,
+      funnelDiscovery,
+      funnelPricing,
+      funnelCreatorReg,
+      funnelBusinessReg,
+      topCityName: topCities[0]?.city || "No data yet",
+      topSourceChannel: topSources[0]?.source || "Direct",
+    };
+  }, [visits, creators]);
+
+  return (
+    <div className="space-y-6">
+      {/* ── TOP CONTROL BAR ── */}
+      <Card className="p-4 bg-secondary/30 border border-border/80">
+        <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div>
+            <div className="flex items-center gap-2">
+              <span className="relative flex size-2.5">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+                <span className="relative inline-flex rounded-full size-2.5 bg-emerald-500"></span>
+              </span>
+              <h2 className="text-sm font-bold tracking-tight text-foreground flex items-center gap-2">
+                <span>Traffic &amp; Visitor Footprint Engine</span>
+              </h2>
+            </div>
+            <p className="mt-0.5 text-xs text-muted-foreground">
+              Live tracking of visitor cities, acquisition channels, popular creator profiles &amp; devices.
+            </p>
+          </div>
+
+          <div className="flex flex-wrap items-center gap-2 shrink-0">
+            {/* Range Toggle */}
+            <div className="flex rounded-xl bg-background p-1 ring-1 ring-border text-xs">
+              {(
+                [
+                  { id: "today", label: "Today" },
+                  { id: "7d", label: "Last 7 Days" },
+                  { id: "30d", label: "Last 30 Days" },
+                  { id: "all", label: "All Time" },
+                ] as const
+              ).map((r) => (
+                <button
+                  key={r.id}
+                  onClick={() => setRange(r.id)}
+                  className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                    range === r.id
+                      ? "bg-foreground text-background shadow-xs"
+                      : "text-muted-foreground hover:text-foreground"
+                  }`}
+                >
+                  {r.label}
+                </button>
+              ))}
+            </div>
+
+            {/* Auto Refresh Toggle */}
+            <button
+              type="button"
+              onClick={() => setAutoRefresh(!autoRefresh)}
+              className={`flex items-center gap-1.5 px-3 py-2 rounded-xl border text-xs font-semibold transition-all ${
+                autoRefresh
+                  ? "bg-emerald-500/10 border-emerald-500/30 text-emerald-600 dark:text-emerald-400"
+                  : "bg-background border-border text-muted-foreground"
+              }`}
+              title="Auto refresh every 15 seconds"
+            >
+              <Radio className={`size-3.5 ${autoRefresh ? "animate-pulse" : ""}`} />
+              <span>{autoRefresh ? "Live (15s)" : "Auto-refresh Off"}</span>
+            </button>
+
+            {/* Refresh Button */}
+            <Button
+              variant="outline"
+              onClick={onRefresh}
+              disabled={loading}
+              className="px-3 py-2 text-xs flex items-center gap-1.5 bg-background hover:bg-secondary"
+            >
+              <RefreshCw className={`size-3.5 ${loading ? "animate-spin text-primary" : ""}`} />
+              <span>Refresh</span>
+            </Button>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── HERO KPI CARDS (6 METRICS) ── */}
+      <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-6">
+        {/* Card 1: Total Views */}
+        <Card className="p-4 bg-secondary/20 border border-border/70 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Total Page Views</span>
+            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <BarChart3 className="size-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold font-mono tracking-tight text-foreground">
+            {stats.totalViews.toLocaleString()}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground flex items-center gap-1">
+            <Activity className="size-3 text-emerald-500" />
+            <span>Recorded hits</span>
+          </p>
+        </Card>
+
+        {/* Card 2: Unique Visitors */}
+        <Card className="p-4 bg-secondary/20 border border-border/70 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Unique Visitors</span>
+            <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+              <UserCheck className="size-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold font-mono tracking-tight text-foreground">
+            {stats.uniqueVisitors.toLocaleString()}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            Distinct people / sessions
+          </p>
+        </Card>
+
+        {/* Card 3: Today's Live Traffic vs Yesterday */}
+        <Card className="p-4 bg-secondary/20 border border-border/70 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Today's Traffic</span>
+            <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+              <Clock className="size-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold font-mono tracking-tight text-foreground">
+            {stats.todayVisitsCount.toLocaleString()}
+          </div>
+          <p className="mt-1 text-[11px] font-semibold text-emerald-600 dark:text-emerald-400 flex items-center gap-1">
+            <span>vs {stats.yesterdayVisitsCount} yesterday</span>
+            {stats.dayTrendDiff >= 0
+              ? ` (+${stats.dayTrendDiff}, +${stats.dayTrendPct}%)`
+              : ` (${stats.dayTrendDiff}, ${stats.dayTrendPct}%)`}
+          </p>
+        </Card>
+
+        {/* Card 4: Top City */}
+        <Card className="p-4 bg-secondary/20 border border-border/70 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Top City Lead</span>
+            <div className="flex size-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500">
+              <MapPin className="size-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-lg font-bold tracking-tight text-foreground truncate" title={stats.topCityName}>
+            {stats.topCityName}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground truncate">
+            {stats.topCities[0] ? `${stats.topCities[0].count} visits (${stats.topCities[0].percentage}%)` : "No visits"}
+          </p>
+        </Card>
+
+        {/* Card 5: Top Channel */}
+        <Card className="p-4 bg-secondary/20 border border-border/70 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Top Source</span>
+            <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
+              <Share2 className="size-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-lg font-bold tracking-tight text-foreground truncate" title={stats.topSourceChannel}>
+            {stats.topSourceChannel}
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground truncate">
+            {stats.topSources[0] ? `${stats.topSources[0].percentage}% share` : "No referrals"}
+          </p>
+        </Card>
+
+        {/* Card 6: Mobile Share */}
+        <Card className="p-4 bg-secondary/20 border border-border/70 relative overflow-hidden">
+          <div className="flex items-center justify-between">
+            <span className="text-xs font-medium text-muted-foreground">Mobile Share</span>
+            <div className="flex size-7 items-center justify-center rounded-lg bg-sky-500/10 text-sky-500">
+              <Smartphone className="size-4" />
+            </div>
+          </div>
+          <div className="mt-2 text-2xl font-bold font-mono tracking-tight text-foreground">
+            {stats.mobilePct}%
+          </div>
+          <p className="mt-1 text-[11px] text-muted-foreground">
+            {stats.mobileCount} mob / {stats.desktopCount} desk
+          </p>
+        </Card>
+      </div>
+
+      {/* ── KEY CONVERSION FUNNEL STATS ── */}
+      <Card className="p-4.5 bg-secondary/15 border border-border/80">
+        <div className="flex items-center justify-between pb-3 border-b border-border/60">
+          <div className="flex items-center gap-2">
+            <div className="flex size-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+              <Sparkles className="size-4" />
+            </div>
+            <div>
+              <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Key Discovery &amp; Conversion Funnel Views
+              </h3>
+              <p className="text-[11px] text-muted-foreground">Traffic across high-intent pages &amp; onboarding flows</p>
+            </div>
+          </div>
+          <span className="text-xs text-muted-foreground">Intent Tracking</span>
+        </div>
+
+        <div className="mt-3.5 grid grid-cols-2 gap-3 sm:grid-cols-4">
+          <div className="p-3 rounded-xl bg-background border border-border/60">
+            <span className="text-[11px] font-semibold text-muted-foreground block">🔍 Search Directory (/discover)</span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-xl font-bold font-mono text-foreground">{stats.funnelDiscovery}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {stats.totalViews ? Math.round((stats.funnelDiscovery / stats.totalViews) * 100) : 0}% traffic
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-background border border-border/60">
+            <span className="text-[11px] font-semibold text-muted-foreground block">💳 Plans &amp; Pricing (/plans)</span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-xl font-bold font-mono text-foreground">{stats.funnelPricing}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {stats.totalViews ? Math.round((stats.funnelPricing / stats.totalViews) * 100) : 0}% traffic
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-background border border-border/60">
+            <span className="text-[11px] font-semibold text-muted-foreground block">✍️ Creator Signup (/register)</span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-xl font-bold font-mono text-foreground">{stats.funnelCreatorReg}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {stats.totalViews ? Math.round((stats.funnelCreatorReg / stats.totalViews) * 100) : 0}% traffic
+              </span>
+            </div>
+          </div>
+
+          <div className="p-3 rounded-xl bg-background border border-border/60">
+            <span className="text-[11px] font-semibold text-muted-foreground block">🏢 Business Signup (/business)</span>
+            <div className="mt-1 flex items-baseline justify-between">
+              <span className="text-xl font-bold font-mono text-foreground">{stats.funnelBusinessReg}</span>
+              <span className="text-[11px] text-muted-foreground">
+                {stats.totalViews ? Math.round((stats.funnelBusinessReg / stats.totalViews) * 100) : 0}% traffic
+              </span>
+            </div>
+          </div>
+        </div>
+      </Card>
+
+      {/* ── EMPTY STATE IF NO DATA YET ── */}
+      {visits.length === 0 && !loading && (
+        <Card className="p-8 text-center border-dashed border-2 border-border/80">
+          <div className="mx-auto flex size-12 items-center justify-center rounded-2xl bg-primary/10 text-primary mb-3">
+            <Activity className="size-6 animate-pulse" />
+          </div>
+          <h3 className="text-base font-bold text-foreground">Waiting for First Visitor Footprints</h3>
+          <p className="mt-1 text-xs text-muted-foreground max-w-md mx-auto">
+            The tracking beacon is active across your site. When users or businesses visit from Instagram, WhatsApp, Google or direct links, their city footprints, visited creators, and referral channels will appear here automatically in real time!
+          </p>
+          <div className="mt-4 flex justify-center gap-2">
+            <Link
+              to="/discover"
+              target="_blank"
+              className="inline-flex items-center gap-1.5 px-4 py-2 rounded-xl bg-foreground text-background text-xs font-semibold hover:bg-foreground/90 transition-all"
+            >
+              <span>Test Visit Discovery Page</span>
+              <ArrowUpRight className="size-3.5" />
+            </Link>
+          </div>
+        </Card>
+      )}
+
+      {/* ── MAIN ANALYTICS GRIDS ── */}
+      {visits.length > 0 && (
+        <div className="space-y-6">
+          {/* Row 1: Geographic Footprints + Traffic Acquisition Channels */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Visitor Cities & State Breakdown */}
+            <Card className="p-5 border border-border/80">
+              <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-rose-500/10 text-rose-500">
+                    <MapPin className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Top Visitor Cities &amp; Locations</h3>
+                    <p className="text-[11px] text-muted-foreground">Geographic footprints of users browsing your platform</p>
+                  </div>
+                </div>
+                <div className="flex items-center gap-1.5">
+                  <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[11px] font-bold">
+                    🇮🇳 India ({stats.indiaPct}%)
+                  </span>
+                  {stats.intlCount > 0 && (
+                    <span className="rounded-full bg-secondary text-muted-foreground px-2 py-0.5 text-[11px] font-bold">
+                      Global ({stats.intlPct}%)
+                    </span>
+                  )}
+                </div>
+              </div>
+
+              {/* State Pills */}
+              {stats.topRegions.length > 0 && (
+                <div className="mt-3 flex flex-wrap gap-1.5 pt-1 pb-2 border-b border-border/40">
+                  <span className="text-[11px] font-semibold text-muted-foreground self-center mr-1">Top States:</span>
+                  {stats.topRegions.map((r) => (
+                    <span
+                      key={r.region}
+                      className="inline-flex items-center gap-1 px-2.5 py-0.5 rounded-full bg-secondary text-[11px] font-medium text-foreground"
+                    >
+                      <span>{r.region}</span>
+                      <strong className="text-muted-foreground font-mono">({r.count})</strong>
+                    </span>
+                  ))}
+                </div>
+              )}
+
+              <div className="mt-4 space-y-3">
+                {stats.topCities.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No city data logged yet.</p>
+                ) : (
+                  stats.topCities.map((item, idx) => (
+                    <div key={`${item.city}-${item.region}-${idx}`} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-[11px] font-bold text-muted-foreground w-5 shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="font-semibold text-foreground truncate">
+                            {item.city}
+                          </span>
+                          {item.region && (
+                            <span className="text-[11px] text-muted-foreground truncate">
+                              · {item.region}
+                            </span>
+                          )}
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 font-mono">
+                          <span className="font-bold text-foreground">{item.count}</span>
+                          <span className="text-[11px] text-muted-foreground w-10 text-right">
+                            {item.percentage}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-gradient-to-r from-primary to-saffrondeep transition-all duration-500"
+                          style={{ width: `${Math.max(item.percentage, 4)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+
+            {/* Traffic Sources & Acquisition */}
+            <Card className="p-5 border border-border/80">
+              <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-indigo-500/10 text-indigo-500">
+                    <Share2 className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Acquisition &amp; Traffic Sources</h3>
+                    <p className="text-[11px] text-muted-foreground">Where your website visitors are arriving from</p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-muted-foreground">
+                  {stats.topSources.length} Channels
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {stats.topSources.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No referral channels recorded.</p>
+                ) : (
+                  stats.topSources.map((item, idx) => {
+                    const style = getSourceStyle(item.source);
+                    return (
+                      <div key={item.source} className="space-y-1">
+                        <div className="flex items-center justify-between text-xs">
+                          <div className="flex items-center gap-2">
+                            <span className="font-mono text-[11px] font-bold text-muted-foreground w-5 shrink-0">
+                              #{idx + 1}
+                            </span>
+                            <span
+                              className={`inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md text-[11px] font-bold border ${style.bg}`}
+                            >
+                              <span className={`size-1.5 rounded-full ${style.dot}`} />
+                              {item.source}
+                            </span>
+                          </div>
+                          <div className="flex items-center gap-2 shrink-0 font-mono">
+                            <span className="font-bold text-foreground">{item.count} visits</span>
+                            <span className="text-[11px] text-muted-foreground w-10 text-right">
+                              {item.percentage}%
+                            </span>
+                          </div>
+                        </div>
+                        <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                          <div
+                            className={`h-full rounded-full transition-all duration-500 ${style.bar}`}
+                            style={{ width: `${Math.max(item.percentage, 4)}%` }}
+                          />
+                        </div>
+                      </div>
+                    );
+                  })
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Row 2: Top Creators Viewed + Top Site Pages */}
+          <div className="grid gap-6 lg:grid-cols-2">
+            {/* Top Creator Profiles Viewed */}
+            <Card className="p-5 border border-border/80">
+              <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-tealdeep/10 text-tealdeep">
+                    <User className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Most Viewed Creator Profiles</h3>
+                    <p className="text-[11px] text-muted-foreground">Profiles attracting the most business views &amp; clicks</p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-muted-foreground">
+                  {stats.topCreators.length} Creators
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-2.5">
+                {stats.topCreators.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">
+                    No creator profile visits recorded yet in this time frame.
+                  </p>
+                ) : (
+                  stats.topCreators.map((item, idx) => (
+                    <div
+                      key={item.id}
+                      className="flex items-center justify-between p-2.5 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/60 transition-all"
+                    >
+                      <div className="flex items-center gap-2.5 min-w-0">
+                        <span className="font-mono text-xs font-bold text-muted-foreground w-5 shrink-0">
+                          #{idx + 1}
+                        </span>
+                        <div className="min-w-0">
+                          <div className="font-semibold text-xs text-foreground truncate">
+                            {item.name}
+                          </div>
+                          <div className="text-[11px] text-muted-foreground truncate">
+                            /creators/{item.slug}
+                          </div>
+                        </div>
+                      </div>
+
+                      <div className="flex items-center gap-3 shrink-0">
+                        <div className="text-right">
+                          <span className="font-mono text-xs font-bold text-foreground">
+                            {item.count}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block">views</span>
+                        </div>
+                        <Link
+                          to="/creators/$creatorId"
+                          params={{ creatorId: item.slug }}
+                          search={{ preview: true }}
+                          target="_blank"
+                          className="p-1.5 rounded-lg bg-background text-muted-foreground hover:text-foreground ring-1 ring-border shadow-xs"
+                          title="View public creator profile"
+                        >
+                          <ExternalLink className="size-3.5" />
+                        </Link>
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+
+            {/* Top Site Pages Visited */}
+            <Card className="p-5 border border-border/80">
+              <div className="flex items-center justify-between pb-3 border-b border-border/60">
+                <div className="flex items-center gap-2">
+                  <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+                    <Globe2 className="size-4" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-foreground">Top Site Pages &amp; Sections</h3>
+                    <p className="text-[11px] text-muted-foreground">Most popular discovery &amp; landing pages</p>
+                  </div>
+                </div>
+                <span className="text-xs font-mono font-bold text-muted-foreground">
+                  {stats.topPages.length} Pages
+                </span>
+              </div>
+
+              <div className="mt-4 space-y-3">
+                {stats.topPages.length === 0 ? (
+                  <p className="text-xs text-muted-foreground py-4 text-center">No page paths recorded yet.</p>
+                ) : (
+                  stats.topPages.map((item, idx) => (
+                    <div key={item.path} className="space-y-1">
+                      <div className="flex items-center justify-between text-xs">
+                        <div className="flex items-center gap-2 min-w-0">
+                          <span className="font-mono text-[11px] font-bold text-muted-foreground w-5 shrink-0">
+                            #{idx + 1}
+                          </span>
+                          <span className="font-mono font-semibold text-foreground truncate">
+                            {item.path}
+                          </span>
+                        </div>
+                        <div className="flex items-center gap-2 shrink-0 font-mono">
+                          <span className="font-bold text-foreground">{item.count}</span>
+                          <span className="text-[11px] text-muted-foreground w-10 text-right">
+                            {item.percentage}%
+                          </span>
+                        </div>
+                      </div>
+                      <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all duration-500"
+                          style={{ width: `${Math.max(item.percentage, 4)}%` }}
+                        />
+                      </div>
+                    </div>
+                  ))
+                )}
+              </div>
+            </Card>
+          </div>
+
+          {/* Row 3: Devices, OS & Browsers Tech Breakdown */}
+          <div className="grid gap-6 md:grid-cols-3">
+            {/* Device Type */}
+            <Card className="p-4.5 border border-border/80">
+              <div className="flex items-center gap-2 pb-3 border-b border-border/60">
+                <Smartphone className="size-4 text-primary" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Device Breakdown</h3>
+              </div>
+              <div className="mt-4 space-y-3">
+                <div className="flex items-center justify-between text-xs">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Smartphone className="size-3.5" /> Mobile
+                  </span>
+                  <span className="font-mono font-bold text-foreground">
+                    {stats.mobileCount} ({stats.mobilePct}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                  <div className="h-full rounded-full bg-amber-500" style={{ width: `${stats.mobilePct}%` }} />
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Monitor className="size-3.5" /> Desktop
+                  </span>
+                  <span className="font-mono font-bold text-foreground">
+                    {stats.desktopCount} ({stats.desktopPct}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                  <div className="h-full rounded-full bg-sky-500" style={{ width: `${stats.desktopPct}%` }} />
+                </div>
+
+                <div className="flex items-center justify-between text-xs pt-1">
+                  <span className="flex items-center gap-1.5 text-muted-foreground">
+                    <Tablet className="size-3.5" /> Tablet
+                  </span>
+                  <span className="font-mono font-bold text-foreground">
+                    {stats.tabletCount} ({stats.tabletPct}%)
+                  </span>
+                </div>
+                <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
+                  <div className="h-full rounded-full bg-emerald-500" style={{ width: `${stats.tabletPct}%` }} />
+                </div>
+              </div>
+            </Card>
+
+            {/* Operating Systems */}
+            <Card className="p-4.5 border border-border/80">
+              <div className="flex items-center gap-2 pb-3 border-b border-border/60">
+                <Layers className="size-4 text-primary" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Operating Systems</h3>
+              </div>
+              <div className="mt-3 space-y-2">
+                {stats.topOs.slice(0, 5).map((item) => (
+                  <div key={item.os} className="flex items-center justify-between text-xs py-1 border-b border-border/30 last:border-0">
+                    <span className="font-medium text-foreground">{item.os}</span>
+                    <span className="font-mono text-muted-foreground font-semibold">
+                      {item.count} ({item.percentage}%)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+
+            {/* Browsers */}
+            <Card className="p-4.5 border border-border/80">
+              <div className="flex items-center gap-2 pb-3 border-b border-border/60">
+                <Globe className="size-4 text-primary" />
+                <h3 className="text-xs font-bold uppercase tracking-wider text-foreground">Browsers &amp; In-App</h3>
+              </div>
+              <div className="mt-3 space-y-2">
+                {stats.topBrowsers.slice(0, 5).map((item) => (
+                  <div key={item.browser} className="flex items-center justify-between text-xs py-1 border-b border-border/30 last:border-0">
+                    <span className="font-medium text-foreground">{item.browser}</span>
+                    <span className="font-mono text-muted-foreground font-semibold">
+                      {item.count} ({item.percentage}%)
+                    </span>
+                  </div>
+                ))}
+              </div>
+            </Card>
+          </div>
+
+          {/* Row 4: Live Real-time Activity Timeline Feed */}
+          <Card className="p-5 border border-border/80">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border/60">
+              <div className="flex items-center gap-2">
+                <div className="flex size-7 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+                  <Activity className="size-4" />
+                </div>
+                <div>
+                  <h3 className="text-sm font-bold text-foreground">⚡ Real-Time Live Activity Feed</h3>
+                  <p className="text-[11px] text-muted-foreground">Live narrative stream of incoming visitors as they browse</p>
+                </div>
+              </div>
+              <span className="text-xs text-muted-foreground">
+                Showing latest <strong className="text-foreground">{Math.min(visits.length, 30)}</strong> visitor events
+              </span>
+            </div>
+
+            <div className="mt-4 space-y-2.5">
+              {visits.slice(0, 30).map((v) => {
+                const srcStyle = getSourceStyle(v.referrerSource);
+                const isCreator = Boolean(v.creatorName || (v.path && v.path.startsWith("/creators/")));
+                const isDiscover = v.path && v.path.startsWith("/discover");
+                const isPlans = v.path && (v.path.includes("pricing") || v.path.includes("plans"));
+                const isReg = v.path && (v.path.includes("/creator/register") || v.path.includes("/creator/signup"));
+                const isBiz = v.path && (v.path.includes("/business/signup") || v.path.includes("/business/register"));
+                const isHome = v.path === "/" || v.path === "";
+
+                const actionText = isCreator
+                  ? `viewed ${v.creatorName ? `${v.creatorName}'s profile` : "a creator profile"}`
+                  : isDiscover
+                  ? "searched the discovery directory"
+                  : isPlans
+                  ? "opened subscription pricing & plans"
+                  : isReg
+                  ? "opened creator registration form"
+                  : isBiz
+                  ? "opened business signup form"
+                  : isHome
+                  ? "landed on homepage"
+                  : `visited ${v.path}`;
+
+                return (
+                  <div
+                    key={v.id}
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/60 transition-all text-xs"
+                  >
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                      <span className="font-mono text-[11px] text-muted-foreground font-semibold shrink-0 min-w-[55px]">
+                        {formatTimeAgo(v.createdAt)}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-foreground">
+                          Visitor from <strong className="text-foreground font-bold">{v.city || "Unknown City"}</strong>
+                          {v.region && <span className="text-muted-foreground">, {v.region}</span>}{" "}
+                          <span className="text-foreground">{actionText}</span>
+                        </p>
+                      </div>
+                    </div>
+
+                    <div className="flex flex-wrap items-center gap-2 shrink-0 sm:self-center pl-16 sm:pl-0">
+                      <span
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${srcStyle.bg}`}
+                      >
+                        <span className={`size-1.5 rounded-full ${srcStyle.dot}`} />
+                        {v.referrerSource}
+                      </span>
+                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-border">
+                        {v.deviceType} · {v.os} · {v.browser}
+                      </span>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          </Card>
+        </div>
+      )}
+    </div>
+  );
+}
+
+// ─────────────────────────────────────────────────────────────────────────────
 // Admin Dashboard
 // ─────────────────────────────────────────────────────────────────────────────
 function AdminDashboard() {
@@ -403,7 +1404,42 @@ function AdminDashboard() {
     toggleFeatured,
     updateCreator,
   } = useAppState();
-  const [tab, setTab] = useState<(typeof TABS)[number]>("Creators");
+  const [tab, setTab] = useState<(typeof TABS)[number]>("Analytics");
+
+  // Analytics state
+  const [analyticsRange, setAnalyticsRange] = useState<"today" | "7d" | "30d" | "all">("7d");
+  const [visits, setVisits] = useState<WebsiteVisit[]>([]);
+  const [loadingVisits, setLoadingVisits] = useState(false);
+  const [liveAutoRefresh, setLiveAutoRefresh] = useState(true);
+
+  const loadAnalytics = async (range = analyticsRange) => {
+    setLoadingVisits(true);
+    try {
+      const data = await supabaseDb.fetchWebsiteVisits(range, 1000);
+      setVisits(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingVisits(false);
+    }
+  };
+
+  useEffect(() => {
+    if (tab === "Analytics") {
+      loadAnalytics(analyticsRange);
+    }
+  }, [tab, analyticsRange]);
+
+  // Live polling every 15s if auto refresh is enabled and Analytics tab is active
+  useEffect(() => {
+    if (tab !== "Analytics" || !liveAutoRefresh) return;
+    const interval = setInterval(() => {
+      supabaseDb.fetchWebsiteVisits(analyticsRange, 1000).then((data) => {
+        setVisits(data);
+      });
+    }, 15000);
+    return () => clearInterval(interval);
+  }, [tab, liveAutoRefresh, analyticsRange]);
 
   // Creator search & filter state
   const [editingCreator, setEditingCreator] = useState<Creator | null>(null);
@@ -735,10 +1771,26 @@ function AdminDashboard() {
                 : "rounded-full px-4 py-2 text-xs font-medium text-muted-foreground ring-1 ring-border hover:text-foreground"
             }
           >
-            {t === "Discount Codes" ? "🏷️ Discount & Referral Codes" : t}
+            {t === "Analytics" ? "📊 Traffic & Footprints" : t === "Discount Codes" ? "🏷️ Discount & Referral Codes" : t}
           </button>
         ))}
       </div>
+
+      {/* ── TAB 0: ANALYTICS & FOOTPRINTS ──────────────────────────────── */}
+      {tab === "Analytics" ? (
+        <div className="mt-5">
+          <AnalyticsTabContent
+            visits={visits}
+            loading={loadingVisits}
+            range={analyticsRange}
+            setRange={setAnalyticsRange}
+            autoRefresh={liveAutoRefresh}
+            setAutoRefresh={setLiveAutoRefresh}
+            onRefresh={() => loadAnalytics(analyticsRange)}
+            creators={creators}
+          />
+        </div>
+      ) : null}
 
       {/* ── TAB 1: CREATORS ─────────────────────────────────────────────── */}
       {tab === "Creators" ? (

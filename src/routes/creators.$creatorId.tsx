@@ -1,8 +1,9 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button, Card, Field, Select, Tag, TextArea } from "@/components/ui-kit";
 import { InstagramIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
+import { trackPageView } from "@/lib/analytics-tracker";
 import {
   REPORT_REASONS,
   calculateAge,
@@ -54,7 +55,6 @@ export const Route = createFileRoute("/creators/$creatorId")({
 function CreatorProfile() {
   const { creatorId } = Route.useParams();
   const { preview } = Route.useSearch();
-  const navigate = useNavigate();
   const { creators, business, addReport } = useAppState();
   const cleanParam = (creatorId || "").trim().toLowerCase();
   const creator = creators.find((c) => {
@@ -74,6 +74,15 @@ function CreatorProfile() {
   const [reason, setReason] = useState<string>(REPORT_REASONS[0]);
   const [details, setDetails] = useState("");
   const [reported, setReported] = useState(false);
+
+  useEffect(() => {
+    if (creator && typeof window !== "undefined") {
+      trackPageView(window.location.pathname + window.location.search, {
+        creatorId: creator.id,
+        creatorName: creator.displayName || creator.name,
+      });
+    }
+  }, [creator?.id]);
 
   if (!creator) {
     return (
