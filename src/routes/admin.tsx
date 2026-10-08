@@ -98,6 +98,11 @@ const STATUSES: CreatorStatus[] = [
 
 type AuthMode = "login" | "signup";
 
+const ADMIN_UNLOCKED_STORAGE_KEY = "cc_admin_unlocked_v1";
+const ADMIN_MASTER_SECRET_KEY =
+  (import.meta.env["VITE_ADMIN_ACCESS_KEY"] as string | undefined)?.trim() ||
+  "dhundo_admin_pass_2026";
+
 function isLocalEnvironment() {
   if (typeof window === "undefined") {
     return process.env["NODE_ENV"] !== "production";
@@ -112,11 +117,76 @@ function isLocalEnvironment() {
   );
 }
 
-function AdminPage() {
-  const isLocal = isLocalEnvironment();
+function checkIsAdminAuthorized(): boolean {
+  if (typeof window === "undefined") {
+    return process.env["NODE_ENV"] !== "production";
+  }
 
-  // If accessed on live/production domain (e.g. Vercel), show 404 Not Found
-  if (!isLocal) {
+  // 1. Localhost / Dev mode is always unlocked for local testing
+  if (isLocalEnvironment()) {
+    return true;
+  }
+
+  // 2. Check if URL contains secret master key (?key=... or ?access_key=... or ?secret=... or ?pass=...)
+  try {
+    const urlParams = new URLSearchParams(window.location.search);
+    const keyParam =
+      urlParams.get("key") ||
+      urlParams.get("access_key") ||
+      urlParams.get("secret") ||
+      urlParams.get("pass");
+
+    if (keyParam && keyParam.trim() === ADMIN_MASTER_SECRET_KEY) {
+      // Valid master key provided! Authorize this browser
+      localStorage.setItem(ADMIN_UNLOCKED_STORAGE_KEY, "true");
+
+      // Strip the secret key parameter from browser URL bar to protect browsing history
+      urlParams.delete("key");
+      urlParams.delete("access_key");
+      urlParams.delete("secret");
+      urlParams.delete("pass");
+      const cleanSearch = urlParams.toString();
+      const newUrl =
+        window.location.pathname + (cleanSearch ? `?${cleanSearch}` : "") + window.location.hash;
+      window.history.replaceState({}, "", newUrl);
+
+      return true;
+    }
+  } catch {
+    // Ignore URL parse errors
+  }
+
+  // 3. Check persistent authorization in this browser
+  try {
+    if (localStorage.getItem(ADMIN_UNLOCKED_STORAGE_KEY) === "true") {
+      return true;
+    }
+  } catch {
+    // Ignore storage errors
+  }
+
+  // Unauthorized -> Cloak portal as 404
+  return false;
+}
+
+function lockAndCloakAdminPortal() {
+  try {
+    localStorage.removeItem(ADMIN_UNLOCKED_STORAGE_KEY);
+  } catch {
+    // ignore
+  }
+  window.location.href = "/admin";
+}
+
+function AdminPage() {
+  const [authorized, setAuthorized] = useState<boolean>(() => checkIsAdminAuthorized());
+
+  useEffect(() => {
+    setAuthorized(checkIsAdminAuthorized());
+  }, []);
+
+  // If accessed without master key authorization, render a fake 404 Page Not Found
+  if (!authorized) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center bg-background px-4 py-16">
         <div className="max-w-md text-center">
@@ -387,9 +457,20 @@ function AdminAuthBox() {
                 </Button>
               </div>
 
-              <div className="mt-5 border-t border-border pt-4 text-center text-[11px] text-muted-foreground">
-                <ShieldCheck className="mx-auto mb-1.5 size-4 opacity-40" />
-                Secured · Admin access only
+              <div className="mt-5 border-t border-border pt-4 flex items-center justify-between text-[11px] text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <ShieldCheck className="size-4 text-emerald-600 dark:text-emerald-400" />
+                  Secured · Admin access only
+                </span>
+                <button
+                  type="button"
+                  onClick={lockAndCloakAdminPortal}
+                  className="inline-flex items-center gap-1 text-muted-foreground hover:text-rose transition-colors cursor-pointer"
+                  title="Remove browser authorization and revert to 404"
+                >
+                  <Lock className="size-3" />
+                  Lock & Cloak
+                </button>
               </div>
             </Card>
           </div>
@@ -1750,14 +1831,28 @@ function AdminDashboard() {
           </SectionEyebrow>
           <h1 className="mt-2 text-3xl leading-tight">Manage the directory</h1>
         </div>
-        <Button
-          variant="ghost"
-          className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-rose"
-          onClick={() => signOutAdmin()}
-        >
-          <LogOut className="size-3.5" />
-          Sign out
-        </Button>
+        <div className="flex items-center gap-2">
+          <Button
+            variant="ghost"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400"
+            title="Lock and cloak the admin portal on this device (reverts to 404)"
+            onClick={async () => {
+              await signOutAdmin();
+              lockAndCloakAdminPortal();
+            }}
+          >
+            <Lock className="size-3.5" />
+            Lock & Cloak
+          </Button>
+          <Button
+            variant="ghost"
+            className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-rose"
+            onClick={() => signOutAdmin()}
+          >
+            <LogOut className="size-3.5" />
+            Sign out
+          </Button>
+        </div>
       </div>
 
       <div className="mt-5 flex flex-wrap gap-2">
