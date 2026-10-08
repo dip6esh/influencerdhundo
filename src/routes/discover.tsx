@@ -1,5 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useState, useMemo } from "react";
+import { useState, useMemo, useRef } from "react";
 import { CreatorCard } from "@/components/creator-card";
 import {
   Button,
@@ -78,7 +78,19 @@ function Discover() {
     }));
   };
 
-  const search = () => setDiscoverHasSearched(true);
+  const resultsRef = useRef<HTMLDivElement>(null);
+
+  const search = () => {
+    setDiscoverHasSearched(true);
+    // Smoothly scroll down towards the results section for better UX
+    setTimeout(() => {
+      if (resultsRef.current) {
+        resultsRef.current.scrollIntoView({ behavior: "smooth", block: "start" });
+      } else {
+        window.scrollBy({ top: 380, behavior: "smooth" });
+      }
+    }, 60);
+  };
 
   const results = useMemo(() => {
     if (!discoverHasSearched) return null;
@@ -419,7 +431,7 @@ function Discover() {
       </section>
 
       {/* RESULTS SECTION */}
-      <div className="mx-auto mt-10 max-w-5xl px-5">
+      <div ref={resultsRef} className="mx-auto mt-10 max-w-5xl px-5 scroll-mt-10">
         {results === null ? (
           <div className="glass-card rounded-2xl p-8 text-center max-w-xl mx-auto">
             <h2 className="text-xl font-display font-semibold">Ready to explore?</h2>
