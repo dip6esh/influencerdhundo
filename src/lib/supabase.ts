@@ -196,6 +196,19 @@ export const supabaseDb = {
     }
   },
 
+  async updateCreatorPhoto(id: string, photoUrl: string): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("creators")
+        .update({ photo: photoUrl, updated_at: new Date().toISOString() })
+        .eq("id", id);
+      return !error;
+    } catch (e) {
+      console.warn("Supabase updateCreatorPhoto error:", e);
+      return false;
+    }
+  },
+
   async toggleFeatured(id: string, featured: boolean): Promise<boolean> {
     try {
       const { error } = await supabase

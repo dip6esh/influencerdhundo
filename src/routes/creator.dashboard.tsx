@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
-import { InstagramIcon } from "@/components/icons";
+import { InstagramIcon, WhatsAppIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
 import {
   PLANS,
@@ -22,26 +22,31 @@ import {
   AlertCircle,
   ArrowUpRight,
   CalendarClock,
+  Camera,
   Check,
   CheckCheck,
   Clock,
+  Coins,
   Copy,
   CreditCard,
   Eye,
   FileText,
   Gift,
+  Globe,
   History,
   IndianRupee,
   Instagram,
   Layers,
   Loader2,
-  MessageCircle,
+  MapPin,
   Printer,
-  Receipt,
   ReceiptText,
   Share2,
   ShieldCheck,
   Sparkles,
+  Tag,
+  Trash2,
+  Upload,
   User,
   Users,
   X,
@@ -79,6 +84,7 @@ function Dashboard() {
     referralEvents,
     fetchReferralEvents,
     upsertCreator,
+    updateCreatorPhoto,
     setCreatorStatus,
     refreshFromSupabase,
   } = useAppState();
@@ -89,6 +95,7 @@ function Dashboard() {
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [copiedPaymentId, setCopiedPaymentId] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentRecord | null>(null);
+  const [showPhotoModal, setShowPhotoModal] = useState(false);
   const mine = creators.find((c) => c.id === myCreatorId);
 
   // Subscriptions & Queued plans calculation
@@ -260,19 +267,21 @@ function Dashboard() {
         <div className="relative mx-auto max-w-5xl px-5">
           {/* QUEUED PLAN NOTICE BANNER */}
           {queuedSubs.length > 0 && queuedSubs[0] ? (
-            <div className="mb-6 rounded-2xl bg-gradient-to-r from-accent/20 via-primary/15 to-accent/10 border border-accent/30 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-tealdeep text-white shadow-sm">
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-accent/20 via-primary/15 to-accent/10 border border-accent/30 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-tealdeep text-white shadow-sm mt-0.5 sm:mt-0">
                   <CalendarClock className="size-5" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span>Upcoming Plan in Queue: {queuedSubs[0].duration}</span>
-                    <span className="rounded-full bg-accent/30 text-tealdeep px-2 py-0.5 text-[11px] font-bold">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">
+                      Upcoming Plan in Queue: {queuedSubs[0].duration}
+                    </span>
+                    <span className="rounded-full bg-accent/30 text-tealdeep border border-accent/40 px-2.5 py-0.5 text-[11px] font-bold shrink-0">
                       Paid Plan Queued
                     </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     {isTrial && subActive && subExpiry ? (
                       <>
                         You are currently on your 3-Day Free Trial (
@@ -307,7 +316,7 @@ function Dashboard() {
               </div>
               <Link
                 to="/creator/plans"
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-background px-3.5 py-1.5 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-all"
+                className="w-full sm:w-auto text-center shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-background px-4 py-2 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-all shadow-xs"
               >
                 Manage Plans
               </Link>
@@ -316,19 +325,19 @@ function Dashboard() {
 
           {/* TRIAL BANNER — ONLY SHOWN IF NO PAID PLAN IS IN QUEUE */}
           {sub && isTrial && subActive && subExpiry && queuedSubs.length === 0 ? (
-            <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 border border-primary/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground">
+            <div className="mb-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 border border-primary/20 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm mt-0.5 sm:mt-0">
                   <Sparkles className="size-5" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-foreground flex items-center gap-2">
-                    <span>3-Day Free Trial Active</span>
-                    <span className="rounded-full bg-accent/20 text-tealdeep px-2 py-0.5 text-[11px] font-bold">
+                <div className="min-w-0 space-y-1">
+                  <div className="flex flex-wrap items-center gap-2">
+                    <span className="text-sm font-bold text-foreground">3-Day Free Trial Active</span>
+                    <span className="rounded-full bg-accent/20 text-tealdeep border border-accent/30 px-2.5 py-0.5 text-[11px] font-bold shrink-0">
                       {formatTimeRemaining(subExpiry)}
                     </span>
-                  </p>
-                  <p className="text-xs text-muted-foreground">
+                  </div>
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     Your profile is live in the public directory until{" "}
                     {subExpiry.toLocaleDateString("en-IN", {
                       month: "short",
@@ -342,7 +351,7 @@ function Dashboard() {
               </div>
               <Link
                 to="/creator/plans"
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-all"
+                className="w-full sm:w-auto text-center shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background hover:bg-foreground/90 transition-all shadow-xs"
               >
                 <IndianRupee className="size-3.5 text-primary" />
                 Upgrade Plan
@@ -351,16 +360,16 @@ function Dashboard() {
           ) : null}
 
           {sub && !subActive && queuedSubs.length === 0 ? (
-            <div className="mb-6 rounded-2xl bg-rose/10 border border-rose/20 p-4 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
-              <div className="flex items-center gap-3">
-                <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-rose text-white">
+            <div className="mb-6 rounded-2xl bg-rose/10 border border-rose/20 p-4 sm:p-5 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 shadow-sm">
+              <div className="flex items-start gap-3.5 min-w-0">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-rose text-white shadow-sm mt-0.5 sm:mt-0">
                   <AlertCircle className="size-5" />
                 </div>
-                <div>
-                  <p className="text-sm font-semibold text-rose">
+                <div className="min-w-0 space-y-1">
+                  <p className="text-sm font-bold text-rose">
                     {isTrial ? "3-Day Free Trial Ended" : "Subscription Expired"}
                   </p>
-                  <p className="text-xs text-muted-foreground">
+                  <p className="text-xs text-muted-foreground leading-relaxed">
                     {isTrial
                       ? "Your free trial has ended. Your profile is safely saved and will not be deleted — activate a paid plan anytime to make it visible again."
                       : "Your subscription has expired. Your profile is safely saved and will not be deleted — renew anytime to restore directory visibility."}
@@ -369,7 +378,7 @@ function Dashboard() {
               </div>
               <Link
                 to="/creator/plans"
-                className="shrink-0 inline-flex items-center gap-1.5 rounded-xl bg-rose px-4 py-2 text-xs font-semibold text-white hover:bg-rose/90 transition-all"
+                className="w-full sm:w-auto text-center shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-rose px-4 py-2 text-xs font-semibold text-white hover:bg-rose/90 transition-all shadow-xs"
               >
                 {isTrial ? "Upgrade to Paid Plan" : "Renew Plan"}
               </Link>
@@ -414,156 +423,212 @@ function Dashboard() {
           {/* MAIN PROFILE & SUBSCRIPTION CARDS */}
           <div className="mt-8 grid gap-6 md:grid-cols-3 items-stretch">
             {/* CREATOR PROFILE HERO CARD */}
-            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-6 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between">
-              <div>
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-border/60">
-                  <div className="flex items-center gap-4">
-                    <div className="relative">
-                      {mine.photo ? (
-                        <img
-                          src={mine.photo}
-                          alt={mine.name}
-                          loading="lazy"
-                          width={816}
-                          height={816}
-                          className="size-16 sm:size-20 rounded-2xl object-cover ring-2 ring-border/60 shadow-md bg-secondary"
-                        />
-                      ) : (
-                        <div className="size-16 sm:size-20 rounded-2xl ring-2 ring-border/60 shadow-md bg-secondary flex items-center justify-center text-muted-foreground/50">
-                          <User className="size-8" />
-                        </div>
-                      )}
-                      {mine.status === "Active" && (
-                        <span
-                          className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
-                          title="Directory Live"
-                        />
-                      )}
-                    </div>
-                    <div>
-                      <div className="flex items-center gap-2 flex-wrap">
-                        <h2 className="text-lg sm:text-xl font-display font-bold text-foreground">
-                          {mine.name || mine.displayName}
-                        </h2>
-                        {mine.status === "Active" && (
-                          <span className="inline-flex items-center rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-tealdeep">
-                            Active Creator
-                          </span>
-                        )}
-                        {mine.instagram && (
-                          <a
-                            href={getInstagramUrl(mine.instagram)}
-                            target="_blank"
-                            rel="noreferrer"
-                            className="inline-flex size-6 items-center justify-center rounded-lg hover:opacity-90 shadow-xs transition-all hover:scale-110 active:scale-95 cursor-pointer"
-                            title="Open Instagram profile"
-                            aria-label="Open Instagram profile"
-                          >
-                            <InstagramIcon className="size-5 shrink-0" />
-                          </a>
-                        )}
+            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between gap-6">
+              <div className="space-y-6">
+                {/* 1. CLEAN IDENTITY HEADER */}
+                <div className="flex items-start gap-4 sm:gap-5">
+                  {/* Avatar */}
+                  <div
+                    className="relative group cursor-pointer shrink-0"
+                    onClick={() => setShowPhotoModal(true)}
+                    title="Click to change or remove photo"
+                  >
+                    {mine.photo ? (
+                      <img
+                        src={mine.photo}
+                        alt={mine.name}
+                        loading="lazy"
+                        width={816}
+                        height={816}
+                        className="size-16 sm:size-20 rounded-2xl object-cover ring-2 ring-primary/20 shadow-md bg-secondary transition-all group-hover:scale-105 group-hover:opacity-90"
+                      />
+                    ) : (
+                      <div className="size-16 sm:size-20 rounded-2xl ring-2 ring-border shadow-md bg-secondary/80 flex items-center justify-center text-muted-foreground/50 transition-all group-hover:bg-secondary group-hover:scale-105">
+                        <User className="size-8 sm:size-9" />
                       </div>
-                      <p className="text-xs text-muted-foreground mt-1.5 flex flex-wrap items-center gap-1.5">
-                        <span>📍 {[mine.locality, mine.city].filter(Boolean).join(", ") || "Location not set"}</span>
-                        {calculateAge(mine.birthDate) !== null && (
-                          <>
-                            <span>•</span>
-                            <span>{calculateAge(mine.birthDate)} yrs old</span>
-                          </>
-                        )}
-                        {mine.gender && (
-                          <>
-                            <span>•</span>
-                            <span>{mine.gender}</span>
-                          </>
-                        )}
-                      </p>
-                    </div>
+                    )}
+
+                    {/* Camera overlay icon */}
+                    <span
+                      className="absolute -bottom-1 -left-1 size-6 rounded-full bg-background text-foreground ring-1 ring-border shadow-md flex items-center justify-center group-hover:bg-primary group-hover:text-white transition-all group-hover:scale-110"
+                      title="Manage profile photo"
+                    >
+                      <Camera className="size-3 text-muted-foreground group-hover:text-white transition-colors" />
+                    </span>
+
+                    {/* Status verified indicator */}
+                    {mine.status === "Active" && (
+                      <span
+                        className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
+                        title="Verified Active in Directory"
+                      />
+                    )}
                   </div>
 
-                  <div className="shrink-0 flex sm:flex-col items-end gap-1.5">
-                    <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
-                      Starting Rate
-                    </span>
-                    <span className="font-display text-lg sm:text-xl font-bold text-saffrondeep">
-                      {formatPrice(mine.startingPrice)}
-                    </span>
-                  </div>
-                </div>
-
-                {/* CATEGORIES & STATS GRID */}
-                <div className="py-5 grid grid-cols-2 sm:grid-cols-3 gap-3">
-                  <div className="rounded-xl bg-background/70 border border-border/70 p-3">
-                    <span className="text-[11px] font-medium text-muted-foreground block">
-                      Audience Size
-                    </span>
-                    <p className="text-base sm:text-lg font-display font-bold text-foreground mt-0.5">
-                      {formatFollowers(mine.followers)}
-                    </p>
-                    <span className="text-[10px] text-muted-foreground">Instagram followers</span>
-                  </div>
-
-                  <div className="rounded-xl bg-background/70 border border-border/70 p-3">
-                    <span className="text-[11px] font-medium text-muted-foreground block">
-                      Categories & Niche
-                    </span>
-                    <div className="flex flex-wrap gap-1 mt-1">
-                      {mine.categories && mine.categories.length > 0 ? (
-                        mine.categories.slice(0, 2).map((cat) => (
-                          <span
-                            key={cat}
-                            className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-medium text-foreground"
-                          >
-                            {cat}
-                          </span>
-                        ))
+                  {/* Creator Info */}
+                  <div className="min-w-0 flex-1 space-y-1.5">
+                    {/* Line 1: Name + Status */}
+                    <div className="flex items-center gap-2.5 flex-wrap">
+                      <h2 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-foreground">
+                        {mine.name || mine.displayName}
+                      </h2>
+                      {mine.status === "Active" ? (
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-tealdeep/10 text-tealdeep border border-tealdeep/25 px-2.5 py-0.5 text-xs font-semibold">
+                          <span className="size-1.5 rounded-full bg-tealdeep animate-pulse" />
+                          Active Creator
+                        </span>
                       ) : (
-                        <span className="text-[11px] text-muted-foreground">None set</span>
-                      )}
-                      {mine.categories && mine.categories.length > 2 && (
-                        <span className="text-[10px] text-muted-foreground font-medium self-center">
-                          +{mine.categories.length - 2} more
+                        <span className="inline-flex items-center rounded-full bg-secondary text-muted-foreground border border-border px-2.5 py-0.5 text-xs font-semibold">
+                          {mine.status}
                         </span>
                       )}
                     </div>
+
+                    {/* Line 2: Location, Age, Gender */}
+                    <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                      <span className="inline-flex items-center gap-1 text-foreground/85 font-medium">
+                        <MapPin className="size-3.5 text-primary shrink-0" />
+                        {[mine.locality, mine.city, mine.state].filter(Boolean).join(", ") || "Location not set"}
+                      </span>
+                      {calculateAge(mine.birthDate) !== null && (
+                        <>
+                          <span className="text-border">•</span>
+                          <span>{calculateAge(mine.birthDate)} yrs old</span>
+                        </>
+                      )}
+                      {mine.gender && (
+                        <>
+                          <span className="text-border">•</span>
+                          <span>{mine.gender}</span>
+                        </>
+                      )}
+                    </p>
+
+                    {/* Line 3: Actions & Social Handle */}
+                    <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                      {mine.instagram && (
+                        <a
+                          href={getInstagramUrl(mine.instagram)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-semibold text-foreground/80 hover:text-foreground border border-border/70 transition-all hover:scale-102 shadow-2xs"
+                          title="Open Instagram profile"
+                        >
+                          <InstagramIcon className="size-3.5 shrink-0" />
+                          <span className="font-mono text-[11px]">{mine.instagram.startsWith("@") ? mine.instagram : `@${mine.instagram}`}</span>
+                        </a>
+                      )}
+                      <button
+                        type="button"
+                        onClick={() => setShowPhotoModal(true)}
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/60 hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground border border-border/60 transition-all cursor-pointer shadow-2xs"
+                        title="Change or remove photo"
+                      >
+                        <Camera className="size-3 text-primary" />
+                        <span>{mine.photo ? "Edit Photo" : "Add Photo"}</span>
+                      </button>
+                    </div>
+                  </div>
+                </div>
+
+                {/* 2. BALANCED METRICS STRIP (4 Columns on Tablet/Desktop, 2x2 on Mobile) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 pt-4 border-t border-border/60">
+                  {/* Metric 1: Starting Rate */}
+                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                      <IndianRupee className="size-3 text-saffrondeep" />
+                      Starting Rate
+                    </span>
+                    <div className="mt-0.5">
+                      <p className="text-lg sm:text-xl font-display font-extrabold text-saffrondeep">
+                        {formatPrice(mine.startingPrice)}
+                      </p>
+                      <span className="text-[10px] text-muted-foreground block">per collaboration</span>
+                    </div>
                   </div>
 
-                  <div className="col-span-2 sm:col-span-1 rounded-xl bg-background/70 border border-border/70 p-3">
-                    <span className="text-[11px] font-medium text-muted-foreground block">
-                      Directory Listing
+                  {/* Metric 2: Audience Size */}
+                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                      <Users className="size-3 text-primary" />
+                      Audience
                     </span>
-                    <p className="text-sm font-semibold text-foreground mt-1 flex items-center gap-1.5">
-                      <span
-                        className={`size-2 rounded-full ${
-                          mine.status === "Active"
-                            ? "bg-tealdeep animate-pulse"
-                            : mine.status === "Expired"
-                              ? "bg-rose"
-                              : "bg-muted-foreground"
-                        }`}
-                      />
-                      {mine.status === "Active"
-                        ? "Public & Searchable"
-                        : mine.status === "Expired"
-                          ? "Hidden (Expired)"
-                          : "Draft Status"}
-                    </p>
-                    <span className="text-[10px] text-muted-foreground">
-                      {mine.status === "Active" ? "Visible to brands" : "Activate plan to show"}
+                    <div className="mt-0.5">
+                      <p className="text-lg sm:text-xl font-display font-extrabold text-foreground">
+                        {formatFollowers(mine.followers)}
+                      </p>
+                      <span className="text-[10px] text-muted-foreground block">followers</span>
+                    </div>
+                  </div>
+
+                  {/* Metric 3: Categories */}
+                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                      <Tag className="size-3 text-saffrondeep" />
+                      Categories
                     </span>
+                    <div className="mt-0.5">
+                      <div className="flex flex-wrap gap-1">
+                        {mine.categories && mine.categories.length > 0 ? (
+                          mine.categories.slice(0, 2).map((cat) => (
+                            <span
+                              key={cat}
+                              className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground border border-border/60"
+                            >
+                              {cat}
+                            </span>
+                          ))
+                        ) : (
+                          <span className="text-[11px] text-muted-foreground">None</span>
+                        )}
+                        {mine.categories && mine.categories.length > 2 && (
+                          <span className="text-[10px] font-semibold text-muted-foreground self-center">
+                            +{mine.categories.length - 2}
+                          </span>
+                        )}
+                      </div>
+                      <span className="text-[10px] text-muted-foreground block mt-0.5">niche focus</span>
+                    </div>
+                  </div>
+
+                  {/* Metric 4: Directory Listing */}
+                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                    <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
+                      <Globe className="size-3 text-tealdeep" />
+                      Directory
+                    </span>
+                    <div className="mt-0.5">
+                      <p className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5 truncate">
+                        <span
+                          className={`size-2 shrink-0 rounded-full ${
+                            mine.status === "Active"
+                              ? "bg-tealdeep animate-pulse"
+                              : mine.status === "Expired"
+                                ? "bg-rose"
+                                : "bg-muted-foreground"
+                          }`}
+                        />
+                        <span className="truncate">
+                          {mine.status === "Active" ? "Public" : mine.status === "Expired" ? "Expired" : "Draft"}
+                        </span>
+                      </p>
+                      <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">
+                        {mine.status === "Active" ? "Searchable" : "Hidden"}
+                      </span>
+                    </div>
                   </div>
                 </div>
               </div>
 
-              {/* CARD FOOTER ACTION BAR */}
+              {/* 3. CARD FOOTER ACTION BAR */}
               <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
-                <span className="text-xs text-muted-foreground">
+                <p className="text-xs text-muted-foreground text-center sm:text-left">
                   Want to update your collaboration rates, photos, or bio?
-                </span>
-                <div className="flex items-center gap-2 w-full sm:w-auto">
+                </p>
+                <div className="flex items-center gap-2.5 w-full sm:w-auto">
                   <Link
                     to="/creator/register"
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-foreground hover:bg-secondary/80 ring-1 ring-border transition-all"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-secondary hover:bg-secondary/80 px-4 py-2 text-xs font-semibold text-foreground ring-1 ring-border transition-all shadow-2xs"
                   >
                     Edit Profile
                   </Link>
@@ -571,7 +636,7 @@ function Dashboard() {
                     to="/creators/$creatorId"
                     params={{ creatorId: mine.id }}
                     search={{ preview: true }}
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background hover:bg-foreground/90 transition-all shadow-xs"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground hover:bg-foreground/90 px-4 py-2 text-xs font-semibold text-background transition-all shadow-xs"
                   >
                     <ArrowUpRight className="size-3.5" />
                     Preview Listing
@@ -881,9 +946,9 @@ function Dashboard() {
                         href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-xs active:scale-98"
+                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-md active:scale-98"
                       >
-                        <MessageCircle className="size-4" />
+                        <WhatsAppIcon className="size-4 shrink-0" />
                         <span>WhatsApp</span>
                       </a>
                     </div>
@@ -988,7 +1053,7 @@ function Dashboard() {
               <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60">
                 <div>
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-saffrondeep border border-primary/25 mb-2">
-                    <Receipt className="size-3.5 text-primary" />
+                    <ReceiptText className="size-3.5 text-primary" />
                     Billing &amp; Payment Receipts
                   </div>
                   <h2 className="text-2xl font-display font-semibold tracking-tight">
@@ -1107,7 +1172,7 @@ function Dashboard() {
               ) : (
                 <div className="mt-6 rounded-2xl border border-dashed border-border/80 p-8 text-center bg-background/40">
                   <div className="inline-flex items-center justify-center size-10 rounded-full bg-secondary text-muted-foreground mb-2">
-                    <Receipt className="size-5" />
+                    <ReceiptText className="size-5" />
                   </div>
                   <p className="text-sm font-semibold text-foreground">
                     No paid transactions yet
@@ -1138,6 +1203,281 @@ function Dashboard() {
           onClose={() => setSelectedReceipt(null)}
         />
       )}
+
+      {/* ── MANAGE PROFILE PHOTO MODAL ── */}
+      {showPhotoModal && mine && (
+        <ManagePhotoModal
+          isOpen={showPhotoModal}
+          onClose={() => setShowPhotoModal(false)}
+          currentPhoto={mine.photo || ""}
+          creatorName={mine.name || mine.displayName || "Creator"}
+          onUpdatePhoto={async (newPhotoUrl) => {
+            return await updateCreatorPhoto(mine.id, newPhotoUrl);
+          }}
+          onDeletePhoto={async () => {
+            return await updateCreatorPhoto(mine.id, "");
+          }}
+        />
+      )}
+    </div>
+  );
+}
+
+/**
+ * Manage Profile Photo Modal (Change or Delete Photo)
+ */
+function ManagePhotoModal({
+  isOpen,
+  onClose,
+  currentPhoto,
+  creatorName,
+  onUpdatePhoto,
+  onDeletePhoto,
+}: {
+  isOpen: boolean;
+  onClose: () => void;
+  currentPhoto: string;
+  creatorName: string;
+  onUpdatePhoto: (newPhotoUrl: string) => Promise<boolean>;
+  onDeletePhoto: () => Promise<boolean>;
+}) {
+  const [selectedFile, setSelectedFile] = useState<File | null>(null);
+  const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+  const [uploading, setUploading] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [errorMsg, setErrorMsg] = useState<string | null>(null);
+  const [successMsg, setSuccessMsg] = useState<string | null>(null);
+
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  if (!isOpen) return null;
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      setErrorMsg("File size must be under 5MB");
+      return;
+    }
+    setErrorMsg(null);
+    setSuccessMsg(null);
+    setSelectedFile(file);
+    setPreviewUrl(URL.createObjectURL(file));
+  };
+
+  const handleUpload = async () => {
+    if (!selectedFile) return;
+    setUploading(true);
+    setErrorMsg(null);
+    try {
+      const publicUrl = await supabaseDb.uploadCreatorPhoto(selectedFile, creatorName || "creator");
+      if (!publicUrl) {
+        setErrorMsg("Failed to upload photo to storage. Please try again.");
+        return;
+      }
+      const ok = await onUpdatePhoto(publicUrl);
+      if (ok) {
+        setSuccessMsg("Profile photo updated successfully!");
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        setTimeout(() => {
+          onClose();
+        }, 1200);
+      } else {
+        setErrorMsg("Failed to update profile photo.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Upload error");
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  const handleDelete = async () => {
+    if (!confirm("Are you sure you want to remove your profile photo?")) return;
+    setDeleting(true);
+    setErrorMsg(null);
+    try {
+      const ok = await onDeletePhoto();
+      if (ok) {
+        setSuccessMsg("Profile photo removed.");
+        setSelectedFile(null);
+        setPreviewUrl(null);
+        setTimeout(() => {
+          onClose();
+        }, 1000);
+      } else {
+        setErrorMsg("Failed to remove photo.");
+      }
+    } catch (err: any) {
+      setErrorMsg(err?.message || "Error removing photo");
+    } finally {
+      setDeleting(false);
+    }
+  };
+
+  const displayPhoto = previewUrl || currentPhoto;
+
+  return (
+    <div
+      role="dialog"
+      aria-modal="true"
+      onClick={onClose}
+      className="fixed inset-0 z-50 flex items-center justify-center p-4 sm:p-6 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200"
+    >
+      <div
+        onClick={(e) => e.stopPropagation()}
+        className="relative w-full max-w-md bg-card rounded-2xl sm:rounded-3xl border border-border shadow-2xl overflow-hidden"
+      >
+        {/* MODAL HEADER */}
+        <div className="flex items-center justify-between px-6 py-4 border-b border-border bg-secondary/30">
+          <div className="flex items-center gap-2">
+            <Camera className="size-4 text-primary" />
+            <h3 className="font-display text-base font-semibold text-foreground">
+              Manage Profile Photo
+            </h3>
+          </div>
+          <button
+            type="button"
+            onClick={onClose}
+            className="inline-flex size-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* MODAL BODY */}
+        <div className="p-6 space-y-5">
+          {/* Avatar Preview */}
+          <div className="flex flex-col items-center justify-center text-center">
+            <div className="relative size-28 sm:size-32 rounded-3xl overflow-hidden ring-4 ring-border shadow-lg bg-secondary flex items-center justify-center">
+              {displayPhoto ? (
+                <img
+                  src={displayPhoto}
+                  alt={creatorName}
+                  className="size-full object-cover"
+                />
+              ) : (
+                <User className="size-14 text-muted-foreground/40" />
+              )}
+            </div>
+            {previewUrl && (
+              <span className="mt-2 text-[11px] font-semibold text-saffrondeep">
+                New photo selected (Click &quot;Save Photo&quot; to apply)
+              </span>
+            )}
+          </div>
+
+          {/* Feedback messages */}
+          {errorMsg && (
+            <div className="p-3 rounded-xl bg-destructive/10 border border-destructive/30 text-destructive text-xs flex items-center gap-2">
+              <AlertCircle className="size-4 shrink-0" />
+              <span>{errorMsg}</span>
+            </div>
+          )}
+          {successMsg && (
+            <div className="p-3 rounded-xl bg-tealdeep/10 border border-tealdeep/30 text-tealdeep text-xs flex items-center gap-2">
+              <Check className="size-4 shrink-0" />
+              <span>{successMsg}</span>
+            </div>
+          )}
+
+          {/* Action Area */}
+          <div className="space-y-3">
+            {selectedFile ? (
+              <div className="flex gap-2">
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={handleUpload}
+                  className="flex-1 inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-4 py-2.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs cursor-pointer disabled:opacity-50"
+                >
+                  {uploading ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin" />
+                      <span>Saving Photo...</span>
+                    </>
+                  ) : (
+                    <>
+                      <Check className="size-3.5" />
+                      <span>Save Photo</span>
+                    </>
+                  )}
+                </button>
+                <button
+                  type="button"
+                  disabled={uploading}
+                  onClick={() => {
+                    setSelectedFile(null);
+                    setPreviewUrl(null);
+                  }}
+                  className="rounded-xl bg-secondary px-3 py-2.5 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all cursor-pointer"
+                >
+                  Cancel
+                </button>
+              </div>
+            ) : (
+              <label className="group flex flex-col items-center justify-center gap-2 p-5 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/60 bg-secondary/20 hover:bg-secondary/40 transition-all cursor-pointer text-center">
+                <div className="size-10 rounded-xl bg-secondary flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:scale-105 transition-all">
+                  <Upload className="size-5" />
+                </div>
+                <div>
+                  <p className="text-xs font-semibold text-foreground">
+                    {currentPhoto ? "Upload New Photo" : "Upload Photo"}
+                  </p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">
+                    JPG, PNG or WebP up to 5MB
+                  </p>
+                </div>
+                <input
+                  type="file"
+                  accept="image/*"
+                  className="hidden"
+                  onChange={handleFileSelect}
+                />
+              </label>
+            )}
+
+            {currentPhoto && !selectedFile && (
+              <button
+                type="button"
+                disabled={deleting}
+                onClick={handleDelete}
+                className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive px-4 py-2.5 text-xs font-semibold ring-1 ring-destructive/30 transition-all cursor-pointer disabled:opacity-50"
+              >
+                {deleting ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>Removing Photo...</span>
+                  </>
+                ) : (
+                  <>
+                    <Trash2 className="size-3.5" />
+                    <span>Remove Profile Photo</span>
+                  </>
+                )}
+              </button>
+            )}
+          </div>
+        </div>
+
+        {/* MODAL FOOTER */}
+        <div className="px-6 py-3.5 bg-secondary/30 border-t border-border flex justify-end">
+          <button
+            type="button"
+            onClick={onClose}
+            className="rounded-xl bg-secondary px-4 py-2 text-xs font-semibold text-foreground hover:bg-secondary/80 ring-1 ring-border transition-all cursor-pointer"
+          >
+            Close
+          </button>
+        </div>
+      </div>
     </div>
   );
 }

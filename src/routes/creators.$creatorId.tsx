@@ -16,10 +16,10 @@ import {
   Briefcase,
   Calendar,
   Clock,
-  Coins,
   ExternalLink,
   Gift,
   Globe,
+  IndianRupee,
   Layers,
   MapPin,
   Plane,
@@ -161,18 +161,17 @@ function CreatorProfile() {
                     <MapPin className="size-3.5 text-primary" />
                     {[creator.locality, creator.city, creator.state].filter(Boolean).join(", ")}
                   </span>
-                  {age !== null && (
-                    <>
-                      <span>•</span>
-                      <span>{age} yrs old</span>
-                    </>
-                  )}
-                  {creator.gender && (
-                    <>
-                      <span>•</span>
-                      <span>{creator.gender}</span>
-                    </>
-                  )}
+                  {[
+                    age !== null ? `${age} yrs old` : null,
+                    creator.gender,
+                  ]
+                    .filter(Boolean)
+                    .map((item, i) => (
+                      <span key={i} className="inline-flex items-center gap-1.5">
+                        <span className="text-muted-foreground/60">·</span>
+                        <span>{item}</span>
+                      </span>
+                    ))}
                 </p>
 
                 {/* Social Channels Row */}
@@ -216,7 +215,7 @@ function CreatorProfile() {
 
               <div className="flex-1 sm:flex-initial rounded-2xl bg-secondary/70 border border-border/80 px-4 py-3 sm:min-w-[145px] text-center shadow-xs">
                 <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-center gap-1.5">
-                  <Coins className="size-3.5 text-saffrondeep" /> Starting Rate
+                  <IndianRupee className="size-3.5 text-saffrondeep" /> Starting Rate
                 </span>
                 <p className="font-display text-xl sm:text-2xl font-bold text-saffrondeep mt-1">
                   {formatPrice(creator.startingPrice)}

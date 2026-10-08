@@ -34,7 +34,7 @@ import {
   validateTrustedEmail,
   type Creator,
 } from "@/lib/directory-data";
-import { Eye, EyeOff, Loader2, User } from "lucide-react";
+import { Camera, Eye, EyeOff, Loader2, Trash2, Upload, User } from "lucide-react";
 
 export const Route = createFileRoute("/creator/register")({
   head: () => ({
@@ -883,57 +883,122 @@ function Register() {
                       placeholder="Aditi Sharma"
                     />
                   </Field>
-                  <Field label="Profile photo" hint="JPG or PNG, portrait or square works best.">
+                  <Field label="Profile photo" hint="JPG, PNG or WebP. Portrait or square works best. (Optional)">
                     <div className="space-y-3">
-                      <input
-                        type="file"
-                        accept="image/*"
-                        onChange={async (e) => {
-                          const file = e.target.files?.[0];
-                          if (!file) return;
-
-                          // Instant local preview
-                          const localPreview = URL.createObjectURL(file);
-                          set("photo", localPreview);
-
-                          // Upload to Supabase Storage bucket
-                          setUploadingPhoto(true);
-                          try {
-                            const publicUrl = await supabaseDb.uploadCreatorPhoto(
-                              file,
-                              form.name || "creator",
-                            );
-                            if (publicUrl) {
-                              set("photo", publicUrl);
-                            }
-                          } catch (err) {
-                            console.error("Photo upload failed:", err);
-                          } finally {
-                            setUploadingPhoto(false);
-                          }
-                        }}
-                        className="w-full rounded-xl bg-background px-4 py-3 text-sm ring-1 ring-border file:mr-3 file:rounded-lg file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold"
-                      />
                       {form.photo ? (
-                        <div className="flex items-center gap-3">
-                          <img
-                            src={form.photo}
-                            alt="Preview"
-                            className="size-16 rounded-xl object-cover ring-1 ring-border shadow-sm"
-                          />
-                          <div className="text-xs text-muted-foreground">
-                            {uploadingPhoto ? (
-                              <span className="inline-flex items-center text-primary font-medium">
-                                ⏳ Uploading to Supabase Storage...
-                              </span>
-                            ) : (
-                              <span className="text-tealdeep font-medium">
-                                ✓ Photo ready
-                              </span>
-                            )}
+                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-secondary/40 border border-border/80">
+                          <div className="flex items-center gap-3.5">
+                            <div className="relative size-16 shrink-0 rounded-2xl overflow-hidden ring-2 ring-border shadow-md bg-secondary">
+                              <img
+                                src={form.photo}
+                                alt="Preview"
+                                className="size-full object-cover"
+                              />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">Profile Photo Selected</p>
+                              <div className="text-xs text-muted-foreground mt-0.5">
+                                {uploadingPhoto ? (
+                                  <span className="inline-flex items-center text-primary font-medium">
+                                    <Loader2 className="size-3.5 animate-spin mr-1.5" /> Uploading to storage...
+                                  </span>
+                                ) : (
+                                  <span className="text-tealdeep font-medium inline-flex items-center">
+                                    ✓ Photo ready
+                                  </span>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-2">
+                            {/* Change Photo Button */}
+                            <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-secondary text-foreground text-xs font-semibold ring-1 ring-border/80 transition-all shadow-xs">
+                              <Camera className="size-3.5 text-primary" />
+                              <span>Change Photo</span>
+                              <input
+                                type="file"
+                                accept="image/*"
+                                className="hidden"
+                                onChange={async (e) => {
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const localPreview = URL.createObjectURL(file);
+                                  set("photo", localPreview);
+                                  setUploadingPhoto(true);
+                                  try {
+                                    const publicUrl = await supabaseDb.uploadCreatorPhoto(
+                                      file,
+                                      form.name || "creator",
+                                    );
+                                    if (publicUrl) {
+                                      set("photo", publicUrl);
+                                    }
+                                  } catch (err) {
+                                    console.error("Photo upload failed:", err);
+                                  } finally {
+                                    setUploadingPhoto(false);
+                                  }
+                                }}
+                              />
+                            </label>
+
+                            {/* Delete / Remove Photo Button */}
+                            <button
+                              type="button"
+                              onClick={() => {
+                                set("photo", "");
+                              }}
+                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-semibold ring-1 ring-destructive/30 transition-all shadow-xs cursor-pointer"
+                              title="Delete photo"
+                            >
+                              <Trash2 className="size-3.5" />
+                              <span>Remove</span>
+                            </button>
                           </div>
                         </div>
-                      ) : null}
+                      ) : (
+                        <div>
+                          <label className="group flex flex-col items-center justify-center gap-2 p-6 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/60 bg-secondary/15 hover:bg-secondary/30 transition-all cursor-pointer text-center">
+                            <div className="size-12 rounded-2xl bg-secondary/80 flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:scale-105 transition-all">
+                              <Upload className="size-6" />
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                Click or drag to upload photo
+                              </p>
+                              <p className="text-xs text-muted-foreground mt-0.5">
+                                JPG, PNG or WebP up to 5MB (leave empty if you prefer no photo)
+                              </p>
+                            </div>
+                            <input
+                              type="file"
+                              accept="image/*"
+                              className="hidden"
+                              onChange={async (e) => {
+                                const file = e.target.files?.[0];
+                                if (!file) return;
+                                const localPreview = URL.createObjectURL(file);
+                                set("photo", localPreview);
+                                setUploadingPhoto(true);
+                                try {
+                                  const publicUrl = await supabaseDb.uploadCreatorPhoto(
+                                    file,
+                                    form.name || "creator",
+                                  );
+                                  if (publicUrl) {
+                                    set("photo", publicUrl);
+                                  }
+                                } catch (err) {
+                                  console.error("Photo upload failed:", err);
+                                } finally {
+                                  setUploadingPhoto(false);
+                                }
+                              }}
+                            />
+                          </label>
+                        </div>
+                      )}
                     </div>
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
@@ -1255,21 +1320,30 @@ function Register() {
                 <div>
                   <p className="label-caps">This is how businesses will see you</p>
                   <div className="glass-card mt-3 rounded-2xl p-5 border border-border/80">
-                    <div className="flex flex-col sm:flex-row gap-4">
-                      {draft.photo ? (
-                        <img
-                          src={draft.photo}
-                          alt={draft.name}
-                          loading="lazy"
-                          width={816}
-                          height={816}
-                          className="size-20 shrink-0 rounded-2xl object-cover ring-1 ring-border"
-                        />
-                      ) : (
-                        <div className="size-20 shrink-0 rounded-2xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground">
-                          <User className="size-8 opacity-40" />
-                        </div>
-                      )}
+                    <div className="flex flex-col sm:flex-row gap-4 items-start">
+                      <div className="flex flex-col items-center gap-1.5 shrink-0">
+                        {draft.photo ? (
+                          <img
+                            src={draft.photo}
+                            alt={draft.name}
+                            loading="lazy"
+                            width={816}
+                            height={816}
+                            className="size-20 rounded-2xl object-cover ring-1 ring-border shadow-xs"
+                          />
+                        ) : (
+                          <div className="size-20 rounded-2xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground/50">
+                            <User className="size-8 opacity-40" />
+                          </div>
+                        )}
+                        <button
+                          type="button"
+                          onClick={() => setStep(1)}
+                          className="text-[11px] text-primary hover:underline font-semibold cursor-pointer"
+                        >
+                          {draft.photo ? "Change / Remove" : "+ Add Photo"}
+                        </button>
+                      </div>
                       <div className="min-w-0">
                         <h2 className="text-2xl leading-tight">{draft.name}</h2>
                         <p className="mt-1 text-sm text-muted-foreground">

@@ -65,6 +65,7 @@ type AppState = {
     c: Creator,
     authUserId?: string | null,
   ) => Promise<{ success: boolean; error?: string }>;
+  updateCreatorPhoto: (id: string, photoUrl: string) => Promise<boolean>;
   setCreatorStatus: (id: string, status: CreatorStatus) => void;
   removeCreator: (id: string) => void;
   toggleFeatured: (id: string) => void;
@@ -344,6 +345,12 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setMyCreatorId(c.id);
         // Persist to Supabase
         return await supabaseDb.upsertCreatorWithAuth(c, authUserId);
+      },
+      updateCreatorPhoto: async (id, photoUrl) => {
+        setCreators((prev) =>
+          prev.map((c) => (c.id === id ? { ...c, photo: photoUrl } : c)),
+        );
+        return await supabaseDb.updateCreatorPhoto(id, photoUrl);
       },
       setCreatorStatus: (id, status) => {
         setCreators((prev) => prev.map((c) => (c.id === id ? { ...c, status } : c)));
