@@ -329,7 +329,7 @@ function Discover() {
                 {showMore && (
                   <div className="space-y-5 border-t border-border pt-6 animate-in fade-in duration-200">
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Field label="Locality / Area">
+                      <Field label="Area">
                         <TextInput
                           placeholder="e.g. Thane West, Bandra, Indiranagar"
                           value={filters.locality}
@@ -390,7 +390,7 @@ function Discover() {
                   className="w-full text-xs font-medium cursor-pointer"
                   onClick={() => setShowMore((s) => !s)}
                 >
-                  {showMore ? "▲ Fewer filters" : "▼ More filters (Locality, Language, Travel, Products)"}
+                  {showMore ? "▲ Fewer filters" : "▼ More filters (Area, Language, Travel, Products)"}
                 </Button>
               </div>
 

@@ -14,6 +14,7 @@ export const CATEGORIES = [
   "Finance",
   "Education",
   "Parenting",
+  "Couple",
   "Gaming",
   "Automobile",
   "Wedding",
@@ -92,6 +93,7 @@ export const CITIES = [
   "Anand",
   "Asansol",
   "Aurangabad",
+  "Bangalore",
   "Bareilly",
   "Belagavi",
   "Bengaluru",
@@ -181,6 +183,7 @@ export const CITIES = [
   "Pondicherry",
   "Puducherry",
   "Pune",
+  "Raigad",
   "Raipur",
   "Rajahmundry",
   "Rajkot",
@@ -312,13 +315,24 @@ export function getSubscriptionExpiry(sub: {
   startedAt: string;
   expiresAt?: string | undefined;
 }): Date {
-  if (sub.expiresAt) {
-    const d = new Date(sub.expiresAt);
-    if (!isNaN(d.getTime())) return d;
-  }
   const started = new Date(sub.startedAt).getTime();
   const dur = getSubscriptionDurationMs(sub.planId, sub.duration);
-  return new Date(started + dur);
+  const calculatedExpiry = new Date(started + dur);
+
+  if (sub.expiresAt) {
+    const d = new Date(sub.expiresAt);
+    if (!isNaN(d.getTime())) {
+      const isTrial = sub.planId === "trial-3d" || sub.duration?.toLowerCase().includes("3 day");
+      if (isTrial) {
+        // If stored trial expiresAt is abnormally large (> 4 days from start), use exact calculated trial duration
+        if (d.getTime() - started > 4 * 24 * 60 * 60 * 1000) {
+          return calculatedExpiry;
+        }
+      }
+      return d;
+    }
+  }
+  return calculatedExpiry;
 }
 
 export function isSubscriptionQueued(sub?: {

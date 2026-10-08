@@ -843,7 +843,7 @@ export const supabaseDb = {
     bonusDays: number,
   ): Promise<boolean> {
     try {
-      // 1. Update creators table
+      // 1. Update creators table overall expiration and bonus days
       const { error: cErr } = await supabase
         .from("creators")
         .update({
@@ -853,12 +853,13 @@ export const supabaseDb = {
         })
         .eq("id", creatorId);
 
-      // 2. Also update the active subscription in subscriptions table
+      // 2. Only update active non-trial subscriptions (trials remain strictly 3 days)
       await supabase
         .from("subscriptions")
         .update({ expires_at: expiresAt.toISOString() })
         .eq("creator_id", creatorId)
-        .eq("status", "active");
+        .eq("status", "active")
+        .neq("plan_id", "trial-3d");
 
       return !cErr;
     } catch {

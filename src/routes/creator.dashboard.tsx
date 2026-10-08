@@ -4,6 +4,7 @@ import { Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
 import { InstagramIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
 import {
+  PLANS,
   calculateAge,
   formatFollowers,
   formatPrice,
@@ -26,6 +27,7 @@ import {
   Clock,
   Copy,
   CreditCard,
+  Eye,
   FileText,
   Gift,
   History,
@@ -34,11 +36,13 @@ import {
   Layers,
   Loader2,
   MessageCircle,
+  Printer,
   Receipt,
   Share2,
   ShieldCheck,
   Sparkles,
   Users,
+  X,
   Zap,
 } from "lucide-react";
 
@@ -82,6 +86,7 @@ function Dashboard() {
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [copiedPaymentId, setCopiedPaymentId] = useState<string | null>(null);
+  const [selectedReceipt, setSelectedReceipt] = useState<PaymentRecord | null>(null);
   const mine = creators.find((c) => c.id === myCreatorId);
 
   // Subscriptions & Queued plans calculation
@@ -89,7 +94,6 @@ function Dashboard() {
   const activeSub = myCreatorId ? getActiveSubscription(subscriptions, myCreatorId) : undefined;
   const queuedSubs = myCreatorId ? getQueuedSubscriptions(subscriptions, myCreatorId) : [];
   const latestSub = userSubs[0];
-  const sub = activeSub || latestSub;
 
   // Auto-fetch profile from Supabase & sync latest data on mount
   useEffect(() => {
@@ -153,17 +157,20 @@ function Dashboard() {
     }
   }, [mine, userSubs, upsertCreator]);
 
-  // Subscription expiration check (incorporating referral bonus days)
-  const subExpiry = mine?.subscriptionExpiresAt
+  // Subscription expiration calculation (safeguards active trial vs queued plans)
+  const currentSub = activeSub || latestSub;
+  const currentSubExpiry = currentSub ? getSubscriptionExpiry(currentSub) : null;
+  const overallExpiry = mine?.subscriptionExpiresAt
     ? new Date(mine.subscriptionExpiresAt)
-    : activeSub
-    ? getSubscriptionExpiry(activeSub)
-    : latestSub
-    ? getSubscriptionExpiry(latestSub)
-    : null;
-  const subActive = subExpiry ? subExpiry.getTime() > Date.now() : isSubscriptionActive(activeSub);
+    : currentSubExpiry;
+  const subActive = currentSubExpiry
+    ? currentSubExpiry.getTime() > Date.now()
+    : isSubscriptionActive(activeSub);
   const isTrial =
-    sub?.planId === "trial-3d" || sub?.duration?.toLowerCase().includes("3 day");
+    currentSub?.planId === "trial-3d" ||
+    currentSub?.duration?.toLowerCase().includes("3 day");
+  const sub = currentSub;
+  const subExpiry = currentSubExpiry;
 
   useEffect(() => {
     if (mine && sub) {
@@ -999,14 +1006,15 @@ function Dashboard() {
                 </div>
               ) : payments.length > 0 ? (
                 <div className="mt-6 overflow-x-auto rounded-2xl border border-border/80 bg-background/60">
-                  <table className="w-full text-left text-xs table-fixed min-w-[620px]">
+                  <table className="w-full text-left text-xs table-fixed min-w-[700px]">
                     <thead className="border-b border-border bg-secondary/50 font-semibold text-muted-foreground uppercase tracking-wider">
                       <tr>
                         <th className="w-32 px-4 py-3">Date</th>
                         <th className="w-40 px-4 py-3">Plan</th>
                         <th className="w-28 px-4 py-3">Amount</th>
                         <th className="w-48 px-4 py-3">Payment Ref ID</th>
-                        <th className="w-28 px-4 py-3">Status</th>
+                        <th className="w-24 px-4 py-3">Status</th>
+                        <th className="w-28 px-4 py-3 text-right">Invoice</th>
                       </tr>
                     </thead>
                     <tbody className="divide-y divide-border/60">
@@ -1071,6 +1079,17 @@ function Dashboard() {
                                 Paid
                               </span>
                             </td>
+                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                              <button
+                                type="button"
+                                title="View / Print Receipt"
+                                onClick={() => setSelectedReceipt(p)}
+                                className="inline-flex items-center gap-1.5 rounded-lg bg-black hover:bg-black/80 text-white px-2.5 py-1.5 transition-all cursor-pointer active:scale-95"
+                              >
+                                <Eye className="size-3.5" />
+                                <Printer className="size-3.5" />
+                              </button>
+                            </td>
                           </tr>
                         );
                       })}
@@ -1102,7 +1121,824 @@ function Dashboard() {
           </div>
         </div>
       </section>
+
+      {/* ── RAZORPAY RECEIPT & TAX INVOICE MODAL ── */}
+      {selectedReceipt && (
+        <PaymentReceiptModal
+          receipt={selectedReceipt}
+          creator={mine}
+          onClose={() => setSelectedReceipt(null)}
+        />
+      )}
     </div>
   );
 }
+
+/**
+ * Detailed Razorpay Payment Receipt & Tax Invoice Modal
+ */
+function PaymentReceiptModal({
+  receipt,
+  creator,
+  onClose,
+}: {
+  receipt: PaymentRecord;
+  creator?: any;
+  onClose: () => void;
+}) {
+  const [copiedField, setCopiedField] = useState<string | null>(null);
+
+  const matchedPlan = PLANS.find((p) => p.id === receipt.planId);
+  const basePrice = matchedPlan?.price ?? receipt.amount;
+  const discountAmount = Math.max(0, basePrice - receipt.amount);
+
+  const planName =
+    receipt.planId === "1m"
+      ? "1 Month Creator Pass"
+      : receipt.planId === "3m"
+        ? "3 Months Creator Pass (Launch Offer)"
+        : receipt.planId === "6m"
+          ? "6 Months Creator Pass"
+          : receipt.planId === "1y"
+            ? "1 Year Creator Pass"
+            : `Subscription Pass (${receipt.planId})`;
+
+  const invoiceNumber = `INV-${receipt.id.replace(/[^a-zA-Z0-9]/g, "").slice(0, 10).toUpperCase()}`;
+
+  const copyToClipboard = (text: string, fieldName: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedField(fieldName);
+    setTimeout(() => setCopiedField(null), 2000);
+  };
+
+  const handlePrint = () => {
+    const printFrame = document.createElement("iframe");
+    printFrame.style.position = "fixed";
+    printFrame.style.right = "0";
+    printFrame.style.bottom = "0";
+    printFrame.style.width = "0";
+    printFrame.style.height = "0";
+    printFrame.style.border = "none";
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    const formattedDate = new Date(receipt.createdAt).toLocaleString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+      hour: "2-digit",
+      minute: "2-digit",
+    });
+
+    const creatorName = creator?.displayName || creator?.name || "Creator";
+    const creatorEmail = creator?.email || "";
+    const creatorPhone = creator?.phone || "";
+    const creatorLoc = [creator?.locality, creator?.city].filter(Boolean).join(", ") || "India";
+    const creatorId = creator?.id || "";
+
+    const discountRow =
+      discountAmount > 0
+        ? `
+        <tr style="background: #f0fdf4;">
+          <td style="padding: 10px 14px; font-weight: 600; color: #166534; border-bottom: 1px solid #e2e8f0;">
+            Discount / Promotional Savings
+          </td>
+          <td style="padding: 10px 14px; text-align: center; color: #166534; font-weight: 600; border-bottom: 1px solid #e2e8f0;">
+            Promo Applied
+          </td>
+          <td style="padding: 10px 14px; text-align: right; color: #166534; font-weight: 700; border-bottom: 1px solid #e2e8f0;">
+            -${formatPrice(discountAmount)}
+          </td>
+        </tr>
+      `
+        : "";
+
+    doc.open();
+    doc.write(`
+      <!DOCTYPE html>
+      <html>
+        <head>
+          <meta charset="utf-8" />
+          <title>Receipt_${invoiceNumber}</title>
+          <style>
+            @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap');
+            @page {
+              size: A4 portrait;
+              margin: 10mm 12mm;
+            }
+            * {
+              box-sizing: border-box;
+              margin: 0;
+              padding: 0;
+              font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, Helvetica, Arial, sans-serif;
+              -webkit-print-color-adjust: exact !important;
+              print-color-adjust: exact !important;
+            }
+            html, body {
+              background: #ffffff;
+              color: #0f172a;
+              font-size: 12px;
+              line-height: 1.45;
+              padding: 0;
+              margin: 0;
+            }
+            .invoice-box {
+              width: 100%;
+              max-width: 680px;
+              margin: 0 auto;
+              border: 1px solid #cbd5e1;
+              border-radius: 14px;
+              padding: 24px 26px;
+              background: #ffffff;
+              page-break-inside: avoid;
+              break-inside: avoid;
+            }
+            .header {
+              display: flex;
+              justify-content: space-between;
+              align-items: flex-start;
+              padding-bottom: 16px;
+              border-bottom: 1px solid #e2e8f0;
+              margin-bottom: 16px;
+            }
+            .brand-wrap {
+              display: flex;
+              align-items: center;
+              gap: 12px;
+            }
+            .brand-logo {
+              width: 44px;
+              height: 44px;
+              border-radius: 50%;
+              object-fit: contain;
+              border: 1px solid #e2e8f0;
+            }
+            .brand-name {
+              font-size: 19px;
+              font-weight: 800;
+              font-family: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
+              color: #0f172a;
+              letter-spacing: -0.3px;
+            }
+            .brand-name span {
+              color: #d97706;
+              font-family: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
+              font-weight: 800;
+            }
+            .brand-sub {
+              font-size: 11px;
+              color: #64748b;
+              margin-top: 1px;
+            }
+            .brand-url {
+              font-size: 10px;
+              color: #94a3b8;
+              font-family: monospace;
+            }
+            .invoice-badge-wrap {
+              text-align: right;
+            }
+            .badge-paid {
+              display: inline-block;
+              background: #ecfdf5;
+              color: #065f46;
+              border: 1px solid #a7f3d0;
+              padding: 4px 10px;
+              border-radius: 9999px;
+              font-size: 10px;
+              font-weight: 800;
+              letter-spacing: 0.5px;
+            }
+            .inv-id {
+              font-size: 12px;
+              font-weight: 700;
+              font-family: monospace;
+              color: #0f172a;
+              margin-top: 6px;
+            }
+            .inv-date {
+              font-size: 11px;
+              color: #64748b;
+              margin-top: 2px;
+            }
+            .grid-2 {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 14px;
+              padding-bottom: 16px;
+              border-bottom: 1px solid #e2e8f0;
+              margin-bottom: 16px;
+            }
+            .info-card {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 10px;
+              padding: 12px 14px;
+            }
+            .info-card-label {
+              font-size: 10px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              color: #64748b;
+              margin-bottom: 4px;
+            }
+            .info-card-name {
+              font-size: 13px;
+              font-weight: 700;
+              color: #0f172a;
+              margin-bottom: 2px;
+            }
+            .info-card-line {
+              font-size: 11px;
+              color: #475569;
+              margin-top: 2px;
+            }
+            .audit-card {
+              background: #f0fdf4;
+              border: 1px solid #bbf7d0;
+              border-radius: 10px;
+              padding: 12px 14px;
+              margin-bottom: 16px;
+            }
+            .audit-header {
+              display: flex;
+              justify-content: space-between;
+              align-items: center;
+              font-size: 11px;
+              font-weight: 700;
+              color: #166534;
+              margin-bottom: 8px;
+            }
+            .audit-pill {
+              background: #dcfce7;
+              color: #15803d;
+              padding: 2px 8px;
+              border-radius: 9999px;
+              font-size: 9px;
+              font-weight: 700;
+            }
+            .audit-grid {
+              display: grid;
+              grid-template-columns: 1fr 1fr;
+              gap: 8px;
+            }
+            .audit-item {
+              background: #ffffff;
+              border: 1px solid #bbf7d0;
+              border-radius: 6px;
+              padding: 6px 8px;
+              font-family: monospace;
+              font-size: 10px;
+              display: flex;
+              justify-content: space-between;
+            }
+            .audit-item-label {
+              color: #64748b;
+            }
+            .audit-item-val {
+              font-weight: 700;
+              color: #0f172a;
+            }
+            .section-label {
+              font-size: 10px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              color: #64748b;
+              margin-bottom: 6px;
+            }
+            table {
+              width: 100%;
+              border-collapse: collapse;
+              border: 1px solid #e2e8f0;
+              border-radius: 10px;
+              overflow: hidden;
+              margin-bottom: 16px;
+            }
+            th {
+              background: #f8fafc;
+              padding: 8px 12px;
+              font-size: 10px;
+              font-weight: 700;
+              text-transform: uppercase;
+              letter-spacing: 0.5px;
+              color: #64748b;
+              border-bottom: 1px solid #e2e8f0;
+              text-align: left;
+            }
+            td {
+              padding: 10px 12px;
+              font-size: 11px;
+              border-bottom: 1px solid #f1f5f9;
+            }
+            .td-total-lbl {
+              padding: 10px 12px;
+              font-size: 12px;
+              font-weight: 700;
+              background: #f8fafc;
+              border-top: 1px solid #e2e8f0;
+            }
+            .td-total-amt {
+              padding: 10px 12px;
+              font-size: 14px;
+              font-weight: 800;
+              color: #ea580c;
+              text-align: right;
+              background: #f8fafc;
+              border-top: 1px solid #e2e8f0;
+            }
+            .terms-card {
+              background: #f8fafc;
+              border: 1px solid #e2e8f0;
+              border-radius: 8px;
+              padding: 10px 12px;
+              font-size: 10px;
+              color: #64748b;
+              line-height: 1.45;
+            }
+            .terms-card strong {
+              color: #0f172a;
+            }
+          </style>
+        </head>
+        <body>
+          <div class="invoice-box">
+            <!-- HEADER -->
+            <div class="header">
+              <div class="brand-wrap">
+                <img src="/logo.png" alt="Influencer Dhundo" class="brand-logo" />
+                <div>
+                  <div class="brand-name">Influencer <span>Dhundo</span></div>
+                  <div class="brand-sub">India's Creator Discovery &amp; Marketplace</div>
+                  <div class="brand-url">https://influencerdhundo.com</div>
+                </div>
+              </div>
+              <div class="invoice-badge-wrap">
+                <span class="badge-paid">✓ PAID • RAZORPAY VERIFIED</span>
+                <div class="inv-id">${invoiceNumber}</div>
+                <div class="inv-date">Date: ${formattedDate}</div>
+              </div>
+            </div>
+
+            <!-- BILLED TO & MERCHANT -->
+            <div class="grid-2">
+              <div class="info-card">
+                <div class="info-card-label">Billed To (Creator)</div>
+                <div class="info-card-name">${creatorName}</div>
+                ${creatorEmail ? `<div class="info-card-line">Email: ${creatorEmail}</div>` : ""}
+                ${creatorPhone ? `<div class="info-card-line">Phone: ${creatorPhone}</div>` : ""}
+                <div class="info-card-line">Location: ${creatorLoc}</div>
+                ${creatorId ? `<div class="info-card-line" style="font-family: monospace; font-size: 10px;">ID: ${creatorId}</div>` : ""}
+              </div>
+
+              <div class="info-card">
+                <div class="info-card-label">Merchant &amp; Gateway</div>
+                <div class="info-card-name">Influencer Dhundo Platform</div>
+                <div class="info-card-line">Processor: Razorpay Software Pvt Ltd</div>
+                <div class="info-card-line">Mode: Live Production Gateway (INR)</div>
+                <div class="info-card-line">Support: support@influencerdhundo.com</div>
+              </div>
+            </div>
+
+            <!-- AUDIT BOX -->
+            <div class="audit-card">
+              <div class="audit-header">
+                <span>🛡️ Razorpay Transaction Verification</span>
+                <span class="audit-pill">Captured &amp; Settled</span>
+              </div>
+              <div class="audit-grid">
+                <div class="audit-item">
+                  <span class="audit-item-label">Payment ID:</span>
+                  <span class="audit-item-val">${receipt.razorpayPaymentId || "N/A"}</span>
+                </div>
+                <div class="audit-item">
+                  <span class="audit-item-label">Order ID:</span>
+                  <span class="audit-item-val">${receipt.razorpayOrderId}</span>
+                </div>
+              </div>
+              ${
+                receipt.razorpaySignature
+                  ? `
+                <div style="font-size: 9px; color: #166534; margin-top: 6px; font-family: monospace;">
+                  Security Signature: HMAC SHA-256 Verified
+                </div>
+              `
+                  : ""
+              }
+            </div>
+
+            <!-- ITEMS TABLE -->
+            <div class="section-label">Itemized Subscription Details</div>
+            <table>
+              <thead>
+                <tr>
+                  <th>Item Description</th>
+                  <th style="text-align: center;">Type</th>
+                  <th style="text-align: right;">Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                <tr>
+                  <td>
+                    <strong>${planName}</strong>
+                    <div style="font-size: 10px; color: #64748b; margin-top: 1px;">
+                      Public creator profile listing &amp; marketplace discovery access
+                    </div>
+                  </td>
+                  <td style="text-align: center; color: #64748b;">One-Time Pass</td>
+                  <td style="text-align: right; font-weight: 600;">${formatPrice(basePrice)}</td>
+                </tr>
+                ${discountRow}
+              </tbody>
+              <tfoot>
+                <tr>
+                  <td colspan="2" class="td-total-lbl">Total Net Paid</td>
+                  <td class="td-total-amt">${formatPrice(receipt.amount)}</td>
+                </tr>
+              </tfoot>
+            </table>
+
+            <!-- TERMS -->
+            <div class="terms-card">
+              <div style="font-weight: 700; color: #0f172a; margin-bottom: 2px;">
+                100% Manual One-Time Pass Guarantee
+              </div>
+              <div>
+                This purchase is a one-time non-recurring pass. There are <strong>no automatic recurring charges</strong> or auto-debits on your account.
+              </div>
+              <div style="font-size: 9px; color: #94a3b8; margin-top: 4px; border-top: 1px solid #e2e8f0; padding-top: 4px;">
+                Official electronic tax invoice processed via Razorpay. Valid without physical signature.
+              </div>
+            </div>
+          </div>
+        </body>
+      </html>
+    `);
+    doc.close();
+
+    setTimeout(() => {
+      const prevTitle = document.title;
+      document.title = `Receipt_${invoiceNumber}`;
+      printFrame.contentWindow?.focus();
+      printFrame.contentWindow?.print();
+      setTimeout(() => {
+        document.title = prevTitle;
+        try {
+          document.body.removeChild(printFrame);
+        } catch {
+          // ignore
+        }
+      }, 1500);
+    }, 1200);
+  };
+
+  return (
+    <>
+      {/* ISOLATED PRINT STYLES (Enforces pristine 1-page A4 print without background artifacts or page duplication) */}
+      <style>{`
+        @media print {
+          @page {
+            size: A4 portrait;
+            margin: 8mm;
+          }
+          html, body {
+            height: auto !important;
+            overflow: visible !important;
+            background: #ffffff !important;
+          }
+          body * {
+            visibility: hidden !important;
+          }
+          #payment-receipt-print-wrapper,
+          #payment-receipt-print-wrapper * {
+            visibility: visible !important;
+          }
+          #payment-receipt-print-wrapper {
+            position: absolute !important;
+            left: 0 !important;
+            top: 0 !important;
+            width: 100% !important;
+            max-width: 100% !important;
+            margin: 0 !important;
+            padding: 0 !important;
+            background: #ffffff !important;
+            color: #0f172a !important;
+            box-shadow: none !important;
+            border: 1px solid #cbd5e1 !important;
+            border-radius: 12px !important;
+            page-break-inside: avoid !important;
+            break-inside: avoid !important;
+          }
+          .print-hidden {
+            display: none !important;
+          }
+          * {
+            -webkit-print-color-adjust: exact !important;
+            print-color-adjust: exact !important;
+          }
+        }
+      `}</style>
+
+      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+        <div
+          id="payment-receipt-print-wrapper"
+          className="relative w-full max-w-2xl bg-card rounded-2xl sm:rounded-3xl border border-border shadow-2xl overflow-hidden my-auto"
+        >
+          {/* MODAL ACTION BAR (Hidden in print) */}
+          <div className="flex items-center justify-between px-6 py-3.5 border-b border-border/80 bg-secondary/40 print-hidden">
+            <div className="flex items-center gap-2">
+              <Receipt className="size-4 text-primary" />
+              <span className="text-xs font-bold uppercase tracking-wider text-foreground">
+                Official Payment Receipt
+              </span>
+            </div>
+            <div className="flex items-center gap-2">
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
+              >
+                <Printer className="size-3.5" />
+                <span>Print / Save PDF</span>
+              </button>
+              <button
+                type="button"
+                onClick={onClose}
+                className="inline-flex size-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                title="Close"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* INVOICE CONTENT */}
+          <div className="p-6 sm:p-7 space-y-5 text-foreground bg-background">
+            {/* HEADER: BRAND LOGO & INVOICE STATUS */}
+            <div className="flex flex-col sm:flex-row sm:items-start justify-between gap-4 pb-5 border-b border-border">
+              <div className="flex items-start gap-3">
+                <img
+                  src="/logo.png"
+                  alt="Influencer Dhundo logo"
+                  className="size-11 rounded-full object-contain shrink-0 ring-1 ring-border/80 shadow-xs"
+                />
+                <div>
+                  <div className="flex items-center gap-1.5">
+                    <span className="font-display text-xl font-bold tracking-tight text-foreground">
+                      Influencer <span className="text-saffrondeep">Dhundo</span>
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    India&apos;s Creator Discovery &amp; Marketplace
+                  </p>
+                  <p className="text-[11px] text-muted-foreground font-mono">
+                    https://influencerdhundo.com
+                  </p>
+                </div>
+              </div>
+
+              <div className="sm:text-right space-y-1">
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-3 py-1 text-xs font-bold text-tealdeep border border-accent/40">
+                  <Check className="size-3.5 stroke-[2.5]" />
+                  PAID &bull; RAZORPAY VERIFIED
+                </span>
+                <p className="text-xs font-mono font-bold text-foreground mt-1.5">
+                  {invoiceNumber}
+                </p>
+                <p className="text-[11px] text-muted-foreground">
+                  Date:{" "}
+                  {new Date(receipt.createdAt).toLocaleString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                    hour: "2-digit",
+                    minute: "2-digit",
+                  })}
+                </p>
+              </div>
+            </div>
+
+            {/* BILLED TO & BILLED BY */}
+            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 text-xs pb-5 border-b border-border/70">
+              {/* BILLED TO (CREATOR) */}
+              <div className="rounded-xl bg-secondary/40 border border-border/70 p-3.5 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">
+                  Billed To (Creator)
+                </span>
+                <p className="text-sm font-bold text-foreground">
+                  {creator?.displayName || creator?.name || "Creator"}
+                </p>
+                {creator?.email && (
+                  <p className="text-muted-foreground">Email: {creator.email}</p>
+                )}
+                {creator?.phone && (
+                  <p className="text-muted-foreground">Phone: {creator.phone}</p>
+                )}
+                <p className="text-muted-foreground">
+                  Location: {[creator?.locality, creator?.city].filter(Boolean).join(", ") || "India"}
+                </p>
+                {creator?.id && (
+                  <p className="text-[11px] text-muted-foreground font-mono">
+                    Profile ID: {creator.id}
+                  </p>
+                )}
+              </div>
+
+              {/* BILLED BY / PLATFORM */}
+              <div className="rounded-xl bg-secondary/40 border border-border/70 p-3.5 space-y-1">
+                <span className="text-[10px] font-bold uppercase tracking-wider text-muted-foreground block mb-0.5">
+                  Merchant &amp; Gateway
+                </span>
+                <p className="text-sm font-bold text-foreground">
+                  Influencer Dhundo Platform
+                </p>
+                <p className="text-muted-foreground">
+                  Processor: Razorpay Software Pvt Ltd
+                </p>
+                <p className="text-muted-foreground">
+                  Mode: Live Production Gateway (INR)
+                </p>
+                <p className="text-muted-foreground">
+                  Support: support@influencerdhundo.com
+                </p>
+              </div>
+            </div>
+
+            {/* RAZORPAY TRANSACTION AUDIT BOX */}
+            <div className="rounded-xl bg-accent/10 border border-accent/30 p-3.5 text-xs space-y-2">
+              <div className="flex items-center justify-between">
+                <span className="font-semibold text-tealdeep flex items-center gap-1.5">
+                  <ShieldCheck className="size-4" />
+                  Razorpay Transaction Verification
+                </span>
+                <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-bold text-tealdeep">
+                  Captured &amp; Settled
+                </span>
+              </div>
+
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px] pt-1 border-t border-accent/20">
+                <div className="flex items-center justify-between bg-background/60 rounded-lg px-2.5 py-1.5 border border-accent/20">
+                  <span className="text-muted-foreground">Payment ID:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-foreground font-bold truncate max-w-[130px]">
+                      {receipt.razorpayPaymentId || "N/A"}
+                    </span>
+                    {receipt.razorpayPaymentId && (
+                      <button
+                        type="button"
+                        onClick={() =>
+                          copyToClipboard(receipt.razorpayPaymentId!, "paymentId")
+                        }
+                        className="text-muted-foreground hover:text-foreground cursor-pointer print-hidden"
+                        title="Copy Payment ID"
+                      >
+                        {copiedField === "paymentId" ? (
+                          <CheckCheck className="size-3 text-tealdeep" />
+                        ) : (
+                          <Copy className="size-3" />
+                        )}
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                <div className="flex items-center justify-between bg-background/60 rounded-lg px-2.5 py-1.5 border border-accent/20">
+                  <span className="text-muted-foreground">Order ID:</span>
+                  <div className="flex items-center gap-1">
+                    <span className="text-foreground font-bold truncate max-w-[130px]">
+                      {receipt.razorpayOrderId}
+                    </span>
+                    <button
+                      type="button"
+                      onClick={() =>
+                        copyToClipboard(receipt.razorpayOrderId, "orderId")
+                      }
+                      className="text-muted-foreground hover:text-foreground cursor-pointer print-hidden"
+                      title="Copy Order ID"
+                    >
+                      {copiedField === "orderId" ? (
+                        <CheckCheck className="size-3 text-tealdeep" />
+                      ) : (
+                        <Copy className="size-3" />
+                      )}
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {receipt.razorpaySignature && (
+                <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
+                  <span>Security Signature:</span>
+                  <span className="font-mono text-tealdeep font-semibold">
+                    HMAC SHA-256 Verified
+                  </span>
+                </div>
+              )}
+            </div>
+
+            {/* ITEMIZED SERVICES TABLE */}
+            <div>
+              <span className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground block mb-1.5">
+                Itemized Subscription Details
+              </span>
+              <div className="rounded-xl border border-border overflow-hidden">
+                <table className="w-full text-left text-xs">
+                  <thead className="bg-secondary/60 border-b border-border font-semibold text-muted-foreground">
+                    <tr>
+                      <th className="px-4 py-2">Item Description</th>
+                      <th className="px-4 py-2 text-center">Type</th>
+                      <th className="px-4 py-2 text-right">Amount</th>
+                    </tr>
+                  </thead>
+                  <tbody className="divide-y divide-border/60">
+                    <tr>
+                      <td className="px-4 py-2.5">
+                        <p className="font-bold text-foreground">{planName}</p>
+                        <p className="text-[11px] text-muted-foreground">
+                          Public creator profile listing &amp; marketplace discovery
+                        </p>
+                      </td>
+                      <td className="px-4 py-2.5 text-center text-muted-foreground">
+                        One-Time Pass
+                      </td>
+                      <td className="px-4 py-2.5 text-right font-medium text-foreground">
+                        {formatPrice(basePrice)}
+                      </td>
+                    </tr>
+
+                    {discountAmount > 0 && (
+                      <tr className="bg-accent/5">
+                        <td className="px-4 py-2">
+                          <span className="font-semibold text-tealdeep">
+                            Discount / Promotional Savings
+                          </span>
+                        </td>
+                        <td className="px-4 py-2 text-center text-tealdeep font-medium">
+                          Promo Applied
+                        </td>
+                        <td className="px-4 py-2 text-right font-semibold text-tealdeep">
+                          -{formatPrice(discountAmount)}
+                        </td>
+                      </tr>
+                    )}
+                  </tbody>
+                  <tfoot className="bg-secondary/40 border-t border-border font-bold">
+                    <tr>
+                      <td colSpan={2} className="px-4 py-2.5 text-foreground text-xs">
+                        Total Net Paid
+                      </td>
+                      <td className="px-4 py-2.5 text-right text-sm text-saffrondeep font-display font-bold">
+                        {formatPrice(receipt.amount)}
+                      </td>
+                    </tr>
+                  </tfoot>
+                </table>
+              </div>
+            </div>
+
+            {/* GUARANTEE & ONE-TIME PASS TERMS */}
+            <div className="rounded-xl bg-secondary/30 border border-border/70 p-3 text-[11px] text-muted-foreground space-y-0.5 leading-relaxed">
+              <p className="font-bold text-foreground flex items-center gap-1.5">
+                <ShieldCheck className="size-3.5 text-tealdeep" />
+                100% Manual One-Time Pass Guarantee
+              </p>
+              <p>
+                This is a one-time non-recurring pass. There are <strong>no automated recurring charges</strong> or auto-debits on your account.
+              </p>
+              <p className="text-[10px] text-muted-foreground/80 pt-0.5 border-t border-border/50">
+                Official electronic tax invoice for payment processed via Razorpay. Valid without physical signature.
+              </p>
+            </div>
+
+            {/* FOOTER ACTIONS (Hidden in print) */}
+            <div className="pt-2 flex flex-col sm:flex-row items-center justify-end gap-3 print-hidden">
+              <button
+                type="button"
+                onClick={onClose}
+                className="w-full sm:w-auto rounded-xl bg-secondary px-5 py-2 text-xs font-semibold text-foreground hover:bg-secondary/80 ring-1 ring-border transition-all cursor-pointer"
+              >
+                Close
+              </button>
+              <button
+                type="button"
+                onClick={handlePrint}
+                className="w-full sm:w-auto inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-2 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs cursor-pointer"
+              >
+                <Printer className="size-4" />
+                <span>Print / Save as PDF</span>
+              </button>
+            </div>
+          </div>
+        </div>
+      </div>
+    </>
+  );
+}
+
 

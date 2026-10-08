@@ -345,7 +345,7 @@ function Register() {
       displayName: form.displayName || form.name,
       photo: form.photo || defaultPhoto,
       city: form.city || "Your city",
-      locality: form.locality || "Your locality",
+      locality: form.locality || "Your area",
       state: form.state || "",
       pincode: form.pincode,
       followers: Number(form.followers) || 0,
@@ -410,7 +410,7 @@ function Register() {
       if (!form.mobile.trim() || form.mobile.replace(/\D/g, "").length < 10)
         return "Please enter a valid 10-digit mobile number.";
       if (!form.city) return "Select your city.";
-      if (!form.locality.trim()) return "Enter your locality.";
+      if (!form.locality.trim()) return "Enter your area.";
       if (wordCount(form.about) > 300) return "About must be 300 words or less.";
     }
     if (step === 2) {
@@ -1003,7 +1003,7 @@ function Register() {
                     </Field>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Locality">
+                    <Field label="Area">
                       <TextInput
                         value={form.locality}
                         onChange={(e) => set("locality", e.target.value)}
@@ -1349,13 +1349,12 @@ function Register() {
                       </p>
                     </div>
                   ) : (
-                    <div className="mt-5 rounded-2xl bg-foreground p-5 text-background shadow-md">
-                      <p className="font-display text-lg font-semibold">
-                        Your profile is saved, but hidden
+                    <div className="mt-5 rounded-2xl bg-accent/15 border border-accent/25 p-5 text-tealdeep shadow-sm">
+                      <p className="font-display text-lg font-semibold flex items-center gap-2">
+                        <span>🎉</span> You&apos;re almost done! 3-Day Free Trial Included
                       </p>
-                      <p className="mt-1 text-sm text-background/70">
-                        An unpaid profile is not visible in the public directory. You can activate a
-                        plan now or come back later.
+                      <p className="mt-1 text-sm text-tealdeep/85">
+                        Click <strong>Continue</strong> to create your profile and activate your <strong>complimentary 3-Day Free Trial</strong>. Your profile will go live instantly in the public creator directory!
                       </p>
                     </div>
                   )}
@@ -1373,7 +1372,7 @@ function Register() {
                 {/* Back: hide on step 0, or on step 1 when editing (existing user skips account step) */}
                 {step > 0 && !(step === 1 && existing) ? (
                   <Button variant="ghost" disabled={saving} onClick={() => setStep((s) => s - 1)}>
-                    Back
+                    Go Back
                   </Button>
                 ) : null}
 
@@ -1425,37 +1424,28 @@ function Register() {
                     )}
                   </>
                 ) : (
-                  /* New creator: standard Continue / Save & plan flow */
+                  /* New creator: simple Go Back + Continue flow with automatic 3-day trial activation */
                   <>
                     {step < STEPS.length - 1 ? (
                       <Button variant="primary" className="flex-1" disabled={signingUp} onClick={next}>
                         {signingUp ? "Creating account..." : "Continue"}
                       </Button>
                     ) : (
-                      <>
-                        <Button
-                          variant="ink"
-                          className="flex-1 justify-center gap-2"
-                          disabled={saving}
-                          onClick={() => handleFinalSave("/creator/plans")}
-                        >
-                          {saving ? (
-                            <>
-                              <Loader2 className="size-4 animate-spin" />
-                              Saving profile...
-                            </>
-                          ) : (
-                            "Save & choose a plan"
-                          )}
-                        </Button>
-                        <Button
-                          variant="ghost"
-                          disabled={saving}
-                          onClick={() => handleFinalSave("/creator/dashboard")}
-                        >
-                          Save for later
-                        </Button>
-                      </>
+                      <Button
+                        variant="primary"
+                        className="flex-1 justify-center gap-2 shadow-xs"
+                        disabled={saving}
+                        onClick={() => handleFinalSave("/creator/dashboard")}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            Creating profile & starting trial...
+                          </>
+                        ) : (
+                          "Continue"
+                        )}
+                      </Button>
                     )}
                   </>
                 )}
