@@ -208,7 +208,13 @@ function Dashboard() {
   ).length;
 
   const totalBonusDaysEarned = referralEvents.reduce((acc, ev) => acc + (ev.daysDelta || 0), 0);
-  const netBonusDays = Math.max(0, mine?.referralBonusDays ?? totalBonusDaysEarned);
+  const totalBonusDaysFromReferrals = paidReferredCount * 7;
+  const netBonusDays = Math.max(
+    0,
+    mine?.referralBonusDays && mine.referralBonusDays > 0 ? mine.referralBonusDays : 0,
+    totalBonusDaysEarned,
+    totalBonusDaysFromReferrals,
+  );
 
   const handleCopyLink = () => {
     if (!referralLink) return;
