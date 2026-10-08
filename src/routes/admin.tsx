@@ -1,15 +1,22 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
-import { Button, Card, DatePicker, Field, SectionEyebrow, StatusPill, TextInput } from "@/components/ui-kit";
+import { useEffect, useRef, useState } from "react";
+import { Button, Card, Chip, DatePicker, Field, SectionEyebrow, StatusPill, TextArea, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
 import { supabaseDb, type DiscountCode } from "@/lib/supabase";
 import {
   CATEGORIES,
   CITIES,
+  COLLAB_TYPES,
+  CONTENT_TYPES,
   formatFollowers,
   formatPrice,
+  GENDERS,
+  LANGUAGES,
   PLANS,
+  TRAVEL_RANGES,
+  TURNAROUNDS,
+  type Creator,
   type CreatorStatus,
 } from "@/lib/directory-data";
 import {
@@ -38,6 +45,11 @@ import {
   Mail,
   Phone,
   Layers,
+  Camera,
+  Upload,
+  Search,
+  IndianRupee,
+  Loader2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -388,8 +400,15 @@ function AdminDashboard() {
     setCreatorStatus,
     removeCreator,
     toggleFeatured,
+    updateCreator,
   } = useAppState();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Creators");
+
+  // Creator search & filter state
+  const [editingCreator, setEditingCreator] = useState<Creator | null>(null);
+  const [creatorSearch, setCreatorSearch] = useState("");
+  const [creatorStatusFilter, setCreatorStatusFilter] = useState<string>("All");
+  const [creatorCategoryFilter, setCreatorCategoryFilter] = useState<string>("All");
 
   // Helper functions for date formatting
   const formatDateToInput = (d: Date | string): string => {
@@ -722,83 +741,248 @@ function AdminDashboard() {
 
       {/* ── TAB 1: CREATORS ─────────────────────────────────────────────── */}
       {tab === "Creators" ? (
-        <div className="mt-5 space-y-3">
-          {creators.map((c) => (
-            <Card key={c.id} className="p-4">
-              <div className="flex flex-wrap items-start justify-between gap-3">
-                <div className="flex min-w-0 gap-3">
-                  {c.photo ? (
-                    <img
-                      src={c.photo}
-                      alt={c.name}
-                      loading="lazy"
-                      width={816}
-                      height={816}
-                      className="size-12 shrink-0 rounded-xl object-cover ring-1 ring-border"
-                    />
-                  ) : (
-                    <div className="size-12 shrink-0 rounded-xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground/50">
-                      <User className="size-6" />
+        <div className="mt-5 space-y-4">
+          {/* SEARCH & FILTERS BAR */}
+          <Card className="p-4 bg-secondary/30 border border-border/80">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                  <Search className="size-4" />
+                </div>
+                <TextInput
+                  value={creatorSearch}
+                  onChange={(e) => setCreatorSearch(e.target.value)}
+                  placeholder="Search creators by name, instagram, city, locality, phone..."
+                  className="pl-10 text-xs sm:text-sm bg-background"
+                />
+                {creatorSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setCreatorSearch("")}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <select
+                  value={creatorStatusFilter}
+                  onChange={(e) => setCreatorStatusFilter(e.target.value)}
+                  className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                >
+                  <option value="All">All Statuses ({creators.length})</option>
+                  {STATUSES.map((s) => (
+                    <option key={s} value={s}>
+                      {s} ({creators.filter((c) => c.status === s).length})
+                    </option>
+                  ))}
+                </select>
+
+                <select
+                  value={creatorCategoryFilter}
+                  onChange={(e) => setCreatorCategoryFilter(e.target.value)}
+                  className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden max-w-[160px]"
+                >
+                  <option value="All">All Categories</option>
+                  {CATEGORIES.map((cat) => (
+                    <option key={cat} value={cat}>
+                      {cat}
+                    </option>
+                  ))}
+                </select>
+
+                {(creatorSearch || creatorStatusFilter !== "All" || creatorCategoryFilter !== "All") && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setCreatorSearch("");
+                      setCreatorStatusFilter("All");
+                      setCreatorCategoryFilter("All");
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground px-2.5 py-2"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
+
+            <div className="mt-2.5 flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
+              <span>
+                Showing <strong className="text-foreground">{
+                  creators.filter((c) => {
+                    const q = creatorSearch.toLowerCase().trim();
+                    if (q) {
+                      const matchName = c.name?.toLowerCase().includes(q);
+                      const matchDisplay = c.displayName?.toLowerCase().includes(q);
+                      const matchInsta = c.instagram?.toLowerCase().includes(q);
+                      const matchCity = c.city?.toLowerCase().includes(q);
+                      const matchLocality = c.locality?.toLowerCase().includes(q);
+                      const matchPhone = c.contact?.phone?.toLowerCase().includes(q);
+                      const matchEmail = c.contact?.email?.toLowerCase().includes(q);
+                      if (!matchName && !matchDisplay && !matchInsta && !matchCity && !matchLocality && !matchPhone && !matchEmail) {
+                        return false;
+                      }
+                    }
+                    if (creatorStatusFilter !== "All" && c.status !== creatorStatusFilter) return false;
+                    if (creatorCategoryFilter !== "All" && !c.categories?.includes(creatorCategoryFilter)) return false;
+                    return true;
+                  }).length
+                }</strong> of {creators.length} creators
+              </span>
+              <span className="text-[11px] font-medium text-tealdeep">
+                Click &quot;Edit&quot; on any creator to modify photo, contact, pricing &amp; bio
+              </span>
+            </div>
+          </Card>
+
+          {/* CREATOR LIST */}
+          {creators
+            .filter((c) => {
+              const q = creatorSearch.toLowerCase().trim();
+              if (q) {
+                const matchName = c.name?.toLowerCase().includes(q);
+                const matchDisplay = c.displayName?.toLowerCase().includes(q);
+                const matchInsta = c.instagram?.toLowerCase().includes(q);
+                const matchCity = c.city?.toLowerCase().includes(q);
+                const matchLocality = c.locality?.toLowerCase().includes(q);
+                const matchPhone = c.contact?.phone?.toLowerCase().includes(q);
+                const matchEmail = c.contact?.email?.toLowerCase().includes(q);
+                if (!matchName && !matchDisplay && !matchInsta && !matchCity && !matchLocality && !matchPhone && !matchEmail) {
+                  return false;
+                }
+              }
+              if (creatorStatusFilter !== "All" && c.status !== creatorStatusFilter) return false;
+              if (creatorCategoryFilter !== "All" && !c.categories?.includes(creatorCategoryFilter)) return false;
+              return true;
+            })
+            .map((c) => (
+              <Card key={c.id} className="p-4.5 hover:border-primary/40 transition-colors shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                  <div className="flex min-w-0 items-start gap-3.5">
+                    <div className="relative shrink-0">
+                      {c.photo ? (
+                        <img
+                          src={c.photo}
+                          alt={c.name}
+                          loading="lazy"
+                          width={816}
+                          height={816}
+                          className="size-14 shrink-0 rounded-2xl object-cover ring-1 ring-border shadow-xs bg-secondary"
+                        />
+                      ) : (
+                        <div className="size-14 shrink-0 rounded-2xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground/50">
+                          <User className="size-7" />
+                        </div>
+                      )}
+                      {c.featured && (
+                        <span
+                          className="absolute -top-1 -right-1 size-3.5 rounded-full bg-saffrondeep ring-2 ring-background shadow-xs"
+                          title="Featured Creator"
+                        />
+                      )}
                     </div>
-                  )}
-                  <div className="min-w-0">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <p className="font-semibold">{c.name}</p>
-                      <StatusPill status={c.status} />
-                      {c.featured ? (
-                        <span className="rounded-full bg-primary/15 px-2.5 py-1 text-xs font-semibold text-saffrondeep">
-                          Featured
+
+                    <div className="min-w-0">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <p className="font-bold text-foreground text-base leading-tight">
+                          {c.name}
+                        </p>
+                        {c.displayName && c.displayName !== c.name && (
+                          <span className="text-xs text-muted-foreground font-medium">
+                            ({c.displayName})
+                          </span>
+                        )}
+                        <StatusPill status={c.status} />
+                        {c.featured ? (
+                          <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-saffrondeep border border-primary/20">
+                            Featured
+                          </span>
+                        ) : null}
+                      </div>
+
+                      <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
+                        <span className="text-foreground/80 font-medium">
+                          {[c.locality, c.city].filter(Boolean).join(", ") || "Location unassigned"}
                         </span>
-                      ) : null}
+                        <span>·</span>
+                        <span>{formatFollowers(c.followers)} followers</span>
+                        <span>·</span>
+                        <span className="text-saffrondeep font-semibold">
+                          {formatPrice(c.startingPrice)}
+                        </span>
+                        {c.categories?.length > 0 && (
+                          <>
+                            <span>·</span>
+                            <span>{c.categories.slice(0, 3).join(", ")}{c.categories.length > 3 ? ` +${c.categories.length - 3}` : ""}</span>
+                          </>
+                        )}
+                      </p>
+
+                      <p className="text-xs text-muted-foreground mt-0.5 font-mono">
+                        {c.contact.phone || "No phone"} · {c.contact.email || "No email"}
+                        {c.instagram && ` · ${c.instagram}`}
+                      </p>
                     </div>
-                    <p className="text-xs text-muted-foreground">
-                      {c.locality}, {c.city} · {formatFollowers(c.followers)} ·{" "}
-                      {formatPrice(c.startingPrice)} · {c.categories.join(", ")}
-                    </p>
-                    <p className="text-xs text-muted-foreground">
-                      {c.contact.phone} · {c.contact.email}
-                    </p>
+                  </div>
+
+                  <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-3 py-2 text-xs flex items-center gap-1.5 ring-1 ring-border bg-background hover:bg-secondary cursor-pointer"
+                      onClick={() => setEditingCreator(c)}
+                    >
+                      <Pencil className="size-3.5 text-primary" />
+                      <span>Edit</span>
+                    </Button>
+
+                    <select
+                      value={c.status}
+                      onChange={(e) =>
+                        setCreatorStatus(c.id, e.target.value as CreatorStatus)
+                      }
+                      className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-3 py-2 text-xs"
+                      onClick={() => toggleFeatured(c.id)}
+                    >
+                      {c.featured ? "Unfeature" : "Feature"}
+                    </Button>
+
+                    <Link
+                      to="/creators/$creatorId"
+                      params={{ creatorId: c.id }}
+                      className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
+                    >
+                      View
+                    </Link>
+
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      className="px-3 py-2 text-xs text-rose hover:bg-rose/10"
+                      onClick={() => removeCreator(c.id)}
+                    >
+                      Remove
+                    </Button>
                   </div>
                 </div>
-                <div className="flex flex-wrap items-center gap-2">
-                  <select
-                    value={c.status}
-                    onChange={(e) =>
-                      setCreatorStatus(c.id, e.target.value as CreatorStatus)
-                    }
-                    className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border"
-                  >
-                    {STATUSES.map((s) => (
-                      <option key={s} value={s}>
-                        {s}
-                      </option>
-                    ))}
-                  </select>
-                  <Button
-                    variant="ghost"
-                    className="px-3 py-2 text-xs"
-                    onClick={() => toggleFeatured(c.id)}
-                  >
-                    {c.featured ? "Unfeature" : "Feature"}
-                  </Button>
-                  <Link
-                    to="/creators/$creatorId"
-                    params={{ creatorId: c.id }}
-                    className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border"
-                  >
-                    View
-                  </Link>
-                  <Button
-                    variant="ghost"
-                    className="px-3 py-2 text-xs text-rose"
-                    onClick={() => removeCreator(c.id)}
-                  >
-                    Remove
-                  </Button>
-                </div>
-              </div>
-            </Card>
-          ))}
+              </Card>
+            ))}
         </div>
       ) : null}
 
@@ -1767,7 +1951,904 @@ function AdminDashboard() {
           </Card>
         </div>
       ) : null}
+      {/* ── EDIT CREATOR MODAL ── */}
+      {editingCreator && (
+        <EditCreatorModal
+          creator={editingCreator}
+          onClose={() => setEditingCreator(null)}
+          onSave={async (updated) => {
+            return await updateCreator(updated);
+          }}
+        />
+      )}
     </div>
   );
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+// Edit Creator Modal Component
+// ─────────────────────────────────────────────────────────────────────────────
+function EditCreatorModal({
+  creator,
+  onClose,
+  onSave,
+}: {
+  creator: Creator;
+  onClose: () => void;
+  onSave: (updated: Creator) => Promise<boolean>;
+}) {
+  const [form, setForm] = useState<Creator>({
+    ...creator,
+    otherSocials: creator.otherSocials || [],
+    categories: creator.categories || [],
+    contentTypes: creator.contentTypes || [],
+    languages: creator.languages || [],
+    contact: creator.contact || { phone: "", whatsapp: "", email: "" },
+  });
+
+  const [activeTab, setActiveTab] = useState<
+    "identity" | "location" | "social" | "pricing" | "categories" | "contact"
+  >("identity");
+
+  const [uploadingPhoto, setUploadingPhoto] = useState(false);
+  const [uploadError, setUploadError] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [saveError, setSaveError] = useState("");
+  const [saveSuccess, setSaveSuccess] = useState(false);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  // Close modal on Escape key
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
+  // Handle Photo Upload directly to Supabase Storage
+  const handlePhotoSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    if (!file.type.startsWith("image/")) {
+      setUploadError("Please select a valid image file (PNG, JPG, WebP).");
+      return;
+    }
+    if (file.size > 5 * 1024 * 1024) {
+      setUploadError("Image exceeds 5MB size limit.");
+      return;
+    }
+
+    try {
+      setUploadingPhoto(true);
+      setUploadError("");
+      const publicUrl = await supabaseDb.uploadCreatorPhoto(
+        file,
+        `admin-edit-${creator.id}`,
+      );
+      if (publicUrl) {
+        setForm((prev) => ({ ...prev, photo: publicUrl }));
+      } else {
+        setUploadError("Could not upload to storage bucket. You can paste a direct URL below.");
+      }
+    } catch (err: any) {
+      setUploadError(err.message || "Failed to upload photo.");
+    } finally {
+      setUploadingPhoto(false);
+      if (fileInputRef.current) fileInputRef.current.value = "";
+    }
+  };
+
+  const handleRemovePhoto = () => {
+    setForm((prev) => ({ ...prev, photo: "" }));
+    setUploadError("");
+  };
+
+  const toggleArrayItem = (
+    key: "categories" | "contentTypes" | "languages",
+    item: string,
+  ) => {
+    setForm((prev) => {
+      const current = prev[key] || [];
+      const next = current.includes(item)
+        ? current.filter((x) => x !== item)
+        : [...current, item];
+      return { ...prev, [key]: next };
+    });
+  };
+
+  const handleAddSocial = () => {
+    setForm((prev) => ({
+      ...prev,
+      otherSocials: [
+        ...(prev.otherSocials || []),
+        { platform: "YouTube", handle: "" },
+      ],
+    }));
+  };
+
+  const handleUpdateSocial = (
+    index: number,
+    field: "platform" | "handle",
+    value: string,
+  ) => {
+    setForm((prev) => {
+      const list = [...(prev.otherSocials || [])];
+      const currentItem = list[index] || { platform: "YouTube", handle: "" };
+      list[index] = {
+        platform: field === "platform" ? value : (currentItem.platform || "YouTube"),
+        handle: field === "handle" ? value : (currentItem.handle || ""),
+      };
+      return { ...prev, otherSocials: list };
+    });
+  };
+
+  const handleRemoveSocial = (index: number) => {
+    setForm((prev) => ({
+      ...prev,
+      otherSocials: (prev.otherSocials || []).filter((_, i) => i !== index),
+    }));
+  };
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!form.name.trim()) {
+      setSaveError("Creator Full Name is required.");
+      return;
+    }
+    try {
+      setSaving(true);
+      setSaveError("");
+      const ok = await onSave(form);
+      if (ok) {
+        setSaveSuccess(true);
+        setTimeout(() => {
+          onClose();
+        }, 500);
+      } else {
+        setSaveError("Failed to update creator. Please try again.");
+      }
+    } catch (err: any) {
+      setSaveError(err.message || "An unexpected error occurred while saving.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const TABS_CONFIG = [
+    { id: "identity", label: "Identity & Photo", icon: User },
+    { id: "location", label: "Location & Bio", icon: Globe },
+    { id: "social", label: "Socials & Reach", icon: Eye },
+    { id: "pricing", label: "Pricing & Collabs", icon: IndianRupee },
+    { id: "categories", label: "Categories & Formats", icon: Tag },
+    { id: "contact", label: "Contact Info", icon: Phone },
+  ] as const;
+
+  return (
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 sm:p-6 overflow-y-auto">
+      <div className="relative w-full max-w-3xl rounded-3xl bg-background border border-border/90 shadow-2xl overflow-hidden my-auto flex flex-col max-h-[92vh]">
+        
+        {/* Modal Header */}
+        <div className="flex items-center justify-between border-b border-border/80 px-6 py-4 bg-secondary/30 shrink-0">
+          <div className="flex items-center gap-3">
+            {form.photo ? (
+              <img
+                src={form.photo}
+                alt={form.name}
+                className="size-10 rounded-xl object-cover ring-1 ring-border shadow-xs"
+              />
+            ) : (
+              <div className="size-10 rounded-xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground/60">
+                <User className="size-5" />
+              </div>
+            )}
+            <div>
+              <div className="flex items-center gap-2">
+                <h2 className="text-base font-bold text-foreground">
+                  Edit Creator: {form.name || "Unnamed"}
+                </h2>
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-mono font-semibold text-primary">
+                  ID: {form.id}
+                </span>
+              </div>
+              <p className="text-xs text-muted-foreground">
+                Update profile photo, demographics, pricing, categories, and direct contact details.
+              </p>
+            </div>
+          </div>
+
+          <button
+            type="button"
+            onClick={onClose}
+            className="size-8 rounded-full flex items-center justify-center text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors cursor-pointer"
+          >
+            <X className="size-4" />
+          </button>
+        </div>
+
+        {/* Modal Tab Strip */}
+        <div className="flex items-center gap-1.5 px-6 py-2.5 border-b border-border/60 bg-secondary/15 overflow-x-auto shrink-0 no-scrollbar">
+          {TABS_CONFIG.map((t) => {
+            const Icon = t.icon;
+            const isSel = activeTab === t.id;
+            return (
+              <button
+                key={t.id}
+                type="button"
+                onClick={() => setActiveTab(t.id)}
+                className={`inline-flex items-center gap-1.5 rounded-xl px-3 py-1.5 text-xs font-semibold whitespace-nowrap transition-all cursor-pointer ${
+                  isSel
+                    ? "bg-foreground text-background shadow-xs"
+                    : "text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                }`}
+              >
+                <Icon className="size-3.5" />
+                <span>{t.label}</span>
+              </button>
+            );
+          })}
+        </div>
+
+        {/* Modal Body */}
+        <form onSubmit={handleSubmit} className="flex flex-col flex-1 overflow-y-auto">
+          <div className="p-6 space-y-6 flex-1">
+            
+            {saveError && (
+              <div className="rounded-2xl border border-rose/30 bg-rose/10 p-3.5 text-xs text-rose flex items-center gap-2">
+                <AlertCircle className="size-4 shrink-0" />
+                <span>{saveError}</span>
+              </div>
+            )}
+
+            {saveSuccess && (
+              <div className="rounded-2xl border border-tealdeep/30 bg-tealdeep/10 p-3.5 text-xs text-tealdeep flex items-center gap-2">
+                <CheckCircle2 className="size-4 shrink-0" />
+                <span>Creator details updated successfully! Closing...</span>
+              </div>
+            )}
+
+            {/* ── TAB: IDENTITY & PHOTO ── */}
+            {activeTab === "identity" && (
+              <div className="space-y-6">
+                {/* PHOTO MANAGEMENT CARD */}
+                <div className="rounded-2xl border border-border/80 bg-secondary/20 p-4 sm:p-5">
+                  <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-1.5">
+                    <Camera className="size-3.5 text-primary" /> Profile Picture
+                  </h3>
+
+                  <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+                    <div className="relative shrink-0">
+                      {form.photo ? (
+                        <img
+                          src={form.photo}
+                          alt={form.name}
+                          className="size-20 rounded-2xl object-cover ring-2 ring-border shadow-md bg-secondary"
+                        />
+                      ) : (
+                        <div className="size-20 rounded-2xl bg-secondary ring-2 ring-border shadow-md flex items-center justify-center text-muted-foreground/50">
+                          <User className="size-8" />
+                        </div>
+                      )}
+                      {form.photo && (
+                        <span
+                          className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
+                          title="Photo Uploaded"
+                        />
+                      )}
+                    </div>
+
+                    <div className="flex-1 space-y-3 w-full">
+                      <div className="flex flex-wrap items-center gap-2">
+                        <input
+                          ref={fileInputRef}
+                          type="file"
+                          accept="image/png,image/jpeg,image/webp,image/jpg"
+                          onChange={handlePhotoSelect}
+                          className="hidden"
+                          id="admin-creator-photo-input"
+                        />
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          disabled={uploadingPhoto}
+                          onClick={() => fileInputRef.current?.click()}
+                          className="text-xs flex items-center gap-1.5 ring-1 ring-border bg-background hover:bg-secondary cursor-pointer"
+                        >
+                          {uploadingPhoto ? (
+                            <>
+                              <Loader2 className="size-3.5 animate-spin text-primary" />
+                              <span>Uploading...</span>
+                            </>
+                          ) : (
+                            <>
+                              <Upload className="size-3.5 text-primary" />
+                              <span>Upload New Photo</span>
+                            </>
+                          )}
+                        </Button>
+
+                        {form.photo && (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={handleRemovePhoto}
+                            className="text-xs text-rose hover:bg-rose/10 cursor-pointer flex items-center gap-1.5"
+                          >
+                            <Trash2 className="size-3.5" />
+                            <span>Remove Photo</span>
+                          </Button>
+                        )}
+                      </div>
+
+                      {uploadError && (
+                        <p className="text-xs text-rose font-medium">{uploadError}</p>
+                      )}
+
+                      <div>
+                        <Field label="Or Direct Image URL" hint="Paste image CDN or public image URL">
+                          <TextInput
+                            value={form.photo || ""}
+                            onChange={(e) =>
+                              setForm((prev) => ({ ...prev, photo: e.target.value.trim() }))
+                            }
+                            placeholder="https://..."
+                            className="font-mono text-xs"
+                          />
+                        </Field>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                {/* NAME & DISPLAY NAME */}
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Full Name" hint="Official name of the creator">
+                    <TextInput
+                      value={form.name}
+                      onChange={(e) => setForm((prev) => ({ ...prev, name: e.target.value }))}
+                      placeholder="e.g. Aditi Sharma"
+                      required
+                    />
+                  </Field>
+
+                  <Field label="Display / Stage Name" hint="Shown on card badges / channel">
+                    <TextInput
+                      value={form.displayName || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, displayName: e.target.value }))
+                      }
+                      placeholder="e.g. aditi.eats"
+                    />
+                  </Field>
+                </div>
+
+                {/* BIRTH DATE, GENDER, STATUS, FEATURED */}
+                <div className="grid gap-4 sm:grid-cols-3">
+                  <Field label="Birth Date" hint="YYYY-MM-DD">
+                    <TextInput
+                      type="date"
+                      value={form.birthDate || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, birthDate: e.target.value || undefined }))
+                      }
+                    />
+                  </Field>
+
+                  <Field label="Gender">
+                    <select
+                      value={form.gender || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, gender: e.target.value || undefined }))
+                      }
+                      className="w-full rounded-2xl bg-background px-4 py-3 text-sm ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                    >
+                      <option value="">Select Gender</option>
+                      {GENDERS.map((g) => (
+                        <option key={g} value={g}>
+                          {g}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Directory Status">
+                    <select
+                      value={form.status}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          status: e.target.value as CreatorStatus,
+                        }))
+                      }
+                      className="w-full rounded-2xl bg-background px-4 py-3 text-sm ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                    >
+                      {STATUSES.map((s) => (
+                        <option key={s} value={s}>
+                          {s}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                <div className="rounded-2xl border border-border/80 p-4 bg-secondary/10 flex items-center justify-between">
+                  <div>
+                    <p className="text-sm font-semibold text-foreground">Featured Creator Spotlight</p>
+                    <p className="text-xs text-muted-foreground">
+                      Featured creators appear highlighted at the top of directory searches.
+                    </p>
+                  </div>
+                  <label className="relative inline-flex items-center cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={!!form.featured}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, featured: e.target.checked }))
+                      }
+                      className="sr-only peer"
+                    />
+                    <div className="w-11 h-6 bg-secondary peer-focus:outline-hidden rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-border after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary ring-1 ring-border"></div>
+                  </label>
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB: LOCATION & BIO ── */}
+            {activeTab === "location" && (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Locality / Area" hint="e.g. Bandra West, Thane West">
+                    <TextInput
+                      value={form.locality}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, locality: e.target.value }))
+                      }
+                      placeholder="e.g. Bandra West"
+                    />
+                  </Field>
+
+                  <Field label="City" hint="City name">
+                    <TextInput
+                      value={form.city}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, city: e.target.value }))
+                      }
+                      placeholder="e.g. Mumbai"
+                      list="admin-city-list"
+                    />
+                    <datalist id="admin-city-list">
+                      {CITIES.map((city) => (
+                        <option key={city} value={city} />
+                      ))}
+                    </datalist>
+                  </Field>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="State" hint="e.g. Maharashtra">
+                    <TextInput
+                      value={form.state}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, state: e.target.value }))
+                      }
+                      placeholder="e.g. Maharashtra"
+                    />
+                  </Field>
+
+                  <Field label="Pincode" hint="6-digit postal code">
+                    <TextInput
+                      value={form.pincode}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, pincode: e.target.value }))
+                      }
+                      placeholder="e.g. 400050"
+                    />
+                  </Field>
+                </div>
+
+                <Field label="About Creator / Bio" hint="Public profile bio description">
+                  <TextArea
+                    value={form.about}
+                    onChange={(e) =>
+                      setForm((prev) => ({ ...prev, about: e.target.value }))
+                    }
+                    rows={4}
+                    placeholder="Tell brands about creator's niche, tone, audience and experience..."
+                  />
+                </Field>
+              </div>
+            )}
+
+            {/* ── TAB: SOCIALS & REACH ── */}
+            {activeTab === "social" && (
+              <div className="space-y-5">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Instagram Handle" hint="Without or with @">
+                    <TextInput
+                      value={form.instagram}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, instagram: e.target.value }))
+                      }
+                      placeholder="@username"
+                    />
+                  </Field>
+
+                  <Field label="Followers Count" hint="Total Instagram followers">
+                    <TextInput
+                      type="number"
+                      min={0}
+                      value={form.followers}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          followers: Math.max(0, Number(e.target.value) || 0),
+                        }))
+                      }
+                      placeholder="e.g. 25000"
+                    />
+                  </Field>
+                </div>
+
+                {/* OTHER SOCIAL CHANNELS */}
+                <div className="rounded-2xl border border-border/80 p-4 bg-secondary/15 space-y-3">
+                  <div className="flex items-center justify-between">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                      Other Social Media Platforms
+                    </h3>
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={handleAddSocial}
+                      className="text-xs flex items-center gap-1.5 ring-1 ring-border bg-background hover:bg-secondary cursor-pointer"
+                    >
+                      <Plus className="size-3.5 text-primary" />
+                      Add Channel
+                    </Button>
+                  </div>
+
+                  {(!form.otherSocials || form.otherSocials.length === 0) ? (
+                    <p className="text-xs text-muted-foreground py-2">
+                      No other social links added. Click "+ Add Channel" to link YouTube, Twitter, etc.
+                    </p>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {form.otherSocials.map((soc, idx) => (
+                        <div key={idx} className="flex items-center gap-2">
+                          <select
+                            value={soc.platform}
+                            onChange={(e) =>
+                              handleUpdateSocial(idx, "platform", e.target.value)
+                            }
+                            className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border w-32 focus:ring-2 focus:ring-primary focus:outline-hidden"
+                          >
+                            <option value="YouTube">YouTube</option>
+                            <option value="Facebook">Facebook</option>
+                            <option value="Twitter / X">Twitter / X</option>
+                            <option value="LinkedIn">LinkedIn</option>
+                            <option value="Snapchat">Snapchat</option>
+                            <option value="Pinterest">Pinterest</option>
+                            <option value="Blog">Blog</option>
+                            <option value="Other">Other</option>
+                          </select>
+
+                          <TextInput
+                            value={soc.handle}
+                            onChange={(e) =>
+                              handleUpdateSocial(idx, "handle", e.target.value)
+                            }
+                            placeholder="Handle or URL"
+                            className="flex-1 text-xs"
+                          />
+
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => handleRemoveSocial(idx)}
+                            className="size-8 p-0 text-rose hover:bg-rose/10 flex items-center justify-center shrink-0"
+                          >
+                            <X className="size-4" />
+                          </Button>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB: PRICING & COLLABS ── */}
+            {activeTab === "pricing" && (
+              <div className="space-y-4">
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Starting Rate (₹)" hint="Base fee for collaboration">
+                    <div className="relative">
+                      <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3 text-muted-foreground font-semibold">
+                        ₹
+                      </div>
+                      <TextInput
+                        type="number"
+                        min={0}
+                        value={form.startingPrice}
+                        onChange={(e) =>
+                          setForm((prev) => ({
+                            ...prev,
+                            startingPrice: Math.max(0, Number(e.target.value) || 0),
+                          }))
+                        }
+                        className="pl-8 font-mono font-semibold"
+                        placeholder="e.g. 2000"
+                      />
+                    </div>
+                  </Field>
+
+                  <Field label="Collab Mode">
+                    <select
+                      value={form.collabType}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          collabType: e.target.value as (typeof COLLAB_TYPES)[number],
+                        }))
+                      }
+                      className="w-full rounded-2xl bg-background px-4 py-3 text-sm ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                    >
+                      {COLLAB_TYPES.map((ct) => (
+                        <option key={ct} value={ct}>
+                          {ct} Collaboration
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Accepts Barter / Products">
+                    <select
+                      value={form.acceptsProducts}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          acceptsProducts: e.target.value as "Yes" | "No" | "Depends",
+                        }))
+                      }
+                      className="w-full rounded-2xl bg-background px-4 py-3 text-sm ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                    >
+                      <option value="Yes">Yes</option>
+                      <option value="No">No</option>
+                      <option value="Depends">Depends</option>
+                    </select>
+                  </Field>
+
+                  <Field label="Barter / Product Notes" hint="Optional details on barter terms">
+                    <TextInput
+                      value={form.acceptsProductsDetails || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          acceptsProductsDetails: e.target.value || undefined,
+                        }))
+                      }
+                      placeholder="e.g. Depends on product value (> ₹1,500)"
+                    />
+                  </Field>
+                </div>
+
+                <div className="grid gap-4 sm:grid-cols-2">
+                  <Field label="Turnaround Delivery Time">
+                    <select
+                      value={form.turnaround}
+                      onChange={(e) =>
+                        setForm((prev) => ({ ...prev, turnaround: e.target.value }))
+                      }
+                      className="w-full rounded-2xl bg-background px-4 py-3 text-sm ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                    >
+                      {TURNAROUNDS.map((t) => (
+                        <option key={t} value={t}>
+                          {t}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+
+                  <Field label="Travel Range for Shoots">
+                    <select
+                      value={form.travelRange || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          travelRange: e.target.value || undefined,
+                          travels: !!e.target.value,
+                        }))
+                      }
+                      className="w-full rounded-2xl bg-background px-4 py-3 text-sm ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                    >
+                      <option value="">Doesn&apos;t travel (Studio / Home only)</option>
+                      {TRAVEL_RANGES.map((tr) => (
+                        <option key={tr} value={tr}>
+                          {tr}
+                        </option>
+                      ))}
+                    </select>
+                  </Field>
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB: CATEGORIES & FORMATS ── */}
+            {activeTab === "categories" && (
+              <div className="space-y-5">
+                <div>
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                    Primary Niche / Categories ({form.categories?.length || 0} selected)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {CATEGORIES.map((cat) => {
+                      const isSel = form.categories?.includes(cat);
+                      return (
+                        <Chip
+                          key={cat}
+                          label={cat}
+                          selected={isSel}
+                          onClick={() => toggleArrayItem("categories", cat)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border/60">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                    Content Formats ({form.contentTypes?.length || 0} selected)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {CONTENT_TYPES.map((ct) => {
+                      const isSel = form.contentTypes?.includes(ct);
+                      return (
+                        <Chip
+                          key={ct}
+                          label={ct}
+                          selected={isSel}
+                          tone="accent"
+                          onClick={() => toggleArrayItem("contentTypes", ct)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+
+                <div className="pt-2 border-t border-border/60">
+                  <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground block mb-2">
+                    Languages ({form.languages?.length || 0} selected)
+                  </label>
+                  <div className="flex flex-wrap gap-2">
+                    {LANGUAGES.map((lang) => {
+                      const isSel = form.languages?.includes(lang);
+                      return (
+                        <Chip
+                          key={lang}
+                          label={lang}
+                          selected={isSel}
+                          onClick={() => toggleArrayItem("languages", lang)}
+                        />
+                      );
+                    })}
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* ── TAB: CONTACT INFO ── */}
+            {activeTab === "contact" && (
+              <div className="space-y-4">
+                <div className="rounded-2xl border border-border/80 p-4 bg-secondary/15">
+                  <p className="text-xs text-muted-foreground">
+                    Direct contact channels are unlocked by registered businesses on Influencer Dhundo.
+                  </p>
+                </div>
+
+                <Field label="Mobile / Phone Number" hint="Primary phone with country code">
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                      <Phone className="size-4" />
+                    </div>
+                    <TextInput
+                      value={form.contact?.phone || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          contact: { ...prev.contact, phone: e.target.value },
+                        }))
+                      }
+                      className="pl-10"
+                      placeholder="+91 98200 11223"
+                    />
+                  </div>
+                </Field>
+
+                <Field label="WhatsApp Number" hint="WhatsApp chat link target">
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                      <Phone className="size-4" />
+                    </div>
+                    <TextInput
+                      value={form.contact?.whatsapp || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          contact: { ...prev.contact, whatsapp: e.target.value },
+                        }))
+                      }
+                      className="pl-10"
+                      placeholder="+91 98200 11223"
+                    />
+                  </div>
+                </Field>
+
+                <Field label="Email Address" hint="Contact email">
+                  <div className="relative">
+                    <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                      <Mail className="size-4" />
+                    </div>
+                    <TextInput
+                      type="email"
+                      value={form.contact?.email || ""}
+                      onChange={(e) =>
+                        setForm((prev) => ({
+                          ...prev,
+                          contact: { ...prev.contact, email: e.target.value },
+                        }))
+                      }
+                      className="pl-10"
+                      placeholder="creator@example.com"
+                    />
+                  </div>
+                </Field>
+              </div>
+            )}
+          </div>
+
+          {/* Modal Action Footer */}
+          <div className="flex items-center justify-between border-t border-border/80 px-6 py-4 bg-secondary/30 shrink-0 gap-3">
+            <Button
+              type="button"
+              variant="ghost"
+              onClick={onClose}
+              disabled={saving}
+              className="text-xs"
+            >
+              Cancel
+            </Button>
+
+            <div className="flex items-center gap-2">
+              <Button
+                type="submit"
+                disabled={saving || saveSuccess}
+                className="text-xs px-5 py-2.5 font-semibold flex items-center gap-2 bg-foreground text-background hover:bg-foreground/90 transition-all shadow-md cursor-pointer"
+              >
+                {saving ? (
+                  <>
+                    <Loader2 className="size-3.5 animate-spin" />
+                    <span>Saving...</span>
+                  </>
+                ) : saveSuccess ? (
+                  <>
+                    <Check className="size-3.5 text-tealdeep" />
+                    <span>Saved!</span>
+                  </>
+                ) : (
+                  <>
+                    <Check className="size-3.5" />
+                    <span>Save Changes</span>
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </form>
+      </div>
+    </div>
+  );
+}
+
 

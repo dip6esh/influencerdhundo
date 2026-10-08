@@ -61,6 +61,7 @@ type AppState = {
   findBusinessByContact: (contact: string) => Promise<BusinessAccount | null>;
   findCreatorByContact: (contact: string) => Promise<Creator | null>;
   upsertCreator: (c: Creator, mine?: boolean) => void;
+  updateCreator: (c: Creator) => Promise<boolean>;
   upsertCreatorWithAuth: (
     c: Creator,
     authUserId?: string | null,
@@ -332,6 +333,16 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         });
         if (mine) setMyCreatorId(c.id);
         supabaseDb.upsertCreator(c);
+      },
+      updateCreator: async (c: Creator) => {
+        setCreators((prev) => {
+          const i = prev.findIndex((x) => x.id === c.id);
+          if (i === -1) return [c, ...prev];
+          const next = [...prev];
+          next[i] = c;
+          return next;
+        });
+        return await supabaseDb.upsertCreator(c);
       },
       upsertCreatorWithAuth: async (c, authUserId) => {
         // Update local state first

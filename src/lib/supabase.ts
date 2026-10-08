@@ -1,6 +1,7 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
 import type { Creator, CreatorStatus } from "./directory-data";
 import type { BusinessAccount, Report, Subscription } from "./app-state";
+import { compressImage } from "./image-compression";
 
 export const SUPABASE_URL =
   import.meta.env["VITE_SUPABASE_URL"] || "https://ixfcoilswyagwifaronh.supabase.co";
@@ -404,14 +405,23 @@ export const supabaseDb = {
 
   async uploadCreatorPhoto(file: File, pathPrefix = "avatar"): Promise<string | null> {
     try {
-      const fileExt = file.name.split(".").pop() || "jpg";
+      // 1. Automatically compress photo client-side (resizes to max 900x900 & converts to webp/jpeg)
+      const processedFile = await compressImage(file, {
+        maxWidth: 900,
+        maxHeight: 900,
+        quality: 0.82,
+        targetMimeType: "image/webp",
+      });
+
+      const fileExt = processedFile.name.split(".").pop() || "webp";
       const cleanPrefix = pathPrefix.replace(/[^a-z0-9]/gi, "-").toLowerCase();
       const fileName = `${cleanPrefix}-${Date.now()}-${Math.random().toString(36).substring(2, 8)}.${fileExt}`;
 
       const { error: uploadError } = await supabase.storage
         .from("creator-photos")
-        .upload(fileName, file, {
-          cacheControl: "3600",
+        .upload(fileName, processedFile, {
+          contentType: processedFile.type || "image/webp",
+          cacheControl: "31536000",
           upsert: false,
         });
 
