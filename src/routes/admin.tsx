@@ -105,24 +105,23 @@ const ADMIN_MASTER_SECRET_KEY =
 
 function isLocalEnvironment() {
   if (typeof window === "undefined") {
-    return process.env["NODE_ENV"] !== "production";
+    return false;
   }
   const host = window.location.hostname;
   return (
     host === "localhost" ||
     host === "127.0.0.1" ||
     host === "0.0.0.0" ||
-    host.endsWith(".local") ||
-    Boolean(import.meta.env.DEV)
+    host.endsWith(".local")
   );
 }
 
 function checkIsAdminAuthorized(): boolean {
   if (typeof window === "undefined") {
-    return process.env["NODE_ENV"] !== "production";
+    return false; // Always return false during SSR so public HTML is 100% 404
   }
 
-  // 1. Localhost / Dev mode is always unlocked for local testing
+  // 1. Localhost / Local dev is always unlocked
   if (isLocalEnvironment()) {
     return true;
   }
@@ -138,9 +137,10 @@ function checkIsAdminAuthorized(): boolean {
 
     if (keyParam && keyParam.trim() === ADMIN_MASTER_SECRET_KEY) {
       // Valid master key provided! Authorize this browser
+      sessionStorage.setItem(ADMIN_UNLOCKED_STORAGE_KEY, "true");
       localStorage.setItem(ADMIN_UNLOCKED_STORAGE_KEY, "true");
 
-      // Strip the secret key parameter from browser URL bar to protect browsing history
+      // Strip secret key from URL bar
       urlParams.delete("key");
       urlParams.delete("access_key");
       urlParams.delete("secret");
@@ -158,7 +158,10 @@ function checkIsAdminAuthorized(): boolean {
 
   // 3. Check persistent authorization in this browser
   try {
-    if (localStorage.getItem(ADMIN_UNLOCKED_STORAGE_KEY) === "true") {
+    if (
+      sessionStorage.getItem(ADMIN_UNLOCKED_STORAGE_KEY) === "true" ||
+      localStorage.getItem(ADMIN_UNLOCKED_STORAGE_KEY) === "true"
+    ) {
       return true;
     }
   } catch {
@@ -172,6 +175,7 @@ function checkIsAdminAuthorized(): boolean {
 function lockAndCloakAdminPortal() {
   try {
     localStorage.removeItem(ADMIN_UNLOCKED_STORAGE_KEY);
+    sessionStorage.removeItem(ADMIN_UNLOCKED_STORAGE_KEY);
   } catch {
     // ignore
   }
@@ -179,14 +183,17 @@ function lockAndCloakAdminPortal() {
 }
 
 function AdminPage() {
-  const [authorized, setAuthorized] = useState<boolean>(() => checkIsAdminAuthorized());
+  const [authorized, setAuthorized] = useState<boolean>(false);
+  const [checked, setChecked] = useState<boolean>(false);
 
   useEffect(() => {
-    setAuthorized(checkIsAdminAuthorized());
+    const isAuth = checkIsAdminAuthorized();
+    setAuthorized(isAuth);
+    setChecked(true);
   }, []);
 
-  // If accessed without master key authorization, render a fake 404 Page Not Found
-  if (!authorized) {
+  // During SSR or if unauthorized -> 100% 404 Page Not Found
+  if (!checked || !authorized) {
     return (
       <div className="flex min-h-[70vh] items-center justify-center bg-background px-4 py-16">
         <div className="max-w-md text-center">
