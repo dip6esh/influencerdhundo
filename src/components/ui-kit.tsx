@@ -322,9 +322,13 @@ export function DatePicker({
 
   const parsedValue = parseDate(value);
   const today = new Date();
+  const currentYear = today.getFullYear();
+  const maxYearVal = maxDate ? (parseInt(maxDate.split("-")[0] || String(currentYear + 10))) : currentYear + 10;
+  const minYearVal = minDate ? (parseInt(minDate.split("-")[0] || "1950")) : 1950;
+  const years = Array.from({ length: Math.max(1, maxYearVal - minYearVal + 1) }, (_, i) => maxYearVal - i);
 
-  const [viewYear, setViewYear] = useState(() => parsedValue?.getFullYear() ?? 2002);
-  const [viewMonth, setViewMonth] = useState(() => parsedValue?.getMonth() ?? 0);
+  const [viewYear, setViewYear] = useState(() => parsedValue?.getFullYear() ?? (minDate ? (parseDate(minDate)?.getFullYear() ?? currentYear) : 2002));
+  const [viewMonth, setViewMonth] = useState(() => parsedValue?.getMonth() ?? (minDate ? (parseDate(minDate)?.getMonth() ?? today.getMonth()) : 0));
   const [viewMode, setViewMode] = useState<"days" | "months" | "years">("days");
 
   useEffect(() => {
@@ -355,10 +359,6 @@ export function DatePicker({
   ];
   const SHORT_MONTHS = ["Jan", "Feb", "Mar", "Apr", "May", "Jun", "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
   const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
-
-  const currentYear = new Date().getFullYear();
-  const startYear = 1950;
-  const years = Array.from({ length: currentYear - startYear + 1 }, (_, i) => currentYear - i);
 
   const daysInMonth = new Date(viewYear, viewMonth + 1, 0).getDate();
   const firstDayIndex = new Date(viewYear, viewMonth, 1).getDay();

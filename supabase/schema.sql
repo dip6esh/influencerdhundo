@@ -233,6 +233,9 @@ CREATE TABLE IF NOT EXISTS public.discount_codes (
   usage_count INTEGER NOT NULL DEFAULT 0,
   max_uses INTEGER DEFAULT NULL,
   notes TEXT DEFAULT '',
+  target_email TEXT DEFAULT NULL,
+  target_phone TEXT DEFAULT NULL,
+  applicable_plans TEXT[] DEFAULT NULL,
   created_at TIMESTAMPTZ NOT NULL DEFAULT now(),
   updated_at TIMESTAMPTZ NOT NULL DEFAULT now()
 );

@@ -1,6 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Button, Card, Field, SectionEyebrow, StatusPill, TextInput } from "@/components/ui-kit";
+import { Button, Card, DatePicker, Field, SectionEyebrow, StatusPill, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
 import { supabaseDb, type DiscountCode } from "@/lib/supabase";
@@ -25,11 +25,15 @@ import {
   Clock,
   Trash2,
   Calendar,
+  CalendarDays,
+  Pencil,
+  X,
   Sparkles,
   RefreshCw,
   AlertCircle,
   CheckCircle2,
   UserCheck,
+  User,
   Globe,
   Mail,
   Phone,
@@ -387,6 +391,27 @@ function AdminDashboard() {
   } = useAppState();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Creators");
 
+  // Helper functions for date formatting
+  const formatDateToInput = (d: Date | string): string => {
+    const date = typeof d === "string" ? new Date(d) : d;
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, "0");
+    const dd = String(date.getDate()).padStart(2, "0");
+    return `${yyyy}-${mm}-${dd}`;
+  };
+
+  const getTodayStr = () => formatDateToInput(new Date());
+  const getTomorrowStr = () => {
+    const tomorrow = new Date();
+    tomorrow.setDate(tomorrow.getDate() + 1);
+    return formatDateToInput(tomorrow);
+  };
+  const getFutureDateStr = (days: number) => {
+    const future = new Date();
+    future.setDate(future.getDate() + days);
+    return formatDateToInput(future);
+  };
+
   // Discount Codes state
   const [discountCodes, setDiscountCodes] = useState<DiscountCode[]>([]);
   const [loadingCodes, setLoadingCodes] = useState(false);
@@ -394,6 +419,8 @@ function AdminDashboard() {
   // New code form state
   const [newCodeName, setNewCodeName] = useState("");
   const [discountPercent, setDiscountPercent] = useState<number>(30);
+  const [startDate, setStartDate] = useState<string>(getTodayStr());
+  const [endDate, setEndDate] = useState<string>(getFutureDateStr(6));
   const [validityDays, setValidityDays] = useState<number>(7);
   const [maxUsesInput, setMaxUsesInput] = useState<string>("");
   const [notesInput, setNotesInput] = useState<string>("");
@@ -409,6 +436,22 @@ function AdminDashboard() {
   const [createError, setCreateError] = useState("");
   const [createSuccess, setCreateSuccess] = useState("");
   const [copiedCode, setCopiedCode] = useState<string | null>(null);
+
+  // Edit Code Modal State
+  const [editingCode, setEditingCode] = useState<DiscountCode | null>(null);
+  const [editCodeName, setEditCodeName] = useState("");
+  const [editDiscountPercent, setEditDiscountPercent] = useState<number>(30);
+  const [editStartDate, setEditStartDate] = useState<string>(getTodayStr());
+  const [editEndDate, setEditEndDate] = useState<string>(getFutureDateStr(6));
+  const [editValidityDays, setEditValidityDays] = useState<number>(7);
+  const [editIsActive, setEditIsActive] = useState<boolean>(true);
+  const [editApplicablePlans, setEditApplicablePlans] = useState<string[]>([]);
+  const [editTargetEmail, setEditTargetEmail] = useState<string>("");
+  const [editTargetPhone, setEditTargetPhone] = useState<string>("");
+  const [editMaxUses, setEditMaxUses] = useState<string>("");
+  const [editNotes, setEditNotes] = useState<string>("");
+  const [savingEdit, setSavingEdit] = useState(false);
+  const [editError, setEditError] = useState("");
 
   // Load discount codes when tab is opened
   const loadDiscountCodes = async () => {
@@ -463,15 +506,25 @@ function AdminDashboard() {
       return;
     }
 
-    if (validityDays <= 0) {
-      setCreateError("Validity must be at least 1 day.");
-      return;
-    }
-
     if (selectedApplicablePlans.length === 0) {
       setCreateError("Please select at least one subscription plan this promo applies to.");
       return;
     }
+
+    if (!startDate || !endDate) {
+      setCreateError("Please select start and end dates.");
+      return;
+    }
+
+    if (new Date(endDate).getTime() < new Date(startDate).getTime()) {
+      setCreateError("End date cannot be earlier than start date.");
+      return;
+    }
+
+    const fromDate = `${startDate}T00:00:00`;
+    const untilDate = `${endDate}T23:59:59.999`;
+    const diffMs = new Date(untilDate).getTime() - new Date(fromDate).getTime();
+    const calculatedValidityDays = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
 
     setCreatingCode(true);
 
@@ -482,7 +535,10 @@ function AdminDashboard() {
         discountPercent,
         discountType: "percentage",
         discountValue: discountPercent,
-        validityDays,
+        validFrom: fromDate,
+        validUntil: untilDate,
+        validityDays: calculatedValidityDays,
+        isActive: true,
         maxUses: isNaN(maxUses as number) ? undefined : maxUses,
         notes: notesInput.trim(),
         targetEmail: targetEmailInput.trim() || undefined,
@@ -495,7 +551,12 @@ function AdminDashboard() {
         return;
       }
 
-      setCreateSuccess(`Code ${res.code.code} created successfully!`);
+      const isFuture = new Date(fromDate).getTime() > Date.now();
+      const modeMsg = isFuture
+        ? `It is scheduled from ${new Date(res.code.validFrom).toLocaleDateString("en-IN", { month: "short", day: "numeric" })} to ${new Date(res.code.validUntil).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })} and will auto-activate.`
+        : `It is active until ${new Date(res.code.validUntil).toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}.`;
+
+      setCreateSuccess(`Code ${res.code.code} saved successfully! ${modeMsg}`);
       setDiscountCodes((prev) => [res.code!, ...prev]);
       setNewCodeName("");
       setNotesInput("");
@@ -506,6 +567,95 @@ function AdminDashboard() {
       setCreateError(e.message || "Failed to create discount code.");
     } finally {
       setCreatingCode(false);
+    }
+  };
+
+  const handleOpenEdit = (dc: DiscountCode) => {
+    setEditingCode(dc);
+    setEditCodeName(dc.code);
+    setEditDiscountPercent(dc.discountPercent);
+    setEditIsActive(dc.isActive);
+    setEditApplicablePlans(dc.applicablePlans || PLANS.map((p) => p.id));
+    setEditTargetEmail(dc.targetEmail || "");
+    setEditTargetPhone(dc.targetPhone || "");
+    setEditMaxUses(dc.maxUses != null ? String(dc.maxUses) : "");
+    setEditNotes(dc.notes || "");
+    setEditError("");
+
+    const fromDateStr = formatDateToInput(dc.validFrom);
+    const untilDateStr = formatDateToInput(dc.validUntil);
+    setEditStartDate(fromDateStr);
+    setEditEndDate(untilDateStr);
+    setEditValidityDays(dc.validityDays);
+  };
+
+  const handleSaveEdit = async () => {
+    if (!editingCode) return;
+    setEditError("");
+
+    const codeToUpdate = editCodeName.trim().toUpperCase();
+    if (!codeToUpdate) {
+      setEditError("Please enter a code name.");
+      return;
+    }
+
+    if (editDiscountPercent <= 0 || editDiscountPercent > 100) {
+      setEditError("Discount percentage must be between 1% and 100%.");
+      return;
+    }
+
+    if (editApplicablePlans.length === 0) {
+      setEditError("Please select at least one applicable subscription plan.");
+      return;
+    }
+
+    if (!editStartDate || !editEndDate) {
+      setEditError("Please select start and end dates.");
+      return;
+    }
+
+    if (new Date(editEndDate).getTime() < new Date(editStartDate).getTime()) {
+      setEditError("End date cannot be earlier than start date.");
+      return;
+    }
+
+    const validFrom = `${editStartDate}T00:00:00`;
+    const validUntil = `${editEndDate}T23:59:59.999`;
+    const diffMs = new Date(validUntil).getTime() - new Date(validFrom).getTime();
+    const calculatedDays = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+
+    setSavingEdit(true);
+    try {
+      const maxUses = editMaxUses.trim() ? parseInt(editMaxUses.trim(), 10) : null;
+      const res = await supabaseDb.updateDiscountCode(editingCode.id, {
+        code: codeToUpdate,
+        discountPercent: editDiscountPercent,
+        discountType: "percentage",
+        discountValue: editDiscountPercent,
+        validFrom,
+        validUntil,
+        validityDays: calculatedDays,
+        isActive: editIsActive,
+        maxUses: maxUses === null || isNaN(maxUses) ? null : maxUses,
+        notes: editNotes.trim(),
+        targetEmail: editTargetEmail.trim() || null,
+        targetPhone: editTargetPhone.trim() || null,
+        applicablePlans: editApplicablePlans,
+      });
+
+      if (!res.success || !res.code) {
+        setEditError(res.error || "Failed to update discount code.");
+        return;
+      }
+
+      setDiscountCodes((prev) =>
+        prev.map((c) => (c.id === editingCode.id ? res.code! : c)),
+      );
+      setEditingCode(null);
+    } catch (e: any) {
+      setEditError(e.message || "Failed to update discount code.");
+    } finally {
+      setSavingEdit(false);
     }
   };
 
@@ -532,9 +682,6 @@ function AdminDashboard() {
     setCopiedCode(code);
     setTimeout(() => setCopiedCode(null), 2000);
   };
-
-  // Preview expiry date for new code
-  const previewExpiry = new Date(Date.now() + validityDays * 24 * 60 * 60 * 1000);
 
   return (
     <div className="mx-auto max-w-5xl px-5 py-10">
@@ -580,14 +727,20 @@ function AdminDashboard() {
             <Card key={c.id} className="p-4">
               <div className="flex flex-wrap items-start justify-between gap-3">
                 <div className="flex min-w-0 gap-3">
-                  <img
-                    src={c.photo}
-                    alt={c.name}
-                    loading="lazy"
-                    width={816}
-                    height={816}
-                    className="size-12 shrink-0 rounded-xl object-cover ring-1 ring-border"
-                  />
+                  {c.photo ? (
+                    <img
+                      src={c.photo}
+                      alt={c.name}
+                      loading="lazy"
+                      width={816}
+                      height={816}
+                      className="size-12 shrink-0 rounded-xl object-cover ring-1 ring-border"
+                    />
+                  ) : (
+                    <div className="size-12 shrink-0 rounded-xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground/50">
+                      <User className="size-6" />
+                    </div>
+                  )}
                   <div className="min-w-0">
                     <div className="flex flex-wrap items-center gap-2">
                       <p className="font-semibold">{c.name}</p>
@@ -662,36 +815,35 @@ function AdminDashboard() {
               <div>
                 <h2 className="text-base font-semibold">Create Referral / Discount Code</h2>
                 <p className="text-xs text-muted-foreground">
-                  Create targeted or general discount promo codes with custom validity, plan restrictions, and creator limits.
+                  Create promo codes for today or schedule them for a future single day or date range. Scheduled codes auto-activate when their date arrives.
                 </p>
               </div>
             </div>
 
             <div className="space-y-4">
-              {/* CODE NAME */}
-              <Field label="Code Name / Identifier">
-                <div className="flex gap-2">
-                  <TextInput
-                    value={newCodeName}
-                    onChange={(e) => setNewCodeName(e.target.value.toUpperCase().replace(/\s+/g, ""))}
-                    placeholder="e.g. DIWALI50, VIPCREATOR, EXCLUSIVE100"
-                    className="font-mono uppercase tracking-wider font-semibold"
-                  />
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    onClick={generateRandomCode}
-                    className="shrink-0 text-xs flex items-center gap-1.5 ring-1 ring-border"
-                  >
-                    <Sparkles className="size-3.5 text-primary" />
-                    Auto-Generate
-                  </Button>
-                </div>
-              </Field>
-
-              {/* CLEAN 2-COLUMN: DISCOUNT PERCENTAGE & VALIDITY DURATION */}
+              {/* CODE NAME & DISCOUNT PERCENTAGE */}
               <div className="grid gap-4 sm:grid-cols-2">
-                <Field label="Discount Percentage (%)" hint="Enter 100 for 100% Free Pass">
+                <Field label="Code Name / Identifier" hint="Unique promo coupon code">
+                  <div className="flex gap-2">
+                    <TextInput
+                      value={newCodeName}
+                      onChange={(e) => setNewCodeName(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                      placeholder="e.g. DIWALI50, VIPCREATOR"
+                      className="font-mono uppercase tracking-wider font-semibold"
+                    />
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      onClick={generateRandomCode}
+                      className="shrink-0 text-xs flex items-center gap-1.5 ring-1 ring-border"
+                    >
+                      <Sparkles className="size-3.5 text-primary" />
+                      Generate
+                    </Button>
+                  </div>
+                </Field>
+
+                <Field label="Discount Percentage (%)" hint="Enter 100 for 100% Free Pass (₹0)">
                   <div className="relative">
                     <TextInput
                       type="number"
@@ -707,26 +859,122 @@ function AdminDashboard() {
                     </div>
                   </div>
                 </Field>
+              </div>
 
-                <Field
-                  label="Validity Duration (Days)"
-                  hint={`Expires on ${previewExpiry.toLocaleDateString("en-IN", { month: "short", day: "numeric", year: "numeric" })}`}
-                >
-                  <div className="relative">
-                    <TextInput
-                      type="number"
-                      min={1}
-                      max={365}
-                      value={validityDays}
-                      onChange={(e) => setValidityDays(Number(e.target.value))}
-                      placeholder="e.g. 7, 30, 90"
-                      className="font-mono pr-14"
-                    />
-                    <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-muted-foreground">
-                      Days
-                    </div>
+              {/* SCHEDULE & VALIDITY SETTINGS (STREAMLINED) */}
+              <div className="rounded-2xl border border-border/80 bg-secondary/25 p-4 space-y-3">
+                <div className="flex items-center justify-between">
+                  <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                    <Calendar className="size-3.5 text-primary" />
+                    <span>Validity &amp; Scheduling</span>
                   </div>
-                </Field>
+                  <span className="text-[11px] text-muted-foreground">
+                    Select dates or type days — auto-activates &amp; auto-deactivates
+                  </span>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-3">
+                  <Field label="Start Date (Valid From)" hint="Defaults to today, or pick future date">
+                    <DatePicker
+                      value={startDate}
+                      minDate={getTodayStr()}
+                      onChange={(val) => {
+                        if (!val) return;
+                        setStartDate(val);
+                        const startObj = new Date(val + "T00:00:00");
+                        const newEndObj = new Date(startObj.getTime() + Math.max(0, validityDays - 1) * 86400000);
+                        setEndDate(formatDateToInput(newEndObj));
+                      }}
+                      placeholder="Select start date"
+                    />
+                  </Field>
+
+                  <Field label="End Date (Valid Until)" hint="Last valid day">
+                    <DatePicker
+                      value={endDate}
+                      minDate={startDate || getTodayStr()}
+                      onChange={(val) => {
+                        if (!val) return;
+                        setEndDate(val);
+                        const diffMs = new Date(val + "T23:59:59").getTime() - new Date(startDate + "T00:00:00").getTime();
+                        const calculatedDays = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+                        setValidityDays(calculatedDays);
+                      }}
+                      placeholder="Select end date"
+                    />
+                  </Field>
+
+                  <Field label="Duration (Days)" hint="Or type number of days">
+                    <div className="relative">
+                      <TextInput
+                        type="number"
+                        min={1}
+                        max={365}
+                        value={validityDays}
+                        onChange={(e) => {
+                          const days = Math.max(1, Number(e.target.value));
+                          setValidityDays(days);
+                          const startObj = new Date(startDate + "T00:00:00");
+                          const newEndObj = new Date(startObj.getTime() + Math.max(0, days - 1) * 86400000);
+                          setEndDate(formatDateToInput(newEndObj));
+                        }}
+                        placeholder="Days (e.g. 7)"
+                        className="font-mono pr-14"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-muted-foreground">
+                        Days
+                      </div>
+                    </div>
+                  </Field>
+                </div>
+
+                {/* Smart Live Preview Alert */}
+                {(() => {
+                  const isFuture = new Date(startDate + "T00:00:00").getTime() > Date.now();
+                  const isSingleDay = startDate === endDate;
+                  const startFormatted = new Date(startDate + "T00:00:00").toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  });
+                  const endFormatted = new Date(endDate + "T23:59:59").toLocaleDateString("en-IN", {
+                    day: "numeric",
+                    month: "short",
+                    year: "numeric",
+                  });
+
+                  if (isFuture) {
+                    return (
+                      <div className="rounded-xl bg-sky-500/10 border border-sky-500/20 p-2.5 text-xs text-sky-700 dark:text-sky-300 flex items-center gap-2">
+                        <Clock className="size-3.5 shrink-0" />
+                        <span>
+                          {isSingleDay ? (
+                            <>
+                              🎯 <strong>Scheduled (Single Day)</strong>: Will automatically activate on{" "}
+                              <strong>{startFormatted}</strong> (1 Day).
+                            </>
+                          ) : (
+                            <>
+                              🗓️ <strong>Scheduled (Date Range)</strong>: Will automatically activate on{" "}
+                              <strong>{startFormatted}</strong> and deactivate after <strong>{endFormatted}</strong> ({validityDays} Day{validityDays > 1 ? "s" : ""}).
+                            </>
+                          )}
+                          {" "}Saved in dashboard for future reactivation.
+                        </span>
+                      </div>
+                    );
+                  }
+
+                  return (
+                    <div className="rounded-xl bg-tealdeep/10 border border-tealdeep/20 p-2.5 text-xs text-tealdeep flex items-center gap-2">
+                      <Sparkles className="size-3.5 shrink-0" />
+                      <span>
+                        ⚡ <strong>Active immediately</strong>: Valid from today until{" "}
+                        <strong>{endFormatted}</strong> ({validityDays} Day{validityDays > 1 ? "s" : ""}). Deactivates after {endFormatted} without expiring permanently.
+                      </span>
+                    </div>
+                  );
+                })()}
               </div>
 
               {/* APPLICABLE SUBSCRIPTION PLANS */}
@@ -884,7 +1132,7 @@ function AdminDashboard() {
                 className="w-full sm:w-auto justify-center px-6 py-2.5 font-semibold flex items-center gap-2"
               >
                 <Plus className="size-4" />
-                {creatingCode ? "Creating Code..." : "Create & Activate Discount Code"}
+                {creatingCode ? "Saving Code..." : "Save Discount Code"}
               </Button>
             </div>
           </Card>
@@ -893,7 +1141,7 @@ function AdminDashboard() {
           <div className="space-y-3">
             <div className="flex items-center justify-between">
               <h2 className="text-sm font-semibold flex items-center gap-2">
-                <span>Active &amp; Past Discount Codes</span>
+                <span>Active &amp; Scheduled Discount Codes</span>
                 <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
                   {discountCodes.length}
                 </span>
@@ -920,10 +1168,14 @@ function AdminDashboard() {
               <div className="grid gap-3">
                 {discountCodes.map((dc) => {
                   const now = Date.now();
+                  const validFromTime = new Date(dc.validFrom).getTime();
                   const validUntilTime = new Date(dc.validUntil).getTime();
-                  const isExpired = now > validUntilTime;
+                  
+                  const isScheduled = now < validFromTime && dc.isActive;
+                  const isActiveNow = now >= validFromTime && now <= validUntilTime && dc.isActive;
+                  const isEnded = now > validUntilTime;
+                  const isManuallyDeactivated = !dc.isActive && !isEnded;
                   const isLimitReached = dc.maxUses != null && dc.usageCount >= dc.maxUses;
-                  const isEffectivelyActive = dc.isActive && !isExpired && !isLimitReached;
 
                   const applicablePlans = dc.applicablePlans || [];
                   const isTargeted = Boolean(dc.targetEmail || dc.targetPhone);
@@ -943,20 +1195,30 @@ function AdminDashboard() {
                                 : `${dc.discountPercent}% OFF`}
                             </span>
 
-                            {isEffectivelyActive ? (
-                              <span className="rounded-full bg-accent/25 text-tealdeep px-2 py-0.5 text-[11px] font-bold">
-                                Active
+                            {isActiveNow ? (
+                              <span className="rounded-full bg-accent/25 text-tealdeep px-2.5 py-0.5 text-[11px] font-bold flex items-center gap-1.5">
+                                <span className="size-1.5 rounded-full bg-tealdeep animate-pulse" />
+                                Active Now
                               </span>
-                            ) : isExpired ? (
-                              <span className="rounded-full bg-rose/15 text-rose px-2 py-0.5 text-[11px] font-bold">
-                                Expired
+                            ) : isScheduled ? (
+                              <span className="rounded-full bg-sky-500/15 text-sky-700 dark:text-sky-300 px-2.5 py-0.5 text-[11px] font-bold flex items-center gap-1">
+                                <Clock className="size-3" />
+                                Scheduled (Starts {new Date(dc.validFrom).toLocaleDateString("en-IN", { month: "short", day: "numeric" })})
+                              </span>
+                            ) : isEnded ? (
+                              <span className="rounded-full bg-secondary text-muted-foreground px-2.5 py-0.5 text-[11px] font-medium">
+                                Deactivated (Period Ended)
                               </span>
                             ) : isLimitReached ? (
-                              <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[11px] font-bold">
+                              <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-400 px-2.5 py-0.5 text-[11px] font-semibold">
                                 Limit Reached
                               </span>
+                            ) : isManuallyDeactivated ? (
+                              <span className="rounded-full bg-secondary text-muted-foreground px-2.5 py-0.5 text-[11px] font-medium">
+                                Deactivated
+                              </span>
                             ) : (
-                              <span className="rounded-full bg-muted text-muted-foreground px-2 py-0.5 text-[11px] font-bold">
+                              <span className="rounded-full bg-muted text-muted-foreground px-2.5 py-0.5 text-[11px] font-bold">
                                 Inactive
                               </span>
                             )}
@@ -1017,10 +1279,16 @@ function AdminDashboard() {
                             </div>
                           )}
 
-                          <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1">
+                          <div className="text-xs text-muted-foreground flex flex-wrap gap-x-3 gap-y-1 items-center">
                             <span className="flex items-center gap-1">
                               <Calendar className="size-3" />
-                              Valid for <strong>{dc.validityDays} Day{dc.validityDays > 1 ? "s" : ""}</strong> (until {new Date(dc.validUntil).toLocaleDateString("en-IN")}, {new Date(dc.validUntil).toLocaleTimeString("en-IN", { hour: "2-digit", minute: "2-digit" })})
+                              <span>
+                                {new Date(dc.validFrom).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                {" → "}
+                                {new Date(dc.validUntil).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                {" "}
+                                <strong className="text-foreground font-semibold">({dc.validityDays} Day{dc.validityDays > 1 ? "s" : ""})</strong>
+                              </span>
                             </span>
                             <span>·</span>
                             <span>
@@ -1038,6 +1306,17 @@ function AdminDashboard() {
 
                         {/* ACTION BUTTONS */}
                         <div className="flex flex-wrap items-center gap-2">
+                          {/* EDIT CODE */}
+                          <Button
+                            variant="ghost"
+                            className="px-3 py-1.5 text-xs flex items-center gap-1.5 ring-1 ring-border text-foreground hover:bg-secondary"
+                            onClick={() => handleOpenEdit(dc)}
+                          >
+                            <Pencil className="size-3 text-primary" />
+                            <span>Edit</span>
+                          </Button>
+
+                          {/* COPY CODE */}
                           <Button
                             variant="ghost"
                             className="px-3 py-1.5 text-xs flex items-center gap-1 ring-1 ring-border"
@@ -1056,16 +1335,18 @@ function AdminDashboard() {
                             )}
                           </Button>
 
+                          {/* TOGGLE ACTIVE / DEACTIVATE */}
                           <Button
                             variant="ghost"
                             className={`px-3 py-1.5 text-xs ${
-                              dc.isActive ? "text-muted-foreground" : "text-tealdeep"
+                              dc.isActive ? "text-muted-foreground hover:text-foreground" : "text-tealdeep font-semibold hover:bg-tealdeep/10"
                             }`}
                             onClick={() => handleToggleCode(dc.id, dc.isActive)}
                           >
                             {dc.isActive ? "Deactivate" : "Activate"}
                           </Button>
 
+                          {/* DELETE */}
                           <Button
                             variant="ghost"
                             className="px-2.5 py-1.5 text-xs text-rose hover:bg-rose/10"
@@ -1081,6 +1362,289 @@ function AdminDashboard() {
               </div>
             )}
           </div>
+
+          {/* EDIT DISCOUNT CODE MODAL */}
+          {editingCode && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto">
+              <div
+                className="fixed inset-0"
+                onClick={() => !savingEdit && setEditingCode(null)}
+              />
+              <Card className="relative z-10 w-full max-w-2xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-border bg-card">
+                <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
+                  <div className="flex items-center gap-2">
+                    <div className="flex size-8 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                      <Pencil className="size-4" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-foreground">Edit Discount Code</h3>
+                      <p className="text-xs text-muted-foreground">
+                        Update code details, discount rate, schedule dates, or active status.
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => !savingEdit && setEditingCode(null)}
+                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                <div className="space-y-4">
+                  {/* CODE NAME & ACTIVE TOGGLE */}
+                  <div className="grid gap-4 sm:grid-cols-2 items-center">
+                    <Field label="Code Name">
+                      <TextInput
+                        value={editCodeName}
+                        onChange={(e) => setEditCodeName(e.target.value.toUpperCase().replace(/\s+/g, ""))}
+                        placeholder="e.g. SAVE50"
+                        className="font-mono uppercase font-bold tracking-wider"
+                      />
+                    </Field>
+
+                    <Field label="Code Status">
+                      <div className="flex items-center gap-3 pt-1">
+                        <button
+                          type="button"
+                          onClick={() => setEditIsActive(!editIsActive)}
+                          className={`flex items-center gap-2 px-3.5 py-2 rounded-xl border text-xs font-bold transition-all ${
+                            editIsActive
+                              ? "bg-tealdeep/15 border-tealdeep text-tealdeep"
+                              : "bg-secondary border-border text-muted-foreground"
+                          }`}
+                        >
+                          <span
+                            className={`size-2.5 rounded-full ${
+                              editIsActive ? "bg-tealdeep animate-pulse" : "bg-muted-foreground"
+                            }`}
+                          />
+                          <span>{editIsActive ? "Active / Enabled" : "Deactivated"}</span>
+                        </button>
+                        <span className="text-[11px] text-muted-foreground">
+                          {editIsActive ? "Code can be used when schedule window allows" : "Code is temporarily disabled"}
+                        </span>
+                      </div>
+                    </Field>
+                  </div>
+
+                  {/* DISCOUNT PERCENTAGE */}
+                  <Field label="Discount Percentage (%)" hint="Enter 100 for 100% Free Pass">
+                    <div className="relative">
+                      <TextInput
+                        type="number"
+                        min={1}
+                        max={100}
+                        value={editDiscountPercent}
+                        onChange={(e) => setEditDiscountPercent(Number(e.target.value))}
+                        className="font-mono pr-8"
+                      />
+                      <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-muted-foreground">
+                        %
+                      </div>
+                    </div>
+                  </Field>
+
+                  {/* VALIDITY & SCHEDULING (STREAMLINED) */}
+                  <div className="rounded-2xl border border-border/80 bg-secondary/25 p-4 space-y-3">
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-1.5 text-xs font-semibold text-foreground">
+                        <Calendar className="size-3.5 text-primary" />
+                        <span>Validity &amp; Scheduling</span>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        Select dates or type days
+                      </span>
+                    </div>
+
+                    <div className="grid gap-3 sm:grid-cols-3">
+                      <Field label="Start Date (Valid From)" hint="Pick today or future date">
+                        <DatePicker
+                          value={editStartDate}
+                          minDate={getTodayStr()}
+                          onChange={(val) => {
+                            if (!val) return;
+                            setEditStartDate(val);
+                            const startObj = new Date(val + "T00:00:00");
+                            const newEndObj = new Date(startObj.getTime() + Math.max(0, editValidityDays - 1) * 86400000);
+                            setEditEndDate(formatDateToInput(newEndObj));
+                          }}
+                          placeholder="Select start date"
+                        />
+                      </Field>
+
+                      <Field label="End Date (Valid Until)" hint="Last valid day">
+                        <DatePicker
+                          value={editEndDate}
+                          minDate={editStartDate || getTodayStr()}
+                          onChange={(val) => {
+                            if (!val) return;
+                            setEditEndDate(val);
+                            const diffMs = new Date(val + "T23:59:59").getTime() - new Date(editStartDate + "T00:00:00").getTime();
+                            const calculatedDays = Math.max(1, Math.ceil(diffMs / (24 * 60 * 60 * 1000)));
+                            setEditValidityDays(calculatedDays);
+                          }}
+                          placeholder="Select end date"
+                        />
+                      </Field>
+
+                      <Field label="Duration (Days)" hint="Or type number of days">
+                        <div className="relative">
+                          <TextInput
+                            type="number"
+                            min={1}
+                            max={365}
+                            value={editValidityDays}
+                            onChange={(e) => {
+                              const days = Math.max(1, Number(e.target.value));
+                              setEditValidityDays(days);
+                              const startObj = new Date(editStartDate + "T00:00:00");
+                              const newEndObj = new Date(startObj.getTime() + Math.max(0, days - 1) * 86400000);
+                              setEditEndDate(formatDateToInput(newEndObj));
+                            }}
+                            placeholder="Days"
+                            className="font-mono pr-14"
+                          />
+                          <div className="pointer-events-none absolute inset-y-0 right-0 flex items-center pr-3 text-xs font-semibold text-muted-foreground">
+                            Days
+                          </div>
+                        </div>
+                      </Field>
+                    </div>
+                  </div>
+
+                  {/* APPLICABLE PLANS */}
+                  <div className="rounded-2xl border border-border/80 bg-secondary/30 p-3.5 space-y-2">
+                    <div className="flex items-center justify-between text-xs font-semibold">
+                      <span>Applicable Subscription Plans</span>
+                      <div className="flex gap-2">
+                        <button
+                          type="button"
+                          onClick={() => setEditApplicablePlans(PLANS.map((p) => p.id))}
+                          className="text-[11px] text-primary hover:underline"
+                        >
+                          All
+                        </button>
+                        <span>·</span>
+                        <button
+                          type="button"
+                          onClick={() => setEditApplicablePlans([])}
+                          className="text-[11px] text-muted-foreground hover:text-foreground"
+                        >
+                          Clear
+                        </button>
+                      </div>
+                    </div>
+
+                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2">
+                      {PLANS.map((plan) => {
+                        const isSelected = editApplicablePlans.includes(plan.id);
+                        return (
+                          <button
+                            key={plan.id}
+                            type="button"
+                            onClick={() => {
+                              setEditApplicablePlans((prev) =>
+                                prev.includes(plan.id)
+                                  ? prev.filter((p) => p !== plan.id)
+                                  : [...prev, plan.id],
+                              );
+                            }}
+                            className={`p-2 rounded-xl border text-left text-xs font-medium transition-all ${
+                              isSelected
+                                ? "border-tealdeep bg-tealdeep/10 text-foreground ring-1 ring-tealdeep/30"
+                                : "border-border bg-background text-muted-foreground hover:text-foreground"
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="font-bold">{plan.duration}</span>
+                              <span className={`size-3.5 rounded-full flex items-center justify-center text-[9px] ${isSelected ? "bg-tealdeep text-white" : "border border-border"}`}>
+                                {isSelected ? "✓" : ""}
+                              </span>
+                            </div>
+                            <span className="text-[10px] text-muted-foreground">₹{plan.price}</span>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+
+                  {/* RESTRICT TO CREATOR (OPTIONAL) */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Allowed Email (Optional)">
+                      <TextInput
+                        type="email"
+                        value={editTargetEmail}
+                        onChange={(e) => setEditTargetEmail(e.target.value)}
+                        placeholder="creator@example.com"
+                      />
+                    </Field>
+
+                    <Field label="Allowed Phone (Optional)">
+                      <TextInput
+                        type="tel"
+                        value={editTargetPhone}
+                        onChange={(e) => setEditTargetPhone(e.target.value)}
+                        placeholder="9876543210"
+                        className="font-mono"
+                      />
+                    </Field>
+                  </div>
+
+                  {/* MAX USES & NOTES */}
+                  <div className="grid gap-3 sm:grid-cols-2">
+                    <Field label="Max Redemptions">
+                      <TextInput
+                        type="number"
+                        min={1}
+                        value={editMaxUses}
+                        onChange={(e) => setEditMaxUses(e.target.value)}
+                        placeholder="Leave empty for unlimited"
+                        className="font-mono"
+                      />
+                    </Field>
+
+                    <Field label="Notes / Campaign Tag">
+                      <TextInput
+                        value={editNotes}
+                        onChange={(e) => setEditNotes(e.target.value)}
+                        placeholder="Campaign details..."
+                      />
+                    </Field>
+                  </div>
+
+                  {editError && (
+                    <div className="rounded-xl bg-rose/10 border border-rose/30 p-3 text-xs font-medium text-rose flex items-center gap-2">
+                      <AlertCircle className="size-4 shrink-0" />
+                      <span>{editError}</span>
+                    </div>
+                  )}
+
+                  <div className="flex items-center justify-end gap-2 pt-2 border-t border-border">
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={() => setEditingCode(null)}
+                      className="px-4 py-2 text-xs"
+                    >
+                      Cancel
+                    </Button>
+                    <Button
+                      variant="ink"
+                      type="button"
+                      disabled={savingEdit}
+                      onClick={handleSaveEdit}
+                      className="px-5 py-2 text-xs font-semibold"
+                    >
+                      {savingEdit ? "Saving Changes..." : "Save Changes"}
+                    </Button>
+                  </div>
+                </div>
+              </Card>
+            </div>
+          )}
         </div>
       ) : null}
 

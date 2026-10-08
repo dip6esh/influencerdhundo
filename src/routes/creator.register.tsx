@@ -34,8 +34,7 @@ import {
   validateTrustedEmail,
   type Creator,
 } from "@/lib/directory-data";
-import defaultPhoto from "@/assets/creator-aditi.jpg";
-import { Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2, User } from "lucide-react";
 
 export const Route = createFileRoute("/creator/register")({
   head: () => ({
@@ -354,7 +353,7 @@ function Register() {
         (form.name || "my-profile").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       name: form.name || "Your name",
       displayName: form.name || form.displayName || "Your name",
-      photo: form.photo || defaultPhoto,
+      photo: form.photo || "",
       city: form.city || "Your city",
       locality: form.locality || "Your area",
       state: form.state || "",
@@ -1257,14 +1256,20 @@ function Register() {
                   <p className="label-caps">This is how businesses will see you</p>
                   <div className="glass-card mt-3 rounded-2xl p-5 border border-border/80">
                     <div className="flex flex-col sm:flex-row gap-4">
-                      <img
-                        src={draft.photo}
-                        alt={draft.name}
-                        loading="lazy"
-                        width={816}
-                        height={816}
-                        className="size-20 shrink-0 rounded-2xl object-cover ring-1 ring-border"
-                      />
+                      {draft.photo ? (
+                        <img
+                          src={draft.photo}
+                          alt={draft.name}
+                          loading="lazy"
+                          width={816}
+                          height={816}
+                          className="size-20 shrink-0 rounded-2xl object-cover ring-1 ring-border"
+                        />
+                      ) : (
+                        <div className="size-20 shrink-0 rounded-2xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground">
+                          <User className="size-8 opacity-40" />
+                        </div>
+                      )}
                       <div className="min-w-0">
                         <h2 className="text-2xl leading-tight">{draft.name}</h2>
                         <p className="mt-1 text-sm text-muted-foreground">

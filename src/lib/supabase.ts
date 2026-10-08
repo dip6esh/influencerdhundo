@@ -1155,7 +1155,10 @@ export const supabaseDb = {
     discountPercent: number;
     discountType?: "percentage" | "flat" | undefined;
     discountValue?: number | undefined;
-    validityDays: number;
+    validityDays?: number | undefined;
+    validFrom?: string | undefined; // ISO string or YYYY-MM-DD
+    validUntil?: string | undefined; // ISO string or YYYY-MM-DD
+    isActive?: boolean | undefined;
     maxUses?: number | undefined;
     notes?: string | undefined;
     targetEmail?: string | undefined;
@@ -1166,8 +1169,31 @@ export const supabaseDb = {
       const cleanCode = input.code.trim().toUpperCase().replace(/\s+/g, "");
       if (!cleanCode) return { success: false, error: "Code name cannot be empty." };
 
-      const now = new Date();
-      const validUntil = new Date(now.getTime() + input.validityDays * 24 * 60 * 60 * 1000);
+      let fromDate: Date;
+      if (input.validFrom) {
+        fromDate = input.validFrom.includes("T")
+          ? new Date(input.validFrom)
+          : new Date(`${input.validFrom}T00:00:00`);
+      } else {
+        fromDate = new Date();
+      }
+
+      let untilDate: Date;
+      if (input.validUntil) {
+        untilDate = input.validUntil.includes("T")
+          ? new Date(input.validUntil)
+          : new Date(`${input.validUntil}T23:59:59.999`);
+      } else {
+        const days = Math.max(1, input.validityDays || 7);
+        untilDate = new Date(fromDate.getTime() + days * 24 * 60 * 60 * 1000);
+      }
+
+      // Calculate validity in days
+      const calculatedDays = Math.max(
+        1,
+        Math.ceil((untilDate.getTime() - fromDate.getTime()) / (24 * 60 * 60 * 1000)),
+      );
+
       const discountType = input.discountType || "percentage";
       const discountPercent = input.discountPercent;
       const discountValue = input.discountValue ?? discountPercent;
@@ -1185,10 +1211,10 @@ export const supabaseDb = {
           discount_percent: discountPercent,
           discount_type: discountType,
           discount_value: discountValue,
-          validity_days: input.validityDays,
-          valid_from: now.toISOString(),
-          valid_until: validUntil.toISOString(),
-          is_active: true,
+          validity_days: calculatedDays,
+          valid_from: fromDate.toISOString(),
+          valid_until: untilDate.toISOString(),
+          is_active: input.isActive ?? true,
           usage_count: 0,
           max_uses: input.maxUses || null,
           notes: input.notes || "",
@@ -1201,6 +1227,130 @@ export const supabaseDb = {
 
       if (error || !data) {
         return { success: false, error: error?.message || "Failed to create discount code." };
+      }
+
+      return {
+        success: true,
+        code: {
+          id: data.id,
+          code: data.code,
+          discountPercent: Number(data.discount_percent),
+          discountType: data.discount_type,
+          discountValue: Number(data.discount_value),
+          validityDays: Number(data.validity_days),
+          validFrom: data.valid_from,
+          validUntil: data.valid_until,
+          isActive: Boolean(data.is_active),
+          usageCount: Number(data.usage_count),
+          maxUses: data.max_uses != null ? Number(data.max_uses) : undefined,
+          notes: data.notes || "",
+          targetEmail: data.target_email || undefined,
+          targetPhone: data.target_phone || undefined,
+          applicablePlans: Array.isArray(data.applicable_plans)
+            ? data.applicable_plans
+            : data.applicable_plans
+            ? [data.applicable_plans]
+            : undefined,
+          createdAt: data.created_at,
+        },
+      };
+    } catch (e: any) {
+      return { success: false, error: e?.message || String(e) };
+    }
+  },
+
+  /** Update an existing discount code */
+  async updateDiscountCode(
+    id: string,
+    updates: {
+      code?: string | undefined;
+      discountPercent?: number | undefined;
+      discountType?: "percentage" | "flat" | undefined;
+      discountValue?: number | undefined;
+      validityDays?: number | undefined;
+      validFrom?: string | undefined;
+      validUntil?: string | undefined;
+      isActive?: boolean | undefined;
+      maxUses?: number | null | undefined;
+      notes?: string | undefined;
+      targetEmail?: string | null | undefined;
+      targetPhone?: string | null | undefined;
+      applicablePlans?: string[] | null | undefined;
+    },
+  ): Promise<{ success: boolean; error?: string; code?: DiscountCode }> {
+    try {
+      const payload: any = {
+        updated_at: new Date().toISOString(),
+      };
+
+      if (updates.code !== undefined) {
+        const cleanCode = updates.code.trim().toUpperCase().replace(/\s+/g, "");
+        if (!cleanCode) return { success: false, error: "Code name cannot be empty." };
+        payload.code = cleanCode;
+      }
+
+      if (updates.discountPercent !== undefined) {
+        payload.discount_percent = updates.discountPercent;
+        payload.discount_value = updates.discountValue ?? updates.discountPercent;
+      }
+
+      if (updates.discountType !== undefined) {
+        payload.discount_type = updates.discountType;
+      }
+
+      if (updates.validFrom !== undefined || updates.validUntil !== undefined) {
+        // Fetch current row to get existing dates if only one is updated
+        let fromDate: Date | null = null;
+        let untilDate: Date | null = null;
+
+        if (updates.validFrom) {
+          fromDate = updates.validFrom.includes("T")
+            ? new Date(updates.validFrom)
+            : new Date(`${updates.validFrom}T00:00:00`);
+          payload.valid_from = fromDate.toISOString();
+        }
+
+        if (updates.validUntil) {
+          untilDate = updates.validUntil.includes("T")
+            ? new Date(updates.validUntil)
+            : new Date(`${updates.validUntil}T23:59:59.999`);
+          payload.valid_until = untilDate.toISOString();
+        }
+
+        if (fromDate && untilDate) {
+          payload.validity_days = Math.max(
+            1,
+            Math.ceil((untilDate.getTime() - fromDate.getTime()) / (24 * 60 * 60 * 1000)),
+          );
+        } else if (updates.validityDays !== undefined) {
+          payload.validity_days = updates.validityDays;
+        }
+      } else if (updates.validityDays !== undefined) {
+        payload.validity_days = updates.validityDays;
+      }
+
+      if (updates.isActive !== undefined) payload.is_active = updates.isActive;
+      if (updates.maxUses !== undefined) payload.max_uses = updates.maxUses;
+      if (updates.notes !== undefined) payload.notes = updates.notes;
+      if (updates.targetEmail !== undefined) {
+        payload.target_email = updates.targetEmail ? updates.targetEmail.trim().toLowerCase() : null;
+      }
+      if (updates.targetPhone !== undefined) {
+        payload.target_phone = updates.targetPhone ? updates.targetPhone.trim() : null;
+      }
+      if (updates.applicablePlans !== undefined) {
+        payload.applicable_plans = updates.applicablePlans && updates.applicablePlans.length > 0 ? updates.applicablePlans : null;
+      }
+
+      const { data, error } = await supabase
+        .from("discount_codes")
+        .update(payload)
+        .eq("id", id)
+        .select("*")
+        .single();
+
+      if (error || !data) {
+        return { success: false, error: error?.message || "Failed to update discount code." };
       }
 
       return {
@@ -1282,13 +1432,30 @@ export const supabaseDb = {
       const validFrom = new Date(row.valid_from).getTime();
 
       if (!row.is_active) {
-        return { valid: false, error: "This coupon code is no longer active." };
+        return { valid: false, error: "This coupon code is currently inactive." };
       }
 
-      if (now < validFrom || now > validUntil) {
+      if (now < validFrom) {
+        const formattedDate = new Date(row.valid_from).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
         return {
           valid: false,
-          error: `This coupon code has expired (valid until ${new Date(row.valid_until).toLocaleDateString("en-IN")}).`,
+          error: `This coupon code is scheduled and will automatically become active on ${formattedDate}.`,
+        };
+      }
+
+      if (now > validUntil) {
+        const formattedDate = new Date(row.valid_until).toLocaleDateString("en-IN", {
+          day: "numeric",
+          month: "short",
+          year: "numeric",
+        });
+        return {
+          valid: false,
+          error: `This coupon code has ended (validity period ended on ${formattedDate}).`,
         };
       }
 

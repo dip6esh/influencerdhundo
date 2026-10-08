@@ -1,5 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { calculateAge, formatFollowers, formatPrice, type Creator } from "@/lib/directory-data";
+import { User } from "lucide-react";
 
 export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: number }) {
   const age = calculateAge(creator.birthDate);
@@ -11,14 +12,20 @@ export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: 
     >
       {/* ── 3:4 PORTRAIT PHOTO ── */}
       <div className="relative aspect-[3/4] w-full shrink-0 overflow-hidden bg-secondary">
-        <img
-          src={creator.photo}
-          alt={creator.name}
-          loading="lazy"
-          width={816}
-          height={1088}
-          className="absolute inset-0 size-full object-cover"
-        />
+        {creator.photo ? (
+          <img
+            src={creator.photo}
+            alt={creator.name}
+            loading="lazy"
+            width={816}
+            height={1088}
+            className="absolute inset-0 size-full object-cover"
+          />
+        ) : (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-secondary/80 text-muted-foreground/40">
+            <User className="size-20" />
+          </div>
+        )}
 
         {/* Gradient scrim — stronger at bottom for legibility */}
         <div className="absolute inset-0 bg-gradient-to-t from-black/70 via-black/10 to-transparent" />

@@ -127,13 +127,19 @@ function CreatorProfile() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/60">
             <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
               <div className="relative shrink-0">
-                <img
-                  src={creator.photo}
-                  alt={creator.name}
-                  width={816}
-                  height={816}
-                  className="size-24 sm:size-28 rounded-2xl object-cover ring-2 ring-border shadow-md bg-secondary"
-                />
+                {creator.photo ? (
+                  <img
+                    src={creator.photo}
+                    alt={creator.name}
+                    width={816}
+                    height={816}
+                    className="size-24 sm:size-28 rounded-2xl object-cover ring-2 ring-border shadow-md bg-secondary"
+                  />
+                ) : (
+                  <div className="size-24 sm:size-28 rounded-2xl ring-2 ring-border shadow-md bg-secondary flex items-center justify-center text-muted-foreground/50">
+                    <User className="size-10" />
+                  </div>
+                )}
                 <span
                   className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
                   title="Verified Profile"

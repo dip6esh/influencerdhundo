@@ -42,6 +42,7 @@ import {
   Share2,
   ShieldCheck,
   Sparkles,
+  User,
   Users,
   X,
   Zap,
@@ -418,14 +419,20 @@ function Dashboard() {
                 <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4 pb-5 border-b border-border/60">
                   <div className="flex items-center gap-4">
                     <div className="relative">
-                      <img
-                        src={mine.photo}
-                        alt={mine.name}
-                        loading="lazy"
-                        width={816}
-                        height={816}
-                        className="size-16 sm:size-20 rounded-2xl object-cover ring-2 ring-border/60 shadow-md bg-secondary"
-                      />
+                      {mine.photo ? (
+                        <img
+                          src={mine.photo}
+                          alt={mine.name}
+                          loading="lazy"
+                          width={816}
+                          height={816}
+                          className="size-16 sm:size-20 rounded-2xl object-cover ring-2 ring-border/60 shadow-md bg-secondary"
+                        />
+                      ) : (
+                        <div className="size-16 sm:size-20 rounded-2xl ring-2 ring-border/60 shadow-md bg-secondary flex items-center justify-center text-muted-foreground/50">
+                          <User className="size-8" />
+                        </div>
+                      )}
                       {mine.status === "Active" && (
                         <span
                           className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
