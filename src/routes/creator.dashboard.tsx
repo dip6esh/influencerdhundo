@@ -38,6 +38,7 @@ import {
   MessageCircle,
   Printer,
   Receipt,
+  ReceiptText,
   Share2,
   ShieldCheck,
   Sparkles,
@@ -1171,6 +1172,14 @@ function PaymentReceiptModal({
     setTimeout(() => setCopiedField(null), 2000);
   };
 
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape") onClose();
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [onClose]);
+
   const handlePrint = () => {
     const printFrame = document.createElement("iframe");
     printFrame.style.position = "fixed";
@@ -1645,15 +1654,19 @@ function PaymentReceiptModal({
         }
       `}</style>
 
-      <div className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200">
+      <div
+        className="fixed inset-0 z-50 flex items-center justify-center p-3 sm:p-6 bg-black/70 backdrop-blur-sm overflow-y-auto animate-in fade-in duration-200"
+        onClick={onClose}
+      >
         <div
           id="payment-receipt-print-wrapper"
+          onClick={(e) => e.stopPropagation()}
           className="relative w-full max-w-2xl bg-card rounded-2xl sm:rounded-3xl border border-border shadow-2xl overflow-hidden my-auto"
         >
           {/* MODAL ACTION BAR (Hidden in print) */}
           <div className="flex items-center justify-between px-6 py-3.5 border-b border-border/80 bg-secondary/40 print-hidden">
             <div className="flex items-center gap-2">
-              <Receipt className="size-4 text-primary" />
+              <ReceiptText className="size-4 text-primary" />
               <span className="text-xs font-bold uppercase tracking-wider text-foreground">
                 Official Payment Receipt
               </span>

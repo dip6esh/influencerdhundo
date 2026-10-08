@@ -18,11 +18,11 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Influencer Dhundo — Where small influencers meet small businesses" },
+      { title: "Influencer Dhundo — Where businesses find relevant Influencers to collaborate" },
       {
         name: "description",
         content:
-          "Influencer Dhundo brings local creators and local businesses together. No agency, no commission, no middleman. Just find each other and make it happen.",
+          "Influencer Dhundo helps creators and businesses find each other. No agency, no commission, no middleman. Just collaborate and make it happen.",
       },
       { property: "og:title", content: "Influencer Dhundo — A Business + Relevant Influencers = Big Possibilities." },
       {
@@ -130,7 +130,7 @@ function Landing() {
 
           {/* Supporting copy */}
           <p className="mt-7 max-w-[54ch] text-base text-pretty text-muted-foreground md:text-lg">
-            Influencer Dhundo helps local businesses discover influencers around them with audiences that are relevant, nearby and useful for the business.
+            With Influencer Dhundo, Big &amp; Small businesses can find influencers around them with audiences that are relevant, nearby and useful for the business.
           </p>
 
           {/* Badges */}
@@ -545,10 +545,8 @@ function PricingSection() {
               <div
                 key={plan.id}
                 className={`glass-card relative flex flex-col rounded-3xl p-6 transition-all hover:translate-y-[-2px] hover:shadow-lg ${
-                  isPopular
+                  isLaunchOffer
                     ? "border-2 border-primary ring-4 ring-primary/10 shadow-md bg-background"
-                    : isLaunchOffer
-                    ? "border-2 border-primary/50 shadow-sm bg-background"
                     : "border border-border/80"
                 }`}
               >
@@ -637,7 +635,7 @@ function PricingSection() {
                   <Link
                     to="/creator/register"
                     className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
-                      isPopular
+                      isLaunchOffer
                         ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
                         : "bg-foreground text-background hover:bg-foreground/90"
                     }`}

@@ -29,16 +29,16 @@ import {
 export const Route = createFileRoute("/discover")({
   head: () => ({
     meta: [
-      { title: "Find local creators — Influencer Dhundo" },
+      { title: "Find Relevant Influencers / Creators — Influencer Dhundo" },
       {
         name: "description",
         content:
-          "Search local creators by city, locality, category, follower size, budget, content type, language and collaboration preferences.",
+          "Discover and connect directly with verified creators and influencers filtered by location, niche category, follower count, and budget.",
       },
-      { property: "og:title", content: "Find local creators — Influencer Dhundo" },
+      { property: "og:title", content: "Find Relevant Influencers / Creators — Influencer Dhundo" },
       {
         property: "og:description",
-        content: "Tell us what you're looking for and see matching local creators.",
+        content: "Filter and connect directly with verified creators by location, niche, audience size, and budget.",
       },
     ],
     links: [
@@ -121,13 +121,13 @@ function Discover() {
 
         {/* CONTAINER ALIGNED EXACTLY WITH SITE HEADER / LOGO */}
         <div className="relative mx-auto max-w-5xl px-5">
-          <div className="max-w-2xl">
+          <div className="max-w-4xl">
             <SectionEyebrow>Discovery</SectionEyebrow>
-            <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
-              Find Local Creators
+            <h1 className="mt-2 text-2xl sm:text-3xl md:text-4xl lg:text-[42px] font-display font-semibold tracking-tight text-foreground">
+              Find Relevant Influencers / Creators
             </h1>
-            <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">
-              Tell us what you're looking for and explore verified creators near your business.
+            <p className="mt-2.5 text-base text-muted-foreground md:text-lg">
+              Filter by location, niche, audience size, budget, collaboration preferences &amp; more.
             </p>
           </div>
 
