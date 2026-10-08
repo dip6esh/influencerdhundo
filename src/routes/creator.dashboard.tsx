@@ -12,6 +12,7 @@ import {
   generateReferralCode,
   getActiveSubscription,
   getInstagramUrl,
+  getCreatorProfileSlug,
   getQueuedSubscriptions,
   getSubscriptionExpiry,
   isSubscriptionActive,
@@ -409,7 +410,7 @@ function Dashboard() {
             <div className="flex flex-wrap items-center gap-2.5">
               <Link
                 to="/creators/$creatorId"
-                params={{ creatorId: mine.id }}
+                params={{ creatorId: getCreatorProfileSlug(mine) }}
                 search={{ preview: true }}
                 className="inline-flex items-center gap-2 rounded-xl bg-background px-4 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border/80 hover:bg-secondary hover:ring-border transition-all shadow-xs"
               >
@@ -640,7 +641,7 @@ function Dashboard() {
                   </Link>
                   <Link
                     to="/creators/$creatorId"
-                    params={{ creatorId: mine.id }}
+                    params={{ creatorId: getCreatorProfileSlug(mine) }}
                     search={{ preview: true }}
                     className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground hover:bg-foreground/90 px-4 py-2 text-xs font-semibold text-background transition-all shadow-xs"
                   >

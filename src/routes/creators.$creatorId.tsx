@@ -10,6 +10,7 @@ import {
   formatInstagramHandle,
   formatPrice,
   getInstagramUrl,
+  normalizeInstagramHandle,
 } from "@/lib/directory-data";
 
 import {
@@ -55,7 +56,20 @@ function CreatorProfile() {
   const { preview } = Route.useSearch();
   const navigate = useNavigate();
   const { creators, business, addReport } = useAppState();
-  const creator = creators.find((c) => c.id === creatorId);
+  const cleanParam = (creatorId || "").trim().toLowerCase();
+  const creator = creators.find((c) => {
+    if (!cleanParam) return false;
+    const cId = (c.id || "").toLowerCase();
+    const cDisplay = (c.displayName || "").toLowerCase();
+    const cNameSlug = (c.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const cHandle = normalizeInstagramHandle(c.instagram).toLowerCase();
+    return (
+      cId === cleanParam ||
+      cDisplay === cleanParam ||
+      cNameSlug === cleanParam ||
+      (cHandle && cHandle === cleanParam)
+    );
+  });
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState<string>(REPORT_REASONS[0]);
   const [details, setDetails] = useState("");

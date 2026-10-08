@@ -393,6 +393,27 @@ export function generateReferralCode(displayName: string): string {
   return `DHUNDO-${initials}${rand}`;
 }
 
+/** Returns a clean SEO-friendly profile URL slug based on the creator's full name */
+export function getCreatorProfileSlug(creator: { id: string; name?: string; displayName?: string }): string {
+  if (creator.name && creator.name.trim()) {
+    const slug = creator.name
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (slug) return slug;
+  }
+  if (creator.displayName && creator.displayName.trim()) {
+    const slug = creator.displayName
+      .trim()
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, "-")
+      .replace(/^-+|-+$/g, "");
+    if (slug) return slug;
+  }
+  return creator.id;
+}
+
 /** Builds the full referral URL for sharing */
 export function getReferralUrl(referralCode: string): string {
   const base =

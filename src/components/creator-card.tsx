@@ -1,5 +1,11 @@
 import { Link } from "@tanstack/react-router";
-import { calculateAge, formatFollowers, formatPrice, type Creator } from "@/lib/directory-data";
+import {
+  calculateAge,
+  formatFollowers,
+  formatPrice,
+  getCreatorProfileSlug,
+  type Creator,
+} from "@/lib/directory-data";
 import { User } from "lucide-react";
 
 export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: number }) {
@@ -97,7 +103,7 @@ export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: 
           </div>
           <Link
             to="/creators/$creatorId"
-            params={{ creatorId: creator.id }}
+            params={{ creatorId: getCreatorProfileSlug(creator) }}
             className="rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background transition-colors hover:bg-foreground/90"
           >
             View profile →

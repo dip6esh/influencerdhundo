@@ -11,6 +11,7 @@ import {
   CONTENT_TYPES,
   formatFollowers,
   formatPrice,
+  getCreatorProfileSlug,
   GENDERS,
   LANGUAGES,
   PLANS,
@@ -965,7 +966,7 @@ function AdminDashboard() {
 
                     <Link
                       to="/creators/$creatorId"
-                      params={{ creatorId: c.id }}
+                      params={{ creatorId: getCreatorProfileSlug(c) }}
                       className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
                     >
                       View
