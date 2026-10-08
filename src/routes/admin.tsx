@@ -96,8 +96,6 @@ const STATUSES: CreatorStatus[] = [
   "Suspended",
 ];
 
-type AuthMode = "login" | "signup";
-
 const ADMIN_UNLOCKED_STORAGE_KEY = "cc_admin_unlocked_v2";
 const ADMIN_MASTER_SECRET_KEY =
   (import.meta.env["VITE_ADMIN_ACCESS_KEY"] as string | undefined)?.trim() ||
@@ -241,73 +239,34 @@ function AdminPageContent() {
 }
 
 // ─────────────────────────────────────────────────────────────────────────────
-// Admin Auth Box (Login / Sign Up)
+// Admin Auth Box (Sign In Only)
 // ─────────────────────────────────────────────────────────────────────────────
 function AdminAuthBox() {
   const { loginAdmin } = useAdminState();
 
-  const [mode, setMode] = useState<AuthMode>("login");
-  const [name, setName] = useState("");
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
-  const [confirmPwd, setConfirmPwd] = useState("");
   const [showPwd, setShowPwd] = useState(false);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
-  const [success, setSuccess] = useState("");
 
   const handleSubmit = async () => {
     setError("");
-    setSuccess("");
 
     if (!email.trim() || !password) {
-      setError("Please enter your email and password.");
+      setError("Please enter your admin email and password.");
       return;
-    }
-
-    if (mode === "signup") {
-      if (!name.trim()) {
-        setError("Please enter your name.");
-        return;
-      }
-      if (password.length < 8) {
-        setError("Password must be at least 8 characters.");
-        return;
-      }
-      if (password !== confirmPwd) {
-        setError("Passwords do not match.");
-        return;
-      }
     }
 
     setLoading(true);
 
     try {
-      if (mode === "login") {
-        const result = await supabaseDb.signInAdmin(email.trim(), password);
-        if ("error" in result) {
-          setError(result.error);
-          return;
-        }
-        loginAdmin(result);
-      } else {
-        const result = await supabaseDb.signUpAdmin(
-          email.trim(),
-          password,
-          name.trim(),
-        );
-        if ("error" in result) {
-          setError(result.error);
-          return;
-        }
-        setSuccess(
-          "Admin account created! Please sign in with your credentials.",
-        );
-        setMode("login");
-        setName("");
-        setPassword("");
-        setConfirmPwd("");
+      const result = await supabaseDb.signInAdmin(email.trim(), password);
+      if ("error" in result) {
+        setError(result.error);
+        return;
       }
+      loginAdmin(result);
     } catch {
       setError("An unexpected error occurred. Please try again.");
     } finally {
@@ -339,59 +298,25 @@ function AdminAuthBox() {
                 <ShieldCheck className="size-6" />
               </div>
               <h1 className="font-display text-3xl font-semibold tracking-tight text-balance md:text-4xl">
-                Admin Portal
+                Admin Sign In
               </h1>
             </div>
             <p className="mt-3 text-sm text-pretty text-muted-foreground">
-              This area is restricted to platform administrators only.
+              Sign in with your administrator credentials to access the portal.
             </p>
           </div>
 
-          {/* Mode toggle */}
-          <div className="mt-8 flex rounded-full bg-secondary p-1 ring-1 ring-border">
-            {(["login", "signup"] as AuthMode[]).map((m) => (
-              <button
-                key={m}
-                onClick={() => {
-                  setMode(m);
-                  setError("");
-                  setSuccess("");
-                }}
-                className={
-                  mode === m
-                    ? "rounded-full bg-foreground px-5 py-2 text-xs font-semibold text-background transition-all"
-                    : "rounded-full px-5 py-2 text-xs font-medium text-muted-foreground transition-all hover:text-foreground"
-                }
-              >
-                {m === "login" ? "Log In" : "Sign Up"}
-              </button>
-            ))}
-          </div>
-
-          <div className="mt-6 w-full max-w-md">
+          <div className="mt-8 w-full max-w-md">
             <Card className="glass-card rounded-2xl border border-border/80 p-6 text-left shadow-xl sm:rounded-3xl sm:p-8">
               <div className="space-y-4">
-                {mode === "signup" && (
-                  <Field label="Your name">
-                    <TextInput
-                      type="text"
-                      value={name}
-                      onChange={(e) => setName(e.target.value)}
-                      onKeyDown={handleKey}
-                      placeholder="Admin Name"
-                      autoFocus
-                    />
-                  </Field>
-                )}
-
-                <Field label="Email address">
+                <Field label="Admin Email">
                   <TextInput
                     type="email"
                     value={email}
                     onChange={(e) => setEmail(e.target.value)}
                     onKeyDown={handleKey}
                     placeholder="admin@influencerdhundo.com"
-                    autoFocus={mode === "login"}
+                    autoFocus
                   />
                 </Field>
 
@@ -402,17 +327,13 @@ function AdminAuthBox() {
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                       onKeyDown={handleKey}
-                      placeholder={
-                        mode === "signup"
-                          ? "Min 8 characters"
-                          : "Your password"
-                      }
+                      placeholder="Enter admin password"
                       className="pr-10"
                     />
                     <button
                       type="button"
                       onClick={() => setShowPwd((v) => !v)}
-                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer"
                       aria-label={showPwd ? "Hide password" : "Show password"}
                     >
                       {showPwd ? (
@@ -424,43 +345,19 @@ function AdminAuthBox() {
                   </div>
                 </Field>
 
-                {mode === "signup" && (
-                  <Field label="Confirm password">
-                    <TextInput
-                      type="password"
-                      value={confirmPwd}
-                      onChange={(e) => setConfirmPwd(e.target.value)}
-                      onKeyDown={handleKey}
-                      placeholder="Re-enter password"
-                    />
-                  </Field>
-                )}
-
                 {error ? (
                   <div className="rounded-xl bg-rose/10 p-3 text-xs font-medium text-rose">
                     {error}
                   </div>
                 ) : null}
 
-                {success ? (
-                  <div className="rounded-xl bg-accent/15 p-3 text-xs font-medium text-tealdeep">
-                    {success}
-                  </div>
-                ) : null}
-
                 <Button
                   variant="ink"
-                  className="w-full justify-center py-3 font-semibold"
+                  className="w-full justify-center py-3 font-semibold cursor-pointer"
                   disabled={loading}
                   onClick={handleSubmit}
                 >
-                  {loading
-                    ? mode === "login"
-                      ? "Signing in..."
-                      : "Creating account..."
-                    : mode === "login"
-                      ? "Log in to Admin"
-                      : "Create Admin Account"}
+                  {loading ? "Signing in..." : "Sign In to Admin"}
                 </Button>
               </div>
 
