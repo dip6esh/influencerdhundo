@@ -189,15 +189,15 @@ function Register() {
         (c) => c.referralCode && c.referralCode.toUpperCase() === cleaned,
       );
       if (local) {
-        setReferrerInfo({ id: local.id, name: local.displayName || local.name });
-        setReferralStatus(`Invited by ${local.displayName || local.name}`);
+        setReferrerInfo({ id: local.id, name: local.name || local.displayName });
+        setReferralStatus(`Invited by ${local.name || local.displayName}`);
         return;
       }
       // Check Supabase
       const remote = await supabaseDb.lookupReferralCode(cleaned);
       if (remote) {
-        setReferrerInfo({ id: remote.id, name: remote.displayName || remote.name });
-        setReferralStatus(`Invited by ${remote.displayName || remote.name}`);
+        setReferrerInfo({ id: remote.id, name: remote.name || remote.displayName });
+        setReferralStatus(`Invited by ${remote.name || remote.displayName}`);
       } else {
         setReferrerInfo(null);
         setReferralStatus("Referral code not found");
@@ -288,11 +288,22 @@ function Register() {
     };
   }, [awaitingVerification]);
 
+  // Scroll to the top on every step change (Next / Continue / Back) for better UX
+  useEffect(() => {
+    window.scrollTo({ top: 0, left: 0, behavior: "smooth" });
+  }, [step]);
+
   const [emailLiveError, setEmailLiveError] = useState<string | null>(null);
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
-    setForm((f) => ({ ...f, [key]: value }));
+    setForm((f) => {
+      const updated = { ...f, [key]: value };
+      if (key === "name") {
+        updated.displayName = String(value || "");
+      }
+      return updated;
+    });
     if (key === "email") {
       const emailStr = String(value || "").trim();
       if (!emailStr) {
@@ -340,9 +351,9 @@ function Register() {
     () => ({
       id:
         existing?.id ??
-        (form.displayName || form.name || "my-profile").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
+        (form.name || "my-profile").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
       name: form.name || "Your name",
-      displayName: form.displayName || form.name,
+      displayName: form.name || form.displayName || "Your name",
       photo: form.photo || defaultPhoto,
       city: form.city || "Your city",
       locality: form.locality || "Your area",
@@ -873,14 +884,6 @@ function Register() {
                       placeholder="Aditi Sharma"
                     />
                   </Field>
-                  <Field label="Creator / display name">
-                    <TextInput
-                      value={form.displayName}
-                      maxLength={60}
-                      onChange={(e) => set("displayName", e.target.value)}
-                      placeholder="aditi.eats"
-                    />
-                  </Field>
                   <Field label="Profile photo" hint="JPG or PNG, portrait or square works best.">
                     <div className="space-y-3">
                       <input
@@ -899,7 +902,7 @@ function Register() {
                           try {
                             const publicUrl = await supabaseDb.uploadCreatorPhoto(
                               file,
-                              form.displayName || form.name || "creator",
+                              form.name || "creator",
                             );
                             if (publicUrl) {
                               set("photo", publicUrl);

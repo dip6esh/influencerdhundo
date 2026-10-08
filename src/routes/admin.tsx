@@ -5,6 +5,8 @@ import { useAppState } from "@/lib/app-state";
 import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
 import { supabaseDb, type DiscountCode } from "@/lib/supabase";
 import {
+  CATEGORIES,
+  CITIES,
   formatFollowers,
   formatPrice,
   PLANS,
@@ -771,7 +773,7 @@ function AdminDashboard() {
                         }`}
                       >
                         <div className="flex items-center justify-between w-full">
-                          <span className="text-xs font-bold">{plan.name}</span>
+                          <span className="text-xs font-bold">{plan.duration}</span>
                           <span
                             className={`size-4 rounded-full flex items-center justify-center text-[10px] ${
                               isSelected
@@ -990,7 +992,7 @@ function AdminDashboard() {
                                     key={pId}
                                     className="rounded-md bg-secondary px-1.5 py-0.5 text-[11px] font-medium text-foreground"
                                   >
-                                    {matched ? matched.name : pId}
+                                    {matched ? matched.duration : pId}
                                   </span>
                                 );
                               })

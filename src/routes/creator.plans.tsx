@@ -96,10 +96,11 @@ function Plans() {
   const selectedPlan = PLANS.find((p) => p.id === selectedPlanId) || PLANS[1];
   const isTrialApplied = Boolean(appliedDiscount?.isTrial && !trialAlreadyUsed);
 
-  // Price calculations — 3m plan has a limited launch offer price of ₹1,099 (was ₹1,999)
+  // Price calculations — 1m and 3m plans have a limited launch offer of 45% OFF
+  const LAUNCH_OFFER_1M_PRICE = 439;
   const LAUNCH_OFFER_3M_PRICE = 1099;
   const getBasePlanPrice = (planId: string, price: number) =>
-    planId === "3m" ? LAUNCH_OFFER_3M_PRICE : price;
+    planId === "1m" ? LAUNCH_OFFER_1M_PRICE : planId === "3m" ? LAUNCH_OFFER_3M_PRICE : price;
 
   const basePrice = getBasePlanPrice(selectedPlan.id, selectedPlan.price);
 
@@ -239,7 +240,7 @@ function Plans() {
       const orderRes = await createRazorpayOrderFn({
         data: {
           creatorId: mine.id,
-          creatorName: mine.displayName || mine.name,
+          creatorName: mine.name || mine.displayName,
           creatorEmail: mine.contact?.email,
           creatorContact: mine.contact?.phone,
           planId: selectedPlan.id,
@@ -260,7 +261,7 @@ function Plans() {
         name: "Influencer Dhundo",
         description: `Creator Pass: ${selectedPlan.duration} (${formatPrice(finalPrice)})`,
         prefill: {
-          name: mine.displayName || mine.name,
+          name: mine.name || mine.displayName,
           email: mine.contact?.email || "",
           contact: mine.contact?.phone || "",
         },
@@ -464,7 +465,7 @@ function Plans() {
                             : "glass-card hover:border-foreground/40 bg-card text-foreground"
                         }`}
                       >
-                        {p.id === "3m" && !appliedDiscount && (
+                        {(p.id === "1m" || p.id === "3m") && !appliedDiscount && (
                           <>
                             <div className="absolute -top-2.5 left-1/2 -translate-x-1/2 rounded-full bg-primary px-2.5 py-0.5 text-[9px] font-bold uppercase tracking-wider text-primary-foreground shadow-sm whitespace-nowrap">
                               Limited Launch Offer
@@ -503,6 +504,15 @@ function Plans() {
                             </span>
                             <span className={`text-sm line-through ${isSelected ? "text-background/60" : "text-muted-foreground"}`}>
                               {formatPrice(standardPrice)}
+                            </span>
+                          </div>
+                        ) : p.id === "1m" ? (
+                          <div className="mt-2 flex items-baseline gap-2">
+                            <span className={`text-xl font-bold ${isSelected ? "text-primary" : "text-saffrondeep"}`}>
+                              ₹439
+                            </span>
+                            <span className={`text-sm line-through ${isSelected ? "text-background/60" : "text-muted-foreground"}`}>
+                              ₹799
                             </span>
                           </div>
                         ) : p.id === "3m" ? (

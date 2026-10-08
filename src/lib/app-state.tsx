@@ -467,7 +467,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         // If paid plan: generate referral code and fire referral reward
         if (!isTrialPlan) {
           if (creator && !creator.referralCode) {
-            const code = generateReferralCode(creator.displayName || creator.name);
+            const code = generateReferralCode(creator.name || creator.displayName);
             await supabaseDb.setReferralCode(s.creatorId, code);
             setCreators((prev) =>
               prev.map((c) => (c.id === s.creatorId ? { ...c, referralCode: code } : c)),

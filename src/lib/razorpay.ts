@@ -5,8 +5,8 @@ import { createClient } from "@supabase/supabase-js";
 
 // Plan price catalog in INR
 const PLAN_PRICES: Record<string, { price: number; duration: string }> = {
-  "1m": { price: 799, duration: "1 Month" },
-  "3m": { price: 1099, duration: "3 Months" }, // Launch offer: ₹1,099
+  "1m": { price: 439, duration: "1 Month" }, // Launch offer: 45% OFF (was ₹799)
+  "3m": { price: 1099, duration: "3 Months" }, // Launch offer: 45% OFF (was ₹1,999)
   "6m": { price: 3398, duration: "6 Months" },
   "1y": { price: 7996, duration: "1 Year" },
 };

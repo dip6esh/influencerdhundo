@@ -151,7 +151,7 @@ function Dashboard() {
       (s) => s.planId !== "trial-3d" && !s.duration?.toLowerCase().includes("3 day"),
     );
     if (mine && !mine.referralCode && hasPaidPlan) {
-      const code = generateReferralCode(mine.displayName || mine.name);
+      const code = generateReferralCode(mine.name || mine.displayName);
       supabaseDb.setReferralCode(mine.id, code);
       upsertCreator({ ...mine, referralCode: code });
     }
@@ -435,7 +435,7 @@ function Dashboard() {
                     <div>
                       <div className="flex items-center gap-2 flex-wrap">
                         <h2 className="text-lg sm:text-xl font-display font-bold text-foreground">
-                          {mine.displayName || mine.name}
+                          {mine.name || mine.displayName}
                         </h2>
                         {mine.status === "Active" && (
                           <span className="inline-flex items-center rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-semibold text-tealdeep">
@@ -1154,7 +1154,7 @@ function PaymentReceiptModal({
 
   const planName =
     receipt.planId === "1m"
-      ? "1 Month Creator Pass"
+      ? "1 Month Creator Pass (Launch Offer)"
       : receipt.planId === "3m"
         ? "3 Months Creator Pass (Launch Offer)"
         : receipt.planId === "6m"
@@ -1195,10 +1195,10 @@ function PaymentReceiptModal({
       minute: "2-digit",
     });
 
-    const creatorName = creator?.displayName || creator?.name || "Creator";
-    const creatorEmail = creator?.email || "";
-    const creatorPhone = creator?.phone || "";
-    const creatorLoc = [creator?.locality, creator?.city].filter(Boolean).join(", ") || "India";
+    const creatorName = creator?.name || creator?.displayName || "Creator";
+    const creatorEmail = creator?.contact?.email || creator?.email || "";
+    const creatorPhone = creator?.contact?.phone || creator?.phone || "";
+    const creatorLoc = [creator?.locality, creator?.city, creator?.state].filter(Boolean).join(", ") || "India";
     const creatorId = creator?.id || "";
 
     const discountRow =
@@ -1658,24 +1658,14 @@ function PaymentReceiptModal({
                 Official Payment Receipt
               </span>
             </div>
-            <div className="flex items-center gap-2">
-              <button
-                type="button"
-                onClick={handlePrint}
-                className="inline-flex items-center gap-1.5 rounded-xl bg-primary px-3.5 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary/90 transition-all cursor-pointer shadow-xs"
-              >
-                <Printer className="size-3.5" />
-                <span>Print / Save PDF</span>
-              </button>
-              <button
-                type="button"
-                onClick={onClose}
-                className="inline-flex size-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
-                title="Close"
-              >
-                <X className="size-4" />
-              </button>
-            </div>
+            <button
+              type="button"
+              onClick={onClose}
+              className="inline-flex size-8 items-center justify-center rounded-xl text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+              title="Close"
+            >
+              <X className="size-4" />
+            </button>
           </div>
 
           {/* INVOICE CONTENT */}
@@ -1732,13 +1722,13 @@ function PaymentReceiptModal({
                   Billed To (Creator)
                 </span>
                 <p className="text-sm font-bold text-foreground">
-                  {creator?.displayName || creator?.name || "Creator"}
+                  {creator?.name || creator?.displayName || "Creator"}
                 </p>
-                {creator?.email && (
-                  <p className="text-muted-foreground">Email: {creator.email}</p>
+                {(creator?.contact?.email || creator?.email) && (
+                  <p className="text-muted-foreground">Email: {creator?.contact?.email || creator?.email}</p>
                 )}
-                {creator?.phone && (
-                  <p className="text-muted-foreground">Phone: {creator.phone}</p>
+                {(creator?.contact?.phone || creator?.phone) && (
+                  <p className="text-muted-foreground">Phone: {creator?.contact?.phone || creator?.phone}</p>
                 )}
                 <p className="text-muted-foreground">
                   Location: {[creator?.locality, creator?.city].filter(Boolean).join(", ") || "India"}

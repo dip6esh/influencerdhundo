@@ -353,7 +353,7 @@ function PricingSection() {
   };
 
   const planPerMonth: Record<string, string> = {
-    "1m": "₹799/mo",
+    "1m": "₹439/mo",
     "3m": "₹366/mo",
     "6m": "₹566/mo",
     "1y": "₹666/mo",
@@ -538,6 +538,7 @@ function PricingSection() {
         {/* ── PLANS GRID ── */}
         <div className="mt-12 grid gap-6 sm:grid-cols-2 lg:grid-cols-4">
           {PLANS.map((plan) => {
+            const isLaunchOffer = plan.id === "1m" || plan.id === "3m";
             const isPopular = plan.id === "3m";
 
             return (
@@ -546,18 +547,20 @@ function PricingSection() {
                 className={`glass-card relative flex flex-col rounded-3xl p-6 transition-all hover:translate-y-[-2px] hover:shadow-lg ${
                   isPopular
                     ? "border-2 border-primary ring-4 ring-primary/10 shadow-md bg-background"
+                    : isLaunchOffer
+                    ? "border-2 border-primary/50 shadow-sm bg-background"
                     : "border border-border/80"
                 }`}
               >
                 {/* Limited Launch Offer Top Badge */}
-                {isPopular ? (
+                {isLaunchOffer ? (
                   <div className="absolute -top-3 left-1/2 -translate-x-1/2 rounded-full bg-primary px-3.5 py-0.5 text-[11px] font-bold text-primary-foreground shadow-sm uppercase tracking-wide whitespace-nowrap">
                     Limited Launch Offer
                   </div>
                 ) : null}
 
                 {/* 45% OFF Corner Circle */}
-                {isPopular ? (
+                {isLaunchOffer ? (
                   <div className="absolute -top-3.5 -right-3.5 z-10 flex size-12 flex-col items-center justify-center rounded-full bg-primary text-primary-foreground font-bold shadow-md">
                     <span className="text-[12px] font-extrabold tracking-tight leading-none">45%</span>
                     <span className="text-[8.5px] uppercase font-bold tracking-wider leading-none mt-0.5 opacity-90">OFF</span>
@@ -574,7 +577,17 @@ function PricingSection() {
                     </span>
                   </div>
 
-                  {isPopular ? (
+                  {plan.id === "1m" ? (
+                    <>
+                      <div className="mt-4 flex items-baseline gap-2">
+                        <span className="font-display text-3xl font-bold tracking-tight text-foreground">₹439</span>
+                        <span className="text-base font-semibold text-muted-foreground line-through">₹799</span>
+                      </div>
+                      <p className="mt-1 text-xs text-muted-foreground">
+                        Effective rate: <span className="font-semibold text-foreground">₹439/mo</span>
+                      </p>
+                    </>
+                  ) : plan.id === "3m" ? (
                     <>
                       <div className="mt-4 flex items-baseline gap-2">
                         <span className="font-display text-3xl font-bold tracking-tight text-foreground">₹1,099</span>

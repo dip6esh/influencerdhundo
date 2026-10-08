@@ -143,7 +143,7 @@ function CreatorProfile() {
               <div className="min-w-0">
                 <div className="flex flex-wrap items-center gap-2">
                   <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-foreground">
-                    {creator.displayName || creator.name}
+                    {creator.name || creator.displayName}
                   </h1>
                   <span className="inline-flex items-center rounded-full bg-accent/20 px-2.5 py-0.5 text-xs font-semibold text-tealdeep border border-accent/30">
                     Active Creator
