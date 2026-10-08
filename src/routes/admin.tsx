@@ -98,10 +98,10 @@ const STATUSES: CreatorStatus[] = [
 
 type AuthMode = "login" | "signup";
 
-const ADMIN_UNLOCKED_STORAGE_KEY = "cc_admin_unlocked_v1";
+const ADMIN_UNLOCKED_STORAGE_KEY = "cc_admin_unlocked_v2";
 const ADMIN_MASTER_SECRET_KEY =
   (import.meta.env["VITE_ADMIN_ACCESS_KEY"] as string | undefined)?.trim() ||
-  "dhundo_admin_pass_2026";
+  "connectme2infludhund";
 
 function isLocalEnvironment() {
   if (typeof window === "undefined") {
