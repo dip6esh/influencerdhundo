@@ -1135,13 +1135,6 @@ export const supabaseDb = {
         usageCount: Number(row.usage_count) || 0,
         maxUses: row.max_uses != null ? Number(row.max_uses) : undefined,
         notes: row.notes || "",
-        targetEmail: row.target_email || undefined,
-        targetPhone: row.target_phone || undefined,
-        applicablePlans: Array.isArray(row.applicable_plans)
-          ? row.applicable_plans
-          : row.applicable_plans
-          ? [row.applicable_plans]
-          : undefined,
         createdAt: row.created_at,
       }));
     } catch {
@@ -1158,9 +1151,6 @@ export const supabaseDb = {
     validityDays: number;
     maxUses?: number | undefined;
     notes?: string | undefined;
-    targetEmail?: string | undefined;
-    targetPhone?: string | undefined;
-    applicablePlans?: string[] | undefined;
   }): Promise<{ success: boolean; error?: string; code?: DiscountCode }> {
     try {
       const cleanCode = input.code.trim().toUpperCase().replace(/\s+/g, "");
@@ -1171,12 +1161,6 @@ export const supabaseDb = {
       const discountType = input.discountType || "percentage";
       const discountPercent = input.discountPercent;
       const discountValue = input.discountValue ?? discountPercent;
-      const targetEmail = input.targetEmail ? input.targetEmail.trim().toLowerCase() : null;
-      const targetPhone = input.targetPhone ? input.targetPhone.trim() : null;
-      const applicablePlans =
-        input.applicablePlans && input.applicablePlans.length > 0
-          ? input.applicablePlans
-          : null;
 
       const { data, error } = await supabase
         .from("discount_codes")
@@ -1192,9 +1176,6 @@ export const supabaseDb = {
           usage_count: 0,
           max_uses: input.maxUses || null,
           notes: input.notes || "",
-          target_email: targetEmail,
-          target_phone: targetPhone,
-          applicable_plans: applicablePlans,
         })
         .select("*")
         .single();
@@ -1218,13 +1199,6 @@ export const supabaseDb = {
           usageCount: Number(data.usage_count),
           maxUses: data.max_uses != null ? Number(data.max_uses) : undefined,
           notes: data.notes || "",
-          targetEmail: data.target_email || undefined,
-          targetPhone: data.target_phone || undefined,
-          applicablePlans: Array.isArray(data.applicable_plans)
-            ? data.applicable_plans
-            : data.applicable_plans
-            ? [data.applicable_plans]
-            : undefined,
           createdAt: data.created_at,
         },
       };
@@ -1259,7 +1233,6 @@ export const supabaseDb = {
   /** Validate a discount code for checkout (returns code details or error) */
   async validateDiscountCode(
     codeStr: string,
-    userContext?: { email?: string; phone?: string; planId?: string },
   ): Promise<
     | { valid: true; discountCode: DiscountCode }
     | { valid: false; error: string }
@@ -1296,59 +1269,6 @@ export const supabaseDb = {
         return { valid: false, error: "This coupon code has reached its maximum redemption limit." };
       }
 
-      // Check plan applicability restriction
-      const applicablePlans: string[] = Array.isArray(row.applicable_plans)
-        ? row.applicable_plans
-        : row.applicable_plans
-        ? [row.applicable_plans]
-        : [];
-
-      if (applicablePlans.length > 0 && !applicablePlans.includes("all")) {
-        if (userContext?.planId && !applicablePlans.includes(userContext.planId)) {
-          const planNames = applicablePlans
-            .map((p) =>
-              p === "1m"
-                ? "1 Month"
-                : p === "3m"
-                ? "3 Months"
-                : p === "6m"
-                ? "6 Months"
-                : p === "1y"
-                ? "1 Year"
-                : p,
-            )
-            .join(", ");
-          return {
-            valid: false,
-            error: `This coupon code is only valid for the following plan(s): ${planNames}.`,
-          };
-        }
-      }
-
-      // Check if code is restricted to a specific email address
-      if (row.target_email && row.target_email.trim()) {
-        const requiredEmail = row.target_email.trim().toLowerCase();
-        const userEmail = userContext?.email ? userContext.email.trim().toLowerCase() : "";
-        if (!userEmail || userEmail !== requiredEmail) {
-          return {
-            valid: false,
-            error: `This exclusive promo code is reserved for account email: ${row.target_email}.`,
-          };
-        }
-      }
-
-      // Check if code is restricted to a specific mobile number
-      if (row.target_phone && row.target_phone.trim()) {
-        const requiredPhoneDigits = row.target_phone.replace(/\D/g, "").slice(-10);
-        const userPhoneDigits = userContext?.phone ? userContext.phone.replace(/\D/g, "").slice(-10) : "";
-        if (!userPhoneDigits || userPhoneDigits !== requiredPhoneDigits) {
-          return {
-            valid: false,
-            error: `This exclusive promo code is reserved for registered phone: ${row.target_phone}.`,
-          };
-        }
-      }
-
       return {
         valid: true,
         discountCode: {
@@ -1364,9 +1284,6 @@ export const supabaseDb = {
           usageCount: Number(row.usage_count),
           maxUses: row.max_uses != null ? Number(row.max_uses) : undefined,
           notes: row.notes || "",
-          targetEmail: row.target_email || undefined,
-          targetPhone: row.target_phone || undefined,
-          applicablePlans: applicablePlans.length > 0 ? applicablePlans : undefined,
           createdAt: row.created_at,
         },
       };
@@ -1426,9 +1343,6 @@ export type DiscountCode = {
   usageCount: number;
   maxUses?: number | undefined;
   notes?: string;
-  targetEmail?: string | undefined;
-  targetPhone?: string | undefined;
-  applicablePlans?: string[] | undefined;
   createdAt: string;
 };
 

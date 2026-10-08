@@ -84,7 +84,6 @@ function Plans() {
     isTrial?: boolean;
     validUntil?: string;
     note?: string;
-    applicablePlans?: string[] | undefined;
   } | null>(null);
   const [promoError, setPromoError] = useState("");
   const [validatingPromo, setValidatingPromo] = useState(false);
@@ -103,25 +102,17 @@ function Plans() {
 
   const basePrice = getBasePlanPrice(selectedPlan.id, selectedPlan.price);
 
-  // Dynamic discount calculation across all plans (respects plan-specific restrictions)
-  const calculateDiscountForPrice = (price: number, planId: string = selectedPlan.id) => {
+  // Dynamic discount calculation across all plans
+  const calculateDiscountForPrice = (price: number) => {
     if (isTrialApplied) return price; // 100% off for 3-day trial
     if (!appliedDiscount) return 0;
-    if (
-      appliedDiscount.applicablePlans &&
-      appliedDiscount.applicablePlans.length > 0 &&
-      !appliedDiscount.applicablePlans.includes("all") &&
-      !appliedDiscount.applicablePlans.includes(planId)
-    ) {
-      return 0; // Discount not applicable to this plan
-    }
     if (appliedDiscount.type === "flat") {
       return Math.min(price, appliedDiscount.value);
     }
     return Math.round((price * appliedDiscount.percent) / 100);
   };
 
-  const discountAmount = calculateDiscountForPrice(basePrice, selectedPlan.id);
+  const discountAmount = calculateDiscountForPrice(basePrice);
   const finalPrice = isTrialApplied ? 0 : Math.max(0, basePrice - discountAmount);
 
   const handleApplyPromo = async () => {
@@ -156,12 +147,7 @@ function Plans() {
     // 2. Validate admin-created discount code from Supabase
     setValidatingPromo(true);
     try {
-      const userContext = {
-        email: mine?.contact?.email || (mine as any)?.email || "",
-        phone: mine?.contact?.phone || (mine as any)?.phone || "",
-        planId: selectedPlanId,
-      };
-      const res = await supabaseDb.validateDiscountCode(cleaned, userContext);
+      const res = await supabaseDb.validateDiscountCode(cleaned);
       if (!res.valid) {
         setPromoError(res.error || "Invalid coupon code.");
         return;
@@ -174,13 +160,12 @@ function Plans() {
         type: dc.discountType,
         value: dc.discountValue,
         validUntil: dc.validUntil,
-        applicablePlans: dc.applicablePlans,
         note:
           dc.discountPercent === 100
             ? "100% OFF (Free Pass)"
             : dc.discountType === "flat"
             ? `₹${dc.discountValue} OFF`
-            : `${dc.discountPercent}% OFF`,
+            : `${dc.discountPercent}% OFF on all plans`,
       });
       setPromoCodeInput("");
     } catch {
@@ -446,9 +431,8 @@ function Plans() {
                   {PLANS.map((p) => {
                     const isSelected = selectedPlanId === p.id && !isTrialApplied;
                     const standardPrice = getBasePlanPrice(p.id, p.price);
-                    const planDiscount = calculateDiscountForPrice(standardPrice, p.id);
+                    const planDiscount = calculateDiscountForPrice(standardPrice);
                     const planFinalPrice = isTrialApplied ? 0 : Math.max(0, standardPrice - planDiscount);
-                    const isDiscountApplicableToThisPlan = planDiscount > 0 || isTrialApplied;
 
                     return (
                       <button
@@ -475,7 +459,7 @@ function Plans() {
                             </div>
                           </>
                         )}
-                        {appliedDiscount && isDiscountApplicableToThisPlan && (
+                        {appliedDiscount && (
                           <div className="absolute -top-2.5 -right-2.5 z-10 flex h-6 items-center justify-center rounded-full bg-tealdeep px-2 text-[10px] font-bold text-white shadow-md">
                             {appliedDiscount.percent === 100
                               ? "FREE"
@@ -496,7 +480,7 @@ function Plans() {
                         <p className="mt-1.5 font-display text-2xl font-semibold">
                           {p.duration}
                         </p>
-                        {appliedDiscount && !isTrialApplied && isDiscountApplicableToThisPlan ? (
+                        {appliedDiscount && !isTrialApplied ? (
                           <div className="mt-2 flex items-baseline gap-2">
                             <span className={`text-xl font-bold ${isSelected ? "text-primary" : "text-tealdeep"}`}>
                               {formatPrice(planFinalPrice)}
