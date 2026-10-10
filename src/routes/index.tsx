@@ -250,7 +250,7 @@ function Landing() {
       </section>
 
       {/* PHILOSOPHY */}
-      <section className="border-y border-border bg-secondary/50">
+      <section className="bg-secondary/50">
         <div className="mx-auto max-w-5xl px-5 py-12 md:py-16">
           <SectionEyebrow>Our philosophy</SectionEyebrow>
           <blockquote className="mt-5 max-w-[36ch] text-3xl font-display font-semibold leading-tight text-balance md:text-4xl">
@@ -339,7 +339,7 @@ function Landing() {
       <FaqSection />
 
       {/* FINAL CTA */}
-      <section className="relative overflow-hidden border-t border-border bg-foreground">
+      <section className="relative overflow-hidden bg-foreground">
         <div className="pointer-events-none absolute -top-20 right-0 size-80 rounded-full bg-primary/20 blur-3xl" />
         <div className="pointer-events-none absolute -bottom-20 -left-10 size-64 rounded-full bg-accent/20 blur-3xl" />
         <div className="relative mx-auto max-w-5xl px-5 py-14 md:py-20">
@@ -426,7 +426,7 @@ const POPULAR_CATEGORIES = [
 
 function RegionalHubSection() {
   return (
-    <section className="border-t border-border bg-secondary/50 py-16 md:py-24">
+    <section className="bg-secondary/50 py-16 md:py-24">
       <div className="mx-auto max-w-5xl px-5">
         <div className="max-w-3xl">
           <SectionEyebrow>Local Discovery</SectionEyebrow>
@@ -503,7 +503,7 @@ function FaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="border-t border-border bg-background py-16 md:py-24">
+    <section className="bg-background py-16 md:py-24">
       <div className="mx-auto max-w-5xl px-5">
         <div className="max-w-3xl">
           <SectionEyebrow>Frequently Asked Questions</SectionEyebrow>

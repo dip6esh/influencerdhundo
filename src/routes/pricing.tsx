@@ -98,7 +98,7 @@ function PricingPage() {
   return (
     <div className="min-h-screen bg-background text-foreground">
       {/* ── HERO HEADER ── */}
-      <section className="relative overflow-hidden border-b border-border/80 bg-gradient-to-b from-secondary/40 via-background to-background py-16 md:py-24">
+      <section className="relative overflow-hidden bg-gradient-to-b from-secondary/40 via-background to-background py-16 md:py-24">
         <div className="pointer-events-none absolute -top-24 left-1/2 -translate-x-1/2 size-96 rounded-full bg-primary/10 blur-3xl" />
         
         <div className="relative mx-auto max-w-5xl px-5 text-center">
@@ -127,7 +127,7 @@ function PricingPage() {
       </section>
 
       {/* ── TWO AUDIENCES SPLIT CARDS ── */}
-      <section className="py-12 md:py-16 border-b border-border/60">
+      <section className="py-12 md:py-16">
         <div className="mx-auto max-w-5xl px-5">
           <div className="grid gap-6 md:grid-cols-2">
             {/* For Creators */}
@@ -324,7 +324,7 @@ function PricingPage() {
       </section>
 
       {/* ── PLANS GRID ── */}
-      <section className="py-12 md:py-16 bg-secondary/20 border-y border-border/60">
+      <section className="py-12 md:py-16 bg-secondary/20">
         <div className="mx-auto max-w-5xl px-5">
           <div className="max-w-2xl">
             <SectionEyebrow>All Subscription Plans</SectionEyebrow>
@@ -534,7 +534,7 @@ function PricingPage() {
       </section>
 
       {/* ── PRICING FAQS ── */}
-      <section className="py-12 md:py-16 border-t border-border/60">
+      <section className="py-12 md:py-16">
         <div className="mx-auto max-w-4xl px-5">
           <div className="text-center max-w-2xl mx-auto">
             <SectionEyebrow>Pricing FAQs</SectionEyebrow>
