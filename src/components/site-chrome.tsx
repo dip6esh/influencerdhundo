@@ -369,11 +369,11 @@ export function SiteFooter() {
             </p>
             <div className="pt-1">
               <a
-                href="mailto:support@influencerdhundo.com"
+                href="mailto:influencerdhundo@gmail.com"
                 className="inline-flex items-center gap-2 text-xs font-medium text-muted-foreground hover:text-foreground transition-colors"
               >
                 <Mail className="size-3.5 text-primary" />
-                <span>support@influencerdhundo.com</span>
+                <span>influencerdhundo@gmail.com</span>
               </a>
             </div>
           </div>

@@ -452,10 +452,10 @@ function PrivacyPage() {
               <p className="text-muted-foreground">
                 Email:{" "}
                 <a
-                  href="mailto:support@influencerdhundo.com"
+                  href="mailto:influencerdhundo@gmail.com"
                   className="text-primary font-medium hover:underline"
                 >
-                  support@influencerdhundo.com
+                  influencerdhundo@gmail.com
                 </a>
               </p>
               <p className="text-muted-foreground">

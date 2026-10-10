@@ -2265,7 +2265,7 @@ function PaymentReceiptModal({
                 <div class="info-card-name">Influencer Dhundo Platform</div>
                 <div class="info-card-line">Processor: Razorpay Software Pvt Ltd</div>
                 <div class="info-card-line">Mode: Live Production Gateway (INR)</div>
-                <div class="info-card-line">Support: support@influencerdhundo.com</div>
+                <div class="info-card-line">Support: influencerdhundo@gmail.com</div>
               </div>
             </div>
 
@@ -2522,7 +2522,7 @@ function PaymentReceiptModal({
                   Mode: Live Production Gateway (INR)
                 </p>
                 <p className="text-muted-foreground">
-                  Support: support@influencerdhundo.com
+                  Support: influencerdhundo@gmail.com
                 </p>
               </div>
             </div>

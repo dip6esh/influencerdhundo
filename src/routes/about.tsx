@@ -296,7 +296,7 @@ function AboutPage() {
 
             <div className="mt-6 flex flex-wrap items-center gap-4">
               <a
-                href="mailto:support@influencerdhundo.com"
+                href="mailto:influencerdhundo@gmail.com"
                 className="inline-flex items-center gap-2 rounded-xl bg-primary px-5 py-3 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-sm"
               >
                 Email Support Team
