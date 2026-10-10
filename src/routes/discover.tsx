@@ -92,10 +92,58 @@ function Discover() {
     }, 60);
   };
 
+  const [sortBy, setSortBy] = useState<
+    | "default"
+    | "followers-desc"
+    | "followers-asc"
+    | "price-asc"
+    | "price-desc"
+    | "turnaround-asc"
+    | "newest"
+  >("default");
+
   const results = useMemo(() => {
     if (!discoverHasSearched) return null;
     return filterCreators(creators, filters);
   }, [discoverHasSearched, creators, filters]);
+
+  const sortedResults = useMemo(() => {
+    if (!results) return null;
+    const list = [...results];
+
+    switch (sortBy) {
+      case "followers-desc":
+        return list.sort((a, b) => (b.followers || 0) - (a.followers || 0));
+      case "followers-asc":
+        return list.sort((a, b) => (a.followers || 0) - (b.followers || 0));
+      case "price-asc":
+        return list.sort((a, b) => (a.startingPrice || 0) - (b.startingPrice || 0));
+      case "price-desc":
+        return list.sort((a, b) => (b.startingPrice || 0) - (a.startingPrice || 0));
+      case "turnaround-asc": {
+        const getTurnaroundWeight = (t?: string) => {
+          if (!t) return 99;
+          const lower = t.toLowerCase();
+          if (lower.includes("1–2 day") || lower.includes("1-2 day") || lower.includes("24 hour")) return 1;
+          if (lower.includes("3–5 day") || lower.includes("3-5 day")) return 2;
+          if (lower.includes("5–7 day") || lower.includes("5-7 day")) return 3;
+          if (lower.includes("1–2 week") || lower.includes("1-2 week") || lower.includes("week")) return 4;
+          return 5;
+        };
+        return list.sort((a, b) => getTurnaroundWeight(a.turnaround) - getTurnaroundWeight(b.turnaround));
+      }
+      case "newest": {
+        return list.sort((a, b) => {
+          const timeA = a.createdAt ? new Date(a.createdAt).getTime() : 0;
+          const timeB = b.createdAt ? new Date(b.createdAt).getTime() : 0;
+          return timeB - timeA;
+        });
+      }
+      case "default":
+      default:
+        return list;
+    }
+  }, [results, sortBy]);
 
   const hasActiveFilters =
     Boolean(filters.city) ||
@@ -431,7 +479,7 @@ function Discover() {
 
       {/* RESULTS SECTION */}
       <div ref={resultsRef} className="mx-auto mt-10 max-w-5xl px-5 scroll-mt-10">
-        {results === null ? (
+        {sortedResults === null ? (
           <div className="glass-card rounded-2xl p-8 text-center max-w-xl mx-auto">
             <h2 className="text-xl font-display font-semibold">Ready to explore?</h2>
             <p className="mt-2 text-sm text-muted-foreground">
@@ -441,10 +489,10 @@ function Discover() {
           </div>
         ) : (
           <div>
-            <div className="flex items-center justify-between border-b border-border pb-4">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
               <p className="text-sm font-medium text-foreground">
-                <span className="font-semibold text-saffrondeep">{results.length}</span> creator
-                {results.length === 1 ? "" : "s"} found
+                <span className="font-semibold text-saffrondeep">{sortedResults.length}</span> creator
+                {sortedResults.length === 1 ? "" : "s"} found
                 {filters.city ? ` in ${filters.city}` : ""}
                 {filters.pincode ? ` (${filters.pincode})` : ""}
                 {filters.category
@@ -452,10 +500,26 @@ function Discover() {
                   : ""}
                 {filters.collabType ? ` • ${filters.collabType}` : ""}
               </p>
-              <span className="text-xs text-muted-foreground">Sorted by fit</span>
+
+              <div className="flex items-center gap-2 shrink-0">
+                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Sort by:</span>
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="rounded-xl bg-background px-3 py-1.5 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden cursor-pointer shadow-2xs hover:bg-secondary/50 transition-colors"
+                >
+                  <option value="default">Default (Best Match)</option>
+                  <option value="followers-desc">Followers: High to Low</option>
+                  <option value="followers-asc">Followers: Low to High (Nano/Micro)</option>
+                  <option value="price-asc">Price: Low to High (Budget-Friendly)</option>
+                  <option value="price-desc">Price: High to Low</option>
+                  <option value="turnaround-asc">⚡ Fastest Delivery</option>
+                  <option value="newest">✨ Newest Creators</option>
+                </select>
+              </div>
             </div>
 
-            {results.length === 0 ? (
+            {sortedResults.length === 0 ? (
               <div className="glass-card mt-6 rounded-2xl p-10 text-center max-w-xl mx-auto">
                 <h2 className="text-lg font-semibold">No creators match yet</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
@@ -463,7 +527,7 @@ function Discover() {
                 </p>
                 <Button
                   variant="ghost"
-                  className="mt-4"
+                  className="mt-4 cursor-pointer"
                   onClick={resetDiscoverFilters}
                 >
                   Reset filters
@@ -471,7 +535,7 @@ function Discover() {
               </div>
             ) : (
               <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
-                {results.map((c, i) => (
+                {sortedResults.map((c, i) => (
                   <CreatorCard key={c.id} creator={c} index={i} />
                 ))}
               </div>
