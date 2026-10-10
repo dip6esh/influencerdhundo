@@ -48,6 +48,25 @@ export const Route = createFileRoute("/discover")({
   component: Discover,
 });
 
+const SORT_OPTIONS: { label: string; value: SortOptionValue }[] = [
+  { label: "Default (Best Match)", value: "default" },
+  { label: "Followers: High to Low", value: "followers-desc" },
+  { label: "Followers: Low to High (Nano/Micro)", value: "followers-asc" },
+  { label: "Price: Low to High (Budget-Friendly)", value: "price-asc" },
+  { label: "Price: High to Low", value: "price-desc" },
+  { label: "⚡ Fastest Delivery", value: "turnaround-asc" },
+  { label: "✨ Newest Creators", value: "newest" },
+];
+
+type SortOptionValue =
+  | "default"
+  | "followers-desc"
+  | "followers-asc"
+  | "price-asc"
+  | "price-desc"
+  | "turnaround-asc"
+  | "newest";
+
 function Discover() {
   const {
     creators,
@@ -501,21 +520,17 @@ function Discover() {
                 {filters.collabType ? ` • ${filters.collabType}` : ""}
               </p>
 
-              <div className="flex items-center gap-2 shrink-0">
-                <span className="text-xs font-medium text-muted-foreground whitespace-nowrap">Sort by:</span>
-                <select
-                  value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="rounded-xl bg-background px-3 py-1.5 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden cursor-pointer shadow-2xs hover:bg-secondary/50 transition-colors"
-                >
-                  <option value="default">Default (Best Match)</option>
-                  <option value="followers-desc">Followers: High to Low</option>
-                  <option value="followers-asc">Followers: Low to High (Nano/Micro)</option>
-                  <option value="price-asc">Price: Low to High (Budget-Friendly)</option>
-                  <option value="price-desc">Price: High to Low</option>
-                  <option value="turnaround-asc">⚡ Fastest Delivery</option>
-                  <option value="newest">✨ Newest Creators</option>
-                </select>
+              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Sort by:</span>
+                <div className="w-full sm:w-64">
+                  <DropdownSelect
+                    value={sortBy}
+                    onChange={(val) => setSortBy(val as SortOptionValue)}
+                    options={SORT_OPTIONS}
+                    searchable={false}
+                    className="py-2 px-3.5 text-xs rounded-xl bg-background ring-1 ring-border shadow-2xs hover:ring-foreground/30 focus:ring-2 focus:ring-primary"
+                  />
+                </div>
               </div>
             </div>
 
