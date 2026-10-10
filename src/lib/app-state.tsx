@@ -527,6 +527,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 (c.referralCode && c.referralCode.toUpperCase() === cleanRef),
             );
             if (referrer) {
+              const alreadyRewarded = referralEvents.some(
+                (ev) =>
+                  ev.referrerId === referrer.id &&
+                  ev.referredCreatorId === s.creatorId &&
+                  ev.eventType === "earned" &&
+                  ev.daysDelta > 0,
+              );
               const referrerExpiry = referrer.subscriptionExpiresAt
                 ? new Date(referrer.subscriptionExpiresAt)
                 : null;
@@ -534,7 +541,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               const referrerSub = subscriptions.find(
                 (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d" && !sub.isTrial,
               );
-              if (referrerActive || referrerSub) {
+              if (!alreadyRewarded && (referrerActive || referrerSub)) {
                 const baseExpiry = referrer.subscriptionExpiresAt
                   ? new Date(referrer.subscriptionExpiresAt)
                   : now;
