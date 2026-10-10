@@ -17,6 +17,14 @@
     <priority>0.9</priority>
   </url>
 
+  <!-- Pricing & Subscription Plans -->
+  <url>
+    <loc>https://www.influencerdhundo.com/pricing</loc>
+    <lastmod>2026-10-10</lastmod>
+    <changefreq>weekly</changefreq>
+    <priority>0.85</priority>
+  </url>
+
   <!-- About Us — Mission, transparency & platform guide -->
   <url>
     <loc>https://www.influencerdhundo.com/about</loc>

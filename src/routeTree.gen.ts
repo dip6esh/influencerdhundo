@@ -14,6 +14,7 @@ import { Route as AboutRouteImport } from './routes/about'
 import { Route as AdminRouteImport } from './routes/admin'
 import { Route as DiscoverRouteImport } from './routes/discover'
 import { Route as LoginRouteImport } from './routes/login'
+import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
 import { Route as TermsRouteImport } from './routes/terms'
@@ -48,6 +49,11 @@ const DiscoverRoute = DiscoverRouteImport.update({
 const LoginRoute = LoginRouteImport.update({
   id: '/login',
   path: '/login',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const PricingRoute = PricingRouteImport.update({
+  id: '/pricing',
+  path: '/pricing',
   getParentRoute: () => rootRouteImport,
 } as any)
 const PrivacyRoute = PrivacyRouteImport.update({
@@ -107,6 +113,7 @@ export interface FileRoutesByFullPath {
   '/admin': typeof AdminRoute
   '/discover': typeof DiscoverRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms': typeof TermsRoute
@@ -124,6 +131,7 @@ export interface FileRoutesByTo {
   '/admin': typeof AdminRoute
   '/discover': typeof DiscoverRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms': typeof TermsRoute
@@ -142,6 +150,7 @@ export interface FileRoutesById {
   '/admin': typeof AdminRoute
   '/discover': typeof DiscoverRoute
   '/login': typeof LoginRoute
+  '/pricing': typeof PricingRoute
   '/privacy': typeof PrivacyRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms': typeof TermsRoute
@@ -161,6 +170,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/discover'
     | '/login'
+    | '/pricing'
     | '/privacy'
     | '/refund-policy'
     | '/terms'
@@ -178,6 +188,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/discover'
     | '/login'
+    | '/pricing'
     | '/privacy'
     | '/refund-policy'
     | '/terms'
@@ -195,6 +206,7 @@ export interface FileRouteTypes {
     | '/admin'
     | '/discover'
     | '/login'
+    | '/pricing'
     | '/privacy'
     | '/refund-policy'
     | '/terms'
@@ -213,6 +225,7 @@ export interface RootRouteChildren {
   AdminRoute: typeof AdminRoute
   DiscoverRoute: typeof DiscoverRoute
   LoginRoute: typeof LoginRoute
+  PricingRoute: typeof PricingRoute
   PrivacyRoute: typeof PrivacyRoute
   RefundPolicyRoute: typeof RefundPolicyRoute
   TermsRoute: typeof TermsRoute
@@ -260,6 +273,13 @@ declare module '@tanstack/react-router' {
       path: '/login'
       fullPath: '/login'
       preLoaderRoute: typeof LoginRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/pricing': {
+      id: '/pricing'
+      path: '/pricing'
+      fullPath: '/pricing'
+      preLoaderRoute: typeof PricingRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/privacy': {
@@ -341,6 +361,7 @@ const rootRouteChildren: RootRouteChildren = {
   AdminRoute: AdminRoute,
   DiscoverRoute: DiscoverRoute,
   LoginRoute: LoginRoute,
+  PricingRoute: PricingRoute,
   PrivacyRoute: PrivacyRoute,
   RefundPolicyRoute: RefundPolicyRoute,
   TermsRoute: TermsRoute,

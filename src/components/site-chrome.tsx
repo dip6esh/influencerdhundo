@@ -80,13 +80,13 @@ export function SiteHeader() {
               <span>Find creators</span>
             </Link>
 
-            <a
-              href="/#pricing"
+            <Link
+              to="/pricing"
               className="inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground px-2.5 py-1.5 transition-colors"
             >
               <Gift className="size-3.5 text-saffrondeep" />
               <span>Pricing &amp; Trial</span>
-            </a>
+            </Link>
 
             {/* Logged in as Business */}
             {business ? (
@@ -217,14 +217,14 @@ export function SiteHeader() {
             Find Creators
           </Link>
 
-          <a
-            href="/#pricing"
+          <Link
+            to="/pricing"
             onClick={closeMenu}
             className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
           >
             <Gift className="size-4 text-saffrondeep shrink-0" />
             Pricing &amp; Free Trial
-          </a>
+          </Link>
 
           <div className="h-px bg-border my-1" />
 
@@ -395,9 +395,9 @@ export function SiteFooter() {
                 </Link>
               </li>
               <li>
-                <a href="/#pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
                   Pricing &amp; 3-Day Trial
-                </a>
+                </Link>
               </li>
               <li>
                 <Link to="/creator/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">

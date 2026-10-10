@@ -5,6 +5,7 @@
 User-agent: *
 Allow: /
 Allow: /discover
+Allow: /pricing
 Allow: /about
 Allow: /privacy
 Allow: /terms
@@ -25,6 +26,7 @@ Disallow: /admin
 User-agent: GPTBot
 Allow: /
 Allow: /discover
+Allow: /pricing
 Allow: /about
 Allow: /creators/
 Disallow: /admin
@@ -34,6 +36,7 @@ Disallow: /business/
 User-agent: PerplexityBot
 Allow: /
 Allow: /discover
+Allow: /pricing
 Allow: /about
 Allow: /creators/
 Disallow: /admin
@@ -43,6 +46,7 @@ Disallow: /business/
 User-agent: ClaudeBot
 Allow: /
 Allow: /discover
+Allow: /pricing
 Allow: /about
 Allow: /creators/
 Disallow: /admin
@@ -52,6 +56,7 @@ Disallow: /business/
 User-agent: Google-Extended
 Allow: /
 Allow: /discover
+Allow: /pricing
 Allow: /about
 Allow: /creators/
 Disallow: /admin
@@ -61,6 +66,7 @@ Disallow: /business/
 User-agent: Applebot-Extended
 Allow: /
 Allow: /discover
+Allow: /pricing
 Allow: /about
 Allow: /creators/
 Disallow: /admin
