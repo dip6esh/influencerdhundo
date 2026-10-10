@@ -13,6 +13,9 @@ import {
   ArrowRight,
   Building2,
   Search,
+  ChevronDown,
+  HelpCircle,
+  MapPin,
 } from "lucide-react";
 
 export const Route = createFileRoute("/")({
@@ -96,8 +99,25 @@ function ArrowLink({
 }
 
 function Landing() {
+  const faqSchema = {
+    "@context": "https://schema.org",
+    "@type": "FAQPage",
+    "mainEntity": FAQ_ITEMS.map((item) => ({
+      "@type": "Question",
+      "name": item.q,
+      "acceptedAnswer": {
+        "@type": "Answer",
+        "text": item.a,
+      },
+    })),
+  };
+
   return (
     <div>
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(faqSchema) }}
+      />
       {/* HERO */}
       <section className="relative overflow-hidden">
         <div className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-primary/15 blur-2xl" />
@@ -320,8 +340,14 @@ function Landing() {
         </div>
       </section>
 
+      {/* REGIONAL LOCAL DISCOVERY HUB */}
+      <RegionalHubSection />
+
       {/* PRICING & FREE TRIAL SECTION */}
       <PricingSection />
+
+      {/* FREQUENTLY ASKED QUESTIONS */}
+      <FaqSection />
 
       {/* FINAL CTA */}
       <section className="relative overflow-hidden border-t border-border bg-foreground">
@@ -751,6 +777,193 @@ function PricingSection() {
           </div>
         </div>
 
+      </div>
+    </section>
+  );
+}
+
+const FAQ_ITEMS = [
+  {
+    q: "How does Influencer Dhundo help local businesses find relevant creators?",
+    a: "Influencer Dhundo is India's direct local influencer discovery platform. Businesses can search and filter verified Instagram creators by city, locality, niche category (Food, Fashion, Fitness, Tech, etc.), audience size, turnaround time, and budget without having to hire expensive agencies.",
+  },
+  {
+    q: "Why is Influencer Dhundo 0% commission?",
+    a: "Traditional agencies often take a 20% to 50% commission cut on every brand deal. Influencer Dhundo operates on zero commission: businesses connect directly with creators via WhatsApp and phone, negotiate their own terms, and keep 100% of the collaboration value between the brand and creator.",
+  },
+  {
+    q: "How do businesses get direct WhatsApp and contact access with creators?",
+    a: "Subscribed businesses can instantly unlock direct WhatsApp chat, verified phone numbers, and email IDs for active creators on our platform, enabling fast communication, product gifting, and rapid campaign execution.",
+  },
+  {
+    q: "Can nano and micro-influencers join Influencer Dhundo?",
+    a: "Yes! Influencer Dhundo is built specifically to champion nano-creators (1K–10K) and micro-creators (10K–100K) who have strong local audience engagement. Creators can easily register, showcase sample reels/posts, list starting prices, and receive direct brand collaboration inquiries.",
+  },
+  {
+    q: "Which cities across India are supported?",
+    a: "We support creators and businesses across major Indian commercial hubs including Surat, Mumbai, Ahmedabad, Delhi NCR, Bangalore, Pune, Hyderabad, Jaipur, Kolkata, Indore, Lucknow, Chandigarh, and 60+ tier-1 and tier-2 cities.",
+  },
+  {
+    q: "How does the Creator Referral Program work?",
+    a: "When an active creator invites fellow creators using their unique referral link, the invited creator receives a 3-day free trial. Once the referred creator upgrades to any paid plan, the referring creator automatically receives +7 bonus subscription days added to their plan.",
+  },
+];
+
+const POPULAR_CITIES = [
+  "Surat",
+  "Mumbai",
+  "Ahmedabad",
+  "Delhi",
+  "Bangalore",
+  "Pune",
+  "Jaipur",
+  "Hyderabad",
+  "Indore",
+  "Lucknow",
+  "Chandigarh",
+  "Kolkata",
+];
+
+const POPULAR_CATEGORIES = [
+  "Food",
+  "Fashion",
+  "Beauty",
+  "Fitness",
+  "Lifestyle",
+  "Travel",
+  "Technology",
+  "Entertainment",
+];
+
+function RegionalHubSection() {
+  return (
+    <section className="border-t border-border bg-secondary/30 py-12 md:py-16">
+      <div className="mx-auto max-w-5xl px-5">
+        <div className="text-center max-w-2xl mx-auto">
+          <SectionEyebrow>Local Discovery</SectionEyebrow>
+          <h2 className="mt-2 text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
+            Discover Creators by City &amp; Category
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Explore verified local influencers across top Indian cities and high-growth niches.
+          </p>
+        </div>
+
+        {/* Cities Hub */}
+        <div className="mt-8 rounded-2xl bg-card p-5 sm:p-6 border border-border/80 shadow-xs">
+          <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <MapPin className="size-4 text-primary shrink-0" />
+            <span>Popular Cities in India</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {POPULAR_CITIES.map((city) => (
+              <Link
+                key={city}
+                to="/discover"
+                className="rounded-xl bg-secondary/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background transition-all shadow-2xs"
+              >
+                {city} Creators
+              </Link>
+            ))}
+          </div>
+        </div>
+
+        {/* Categories Hub */}
+        <div className="mt-4 rounded-2xl bg-card p-5 sm:p-6 border border-border/80 shadow-xs">
+          <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+            <Sparkles className="size-4 text-primary shrink-0" />
+            <span>Trending Niche Categories</span>
+          </div>
+          <div className="flex flex-wrap gap-2">
+            {POPULAR_CATEGORIES.map((cat) => (
+              <Link
+                key={cat}
+                to="/discover"
+                className="rounded-xl bg-secondary/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background transition-all shadow-2xs"
+              >
+                {cat} Influencers
+              </Link>
+            ))}
+          </div>
+        </div>
+      </div>
+    </section>
+  );
+}
+
+function FaqSection() {
+  const [openIndex, setOpenIndex] = useState<number | null>(0);
+
+  return (
+    <section className="border-t border-border bg-background py-14 md:py-20">
+      <div className="mx-auto max-w-4xl px-5">
+        <div className="text-center max-w-2xl mx-auto">
+          <SectionEyebrow>Frequently Asked Questions</SectionEyebrow>
+          <h2 className="mt-2 text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
+            Everything You Need to Know
+          </h2>
+          <p className="mt-2 text-sm text-muted-foreground">
+            Got questions about how Influencer Dhundo works for brands and creators? Find answers below.
+          </p>
+        </div>
+
+        <div className="mt-10 space-y-3">
+          {FAQ_ITEMS.map((item, index) => {
+            const isOpen = openIndex === index;
+            return (
+              <div
+                key={index}
+                className="rounded-2xl bg-card border border-border/80 shadow-2xs overflow-hidden transition-all"
+              >
+                <button
+                  type="button"
+                  onClick={() => setOpenIndex(isOpen ? null : index)}
+                  className="flex w-full items-center justify-between gap-4 p-5 text-left font-display text-base font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                  aria-expanded={isOpen}
+                >
+                  <span className="flex items-start gap-3">
+                    <HelpCircle className="size-5 text-primary shrink-0 mt-0.5" />
+                    <span>{item.q}</span>
+                  </span>
+                  <ChevronDown
+                    className={`size-5 text-muted-foreground shrink-0 transition-transform duration-200 ${
+                      isOpen ? "rotate-180 text-primary" : ""
+                    }`}
+                  />
+                </button>
+                {isOpen && (
+                  <div className="px-5 pb-5 pt-1 text-sm text-muted-foreground leading-relaxed pl-12 border-t border-border/40">
+                    {item.a}
+                  </div>
+                )}
+              </div>
+            );
+          })}
+        </div>
+
+        {/* Support Callout */}
+        <div className="mt-10 rounded-2xl bg-secondary/60 border border-border p-6 text-center">
+          <p className="text-sm font-semibold text-foreground">
+            Still have questions or need help onboarding?
+          </p>
+          <p className="mt-1 text-xs text-muted-foreground">
+            Reach out to our team directly on WhatsApp or explore our creator and business guides.
+          </p>
+          <div className="mt-4 flex flex-wrap justify-center gap-3">
+            <Link
+              to="/discover"
+              className="inline-flex rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors"
+            >
+              Explore Directory
+            </Link>
+            <Link
+              to="/about"
+              className="inline-flex rounded-xl bg-background px-4 py-2 text-xs font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-colors"
+            >
+              About Our Mission
+            </Link>
+          </div>
+        </div>
       </div>
     </section>
   );

@@ -1,6 +1,7 @@
 # Influencer Dhundo — robots.txt
 # https://www.influencerdhundo.com
 
+# ── General Search Engine Crawlers (Google, Bing, Yahoo, DuckDuckGo) ──
 User-agent: *
 Allow: /
 Allow: /discover
@@ -10,7 +11,7 @@ Allow: /terms
 Allow: /refund-policy
 Allow: /creators/
 
-# Block all auth, private, and admin management routes
+# Block all private, auth, and admin routes
 Disallow: /creator/dashboard
 Disallow: /creator/plans
 Disallow: /creator/register
@@ -20,5 +21,52 @@ Disallow: /business/login
 Disallow: /login
 Disallow: /admin
 
+# ── AI Search Engines & Conversational Assistants (ChatGPT, Perplexity, Gemini, Claude, Apple) ──
+User-agent: GPTBot
+Allow: /
+Allow: /discover
+Allow: /about
+Allow: /creators/
+Disallow: /admin
+Disallow: /creator/
+Disallow: /business/
+
+User-agent: PerplexityBot
+Allow: /
+Allow: /discover
+Allow: /about
+Allow: /creators/
+Disallow: /admin
+Disallow: /creator/
+Disallow: /business/
+
+User-agent: ClaudeBot
+Allow: /
+Allow: /discover
+Allow: /about
+Allow: /creators/
+Disallow: /admin
+Disallow: /creator/
+Disallow: /business/
+
+User-agent: Google-Extended
+Allow: /
+Allow: /discover
+Allow: /about
+Allow: /creators/
+Disallow: /admin
+Disallow: /creator/
+Disallow: /business/
+
+User-agent: Applebot-Extended
+Allow: /
+Allow: /discover
+Allow: /about
+Allow: /creators/
+Disallow: /admin
+Disallow: /creator/
+Disallow: /business/
+
 Sitemap: https://www.influencerdhundo.com/sitemap.xml
+
 
