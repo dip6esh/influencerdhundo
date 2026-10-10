@@ -154,10 +154,24 @@ function Plans() {
       return;
     }
 
-    // 2. Validate admin-created discount code from Supabase
+    // 2. Prevent reusing any promo code already redeemed in past subscriptions
+    if (mine?.id) {
+      const alreadyRedeemed = subscriptions.some(
+        (s) =>
+          s.creatorId === mine.id &&
+          s.referralCodeUsed?.trim().toUpperCase() === cleaned,
+      );
+      if (alreadyRedeemed) {
+        setPromoError("You have already redeemed this promo code previously. Each discount code can only be used once per creator.");
+        return;
+      }
+    }
+
+    // 3. Validate admin-created discount code from Supabase
     setValidatingPromo(true);
     try {
       const userContext = {
+        creatorId: mine?.id,
         email: mine?.contact?.email || (mine as any)?.email || "",
         phone: mine?.contact?.phone || (mine as any)?.phone || "",
         planId: selectedPlanId,
@@ -217,12 +231,16 @@ function Plans() {
         const planIdToActivate = isTrialApplied ? "trial-3d" : selectedPlan.id;
         const durationToActivate = isTrialApplied ? "3 Days Free Trial" : selectedPlan.duration;
 
-        await activateSubscription({
-          creatorId: mine.id,
-          planId: planIdToActivate,
-          duration: durationToActivate,
-          price: 0,
-        });
+        await activateSubscription(
+          {
+            creatorId: mine.id,
+            planId: planIdToActivate,
+            duration: durationToActivate,
+            price: 0,
+            isTrial: isTrialApplied,
+          },
+          appliedDiscount?.code,
+        );
 
         // If a 100% discount code was used, increment usage count
         if (appliedDiscount?.code && !isTrialApplied) {
@@ -298,12 +316,17 @@ function Plans() {
             }
 
             // 5. Activate or queue subscription in application state
-            await activateSubscription({
-              creatorId: mine.id,
-              planId: selectedPlan.id,
-              duration: selectedPlan.duration,
-              price: finalPrice,
-            });
+            await activateSubscription(
+              {
+                creatorId: mine.id,
+                planId: selectedPlan.id,
+                duration: selectedPlan.duration,
+                price: finalPrice,
+                razorpayOrderId: response.razorpay_order_id,
+                razorpayPaymentId: response.razorpay_payment_id,
+              },
+              appliedDiscount?.code,
+            );
 
             setSuccess(true);
             setTimeout(() => {

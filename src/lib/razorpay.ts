@@ -243,6 +243,8 @@ export const verifyRazorpayPaymentFn = createServerFn({ method: "POST" })
             currency: "INR",
             plan_id: planId,
             status: "captured",
+            promo_code_used: discountCode?.trim().toUpperCase() || null,
+            referral_code_used: discountCode?.trim().toUpperCase() || null,
           },
         ]);
 

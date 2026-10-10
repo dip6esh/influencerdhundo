@@ -516,6 +516,7 @@ export type Creator = {
   trialStartedAt?: string | undefined;
   subscriptionExpiresAt?: string | undefined;
   referralBonusDays?: number | undefined;
+  createdAt?: string | undefined;
 };
 
 export const CREATORS: Creator[] = [
@@ -817,8 +818,13 @@ export const EMPTY_FILTERS: Filters = {
 };
 
 export function filterCreators(creators: Creator[], f: Filters) {
+  const now = Date.now();
   return creators.filter((c) => {
+    // 1. Strict Active Status & Expiration Guard
     if (c.status !== "Active") return false;
+    const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+    if (expTime > 0 && expTime <= now) return false;
+
     if (f.city && c.city !== f.city) return false;
     if (f.locality && !c.locality.toLowerCase().includes(f.locality.trim().toLowerCase()))
       return false;

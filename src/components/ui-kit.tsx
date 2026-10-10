@@ -711,13 +711,18 @@ export function SectionEyebrow({ children, className }: { children: ReactNode; c
 export function StatusPill({ status }: { status: string }) {
   const tone =
     status === "Active"
-      ? "bg-accent/10 text-tealdeep"
+      ? "bg-accent/15 text-tealdeep border border-accent/30 font-bold"
       : status === "Suspended"
-        ? "bg-rose/10 text-rose"
-        : "bg-primary/15 text-saffrondeep";
+        ? "bg-rose/15 text-rose border border-rose/30 font-bold"
+        : status === "Expired"
+          ? "bg-rose/15 text-rose border border-rose/30 font-bold"
+          : status === "Inactive"
+            ? "bg-secondary text-muted-foreground border border-border"
+            : "bg-primary/15 text-saffrondeep border border-primary/25";
   return (
-    <span className={cn("rounded-full px-2.5 py-1 text-xs font-semibold", tone)}>
-      {status}
+    <span className={cn("rounded-full px-2.5 py-0.5 text-xs font-semibold inline-flex items-center gap-1", tone)}>
+      {status === "Expired" && <span className="size-1.5 rounded-full bg-rose animate-pulse" />}
+      <span>{status}</span>
     </span>
   );
 }

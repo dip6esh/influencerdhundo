@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button, Card, Field, Select, Tag, TextArea } from "@/components/ui-kit";
 import { InstagramIcon } from "@/components/icons";
@@ -10,6 +10,7 @@ import {
   formatFollowers,
   formatInstagramHandle,
   formatPrice,
+  getCreatorProfileSlug,
   getInstagramUrl,
   normalizeInstagramHandle,
 } from "@/lib/directory-data";
@@ -53,21 +54,36 @@ export const Route = createFileRoute("/creators/$creatorId")({
 });
 
 function CreatorProfile() {
+  const navigate = useNavigate();
   const { creatorId } = Route.useParams();
   const { preview } = Route.useSearch();
   const { creators, business, addReport } = useAppState();
   const cleanParam = (creatorId || "").trim().toLowerCase();
+  const cleanParamNorm = cleanParam.replace(/^-+|-+$/g, "");
+
   const creator = creators.find((c) => {
     if (!cleanParam) return false;
-    const cId = (c.id || "").toLowerCase();
-    const cDisplay = (c.displayName || "").toLowerCase();
-    const cNameSlug = (c.name || "").toLowerCase().replace(/[^a-z0-9]+/g, "-");
+    const cId = (c.id || "").toLowerCase().trim();
+    const cIdClean = cId.replace(/^-+|-+$/g, "");
+    const cSlug = getCreatorProfileSlug(c).toLowerCase();
+    const cDisplay = (c.displayName || "").toLowerCase().trim();
+    const cName = (c.name || "").toLowerCase().trim();
+    const cNameSlug = cName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+    const cDisplaySlug = cDisplay.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
     const cHandle = normalizeInstagramHandle(c.instagram).toLowerCase();
+
     return (
       cId === cleanParam ||
+      cIdClean === cleanParamNorm ||
+      cSlug === cleanParam ||
+      cSlug === cleanParamNorm ||
       cDisplay === cleanParam ||
+      cName === cleanParam ||
       cNameSlug === cleanParam ||
-      (cHandle && cHandle === cleanParam)
+      cNameSlug === cleanParamNorm ||
+      cDisplaySlug === cleanParam ||
+      cDisplaySlug === cleanParamNorm ||
+      (cHandle && (cHandle === cleanParam || cHandle === cleanParamNorm))
     );
   });
   const [reportOpen, setReportOpen] = useState(false);
@@ -87,15 +103,41 @@ function CreatorProfile() {
   if (!creator) {
     return (
       <div className="mx-auto max-w-5xl px-5 py-16 text-center">
-        <h1 className="text-2xl">Creator not found</h1>
+        <h1 className="text-2xl font-bold">Creator not found</h1>
         <p className="mt-2 text-sm text-muted-foreground">
           This profile may have been removed or is no longer visible.
         </p>
         <Link
           to="/discover"
-          className="mt-5 inline-flex rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background"
+          className="mt-5 inline-flex rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
         >
           Back to search
+        </Link>
+      </div>
+    );
+  }
+
+  const expTime = creator.subscriptionExpiresAt
+    ? new Date(creator.subscriptionExpiresAt).getTime()
+    : 0;
+  const isExpired =
+    creator.status === "Expired" ||
+    creator.status === "Inactive" ||
+    creator.status === "Draft" ||
+    (expTime > 0 && expTime <= Date.now());
+
+  if (!preview && isExpired) {
+    return (
+      <div className="mx-auto max-w-5xl px-5 py-16 text-center">
+        <h1 className="text-2xl font-bold">Profile Currently Inactive</h1>
+        <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+          This creator&apos;s pass has expired and their profile is temporarily inactive while awaiting renewal.
+        </p>
+        <Link
+          to="/discover"
+          className="mt-5 inline-flex rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
+        >
+          Discover Active Creators
         </Link>
       </div>
     );

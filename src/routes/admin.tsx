@@ -41,6 +41,7 @@ import {
   CheckCircle2,
   UserCheck,
   User,
+  Users,
   Globe,
   Globe2,
   Mail,
@@ -61,6 +62,13 @@ import {
   ArrowUpRight,
   Radio,
   ExternalLink,
+  Zap,
+  CreditCard,
+  MessageSquare,
+  PhoneCall,
+  Award,
+  AlertTriangle,
+  TrendingUp,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -1388,6 +1396,9 @@ function AdminDashboard() {
     removeCreator,
     toggleFeatured,
     updateCreator,
+    activateSubscription,
+    startFreeTrial,
+    refreshFromSupabase,
   } = useAppState();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Analytics");
 
@@ -1408,6 +1419,10 @@ function AdminDashboard() {
       setLoadingVisits(false);
     }
   };
+
+  useEffect(() => {
+    refreshFromSupabase();
+  }, [tab]);
 
   useEffect(() => {
     if (tab === "Analytics") {
@@ -1431,6 +1446,70 @@ function AdminDashboard() {
   const [creatorSearch, setCreatorSearch] = useState("");
   const [creatorStatusFilter, setCreatorStatusFilter] = useState<string>("All");
   const [creatorCategoryFilter, setCreatorCategoryFilter] = useState<string>("All");
+  const [creatorFunnelFilter, setCreatorFunnelFilter] = useState<
+    "all" | "paid" | "promo100" | "trial" | "draft" | "expired" | "inactive"
+  >("all");
+  const [actionFeedback, setActionFeedback] = useState<{ id: string; msg: string; type: "success" | "error" } | null>(null);
+
+  // Subscriptions tab state
+  const [subSearch, setSubSearch] = useState("");
+  const [subFilter, setSubFilter] = useState<"all" | "paid" | "promo100" | "trial" | "active" | "queued" | "expired">("all");
+
+  const clearActionFeedback = () => {
+    setTimeout(() => setActionFeedback(null), 3500);
+  };
+
+  // Funnel Quick Actions
+  const handleGrantTrial = async (creatorId: string) => {
+    try {
+      await startFreeTrial(creatorId);
+      setCreatorStatus(creatorId, "Active");
+      setActionFeedback({ id: creatorId, msg: "⚡ 3-Day Free Trial activated successfully!", type: "success" });
+      await refreshFromSupabase();
+    } catch (err) {
+      setActionFeedback({ id: creatorId, msg: `Error: ${String(err)}`, type: "error" });
+    }
+    clearActionFeedback();
+  };
+
+  const handleActivatePass = async (creator: Creator, planId: string, duration: string) => {
+    try {
+      await activateSubscription({
+        creatorId: creator.id,
+        planId,
+        duration,
+        price: 0,
+      });
+      setCreatorStatus(creator.id, "Active");
+      setActionFeedback({ id: creator.id, msg: `💎 ${duration} plan activated successfully!`, type: "success" });
+      await refreshFromSupabase();
+    } catch (err) {
+      setActionFeedback({ id: creator.id, msg: `Error: ${String(err)}`, type: "error" });
+    }
+    clearActionFeedback();
+  };
+
+  const handleExtendExpiry = async (creator: Creator, extraDays: number) => {
+    try {
+      const now = new Date();
+      const base = creator.subscriptionExpiresAt && new Date(creator.subscriptionExpiresAt).getTime() > now.getTime()
+        ? new Date(creator.subscriptionExpiresAt)
+        : now;
+      const newExpiry = new Date(base.getTime() + extraDays * 24 * 60 * 60 * 1000);
+      await supabaseDb.updateSubscriptionExpiry(creator.id, newExpiry, creator.referralBonusDays ?? 0);
+      await supabaseDb.updateCreatorStatus(creator.id, "Active");
+      setCreatorStatus(creator.id, "Active");
+      setActionFeedback({
+        id: creator.id,
+        msg: `⏳ Extended by +${extraDays} days! New expiry: ${newExpiry.toLocaleDateString("en-IN")}`,
+        type: "success",
+      });
+      await refreshFromSupabase();
+    } catch (err) {
+      setActionFeedback({ id: creator.id, msg: `Error: ${String(err)}`, type: "error" });
+    }
+    clearActionFeedback();
+  };
 
   // Helper functions for date formatting
   const formatDateToInput = (d: Date | string): string => {
@@ -1493,6 +1572,11 @@ function AdminDashboard() {
   const [editNotes, setEditNotes] = useState<string>("");
   const [savingEdit, setSavingEdit] = useState(false);
   const [editError, setEditError] = useState("");
+
+  // Campaign Referral Attribution state
+  const [selectedAttributionCode, setSelectedAttributionCode] = useState<string>("all");
+  const [expandedReferrerId, setExpandedReferrerId] = useState<string | null>(null);
+  const [attributionModalCode, setAttributionModalCode] = useState<DiscountCode | null>(null);
 
   // Load discount codes when tab is opened
   const loadDiscountCodes = async () => {
@@ -1791,9 +1875,272 @@ function AdminDashboard() {
         </div>
       ) : null}
 
-      {/* ── TAB 1: CREATORS ─────────────────────────────────────────────── */}
+      {/* ── TAB 1: CREATORS & REGISTRATION FUNNEL ────────────────────────────── */}
       {tab === "Creators" ? (
-        <div className="mt-5 space-y-4">
+        <div className="mt-5 space-y-5">
+          {/* ACTION FEEDBACK ALERT */}
+          {actionFeedback && (
+            <div
+              className={`p-3.5 rounded-2xl flex items-center justify-between text-xs font-semibold border transition-all ${
+                actionFeedback.type === "success"
+                  ? "bg-tealdeep/15 text-tealdeep border-tealdeep/30"
+                  : "bg-rose/15 text-rose border-rose/30"
+              }`}
+            >
+              <div className="flex items-center gap-2">
+                <CheckCircle2 className="size-4 shrink-0" />
+                <span>{actionFeedback.msg}</span>
+              </div>
+              <button
+                type="button"
+                onClick={() => setActionFeedback(null)}
+                className="text-muted-foreground hover:text-foreground p-1"
+              >
+                <X className="size-3.5" />
+              </button>
+            </div>
+          )}
+
+          {/* ── INTERACTIVE FUNNEL / LIFECYCLE STATS CARDS ── */}
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+            {/* 1. ALL PROFILES */}
+            <button
+              type="button"
+              onClick={() => {
+                setCreatorFunnelFilter("all");
+                setCreatorStatusFilter("All");
+              }}
+              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                creatorFunnelFilter === "all"
+                  ? "bg-card border-primary ring-2 ring-primary/20 shadow-sm"
+                  : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+              }`}
+            >
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[11px] font-semibold">All Profiles</span>
+                <User className="size-3.5" />
+              </div>
+              <p className="text-xl font-bold text-foreground">{creators.length}</p>
+              <p className="text-[10px] text-muted-foreground mt-0.5">Total database</p>
+            </button>
+
+            {/* 2. REAL PAID SUBSCRIBERS */}
+            {(() => {
+              const now = Date.now();
+              const paidCount = creators.filter((c) =>
+                subscriptions.some(
+                  (s) =>
+                    s.creatorId === c.id &&
+                    !s.isTrial &&
+                    s.planId !== "trial-3d" &&
+                    (s.price ?? 0) > 0 &&
+                    new Date(s.expiresAt || s.startedAt).getTime() > now,
+                ),
+              ).length;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatorFunnelFilter("paid");
+                    setCreatorStatusFilter("All");
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    creatorFunnelFilter === "paid"
+                      ? "bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm"
+                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-1">
+                    <span className="text-[11px] font-bold">Paid Plans (₹)</span>
+                    <CreditCard className="size-3.5" />
+                  </div>
+                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
+                    {paidCount}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Real money paid</p>
+                </button>
+              );
+            })()}
+
+            {/* 3. 100% OFF PROMO PASSES */}
+            {(() => {
+              const now = Date.now();
+              const promo100Count = creators.filter((c) => {
+                if (c.status === "Draft" || c.id.startsWith("draft-")) return false;
+                const hasRealPaid = subscriptions.some(
+                  (s) =>
+                    s.creatorId === c.id &&
+                    !s.isTrial &&
+                    s.planId !== "trial-3d" &&
+                    (s.price ?? 0) > 0 &&
+                    new Date(s.expiresAt || s.startedAt).getTime() > now,
+                );
+                if (hasRealPaid) return false;
+                return subscriptions.some(
+                  (s) =>
+                    s.creatorId === c.id &&
+                    !s.isTrial &&
+                    s.planId !== "trial-3d" &&
+                    (s.price === 0 || s.price == null) &&
+                    new Date(s.expiresAt || s.startedAt).getTime() > now,
+                );
+              }).length;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatorFunnelFilter("promo100");
+                    setCreatorStatusFilter("All");
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    creatorFunnelFilter === "promo100"
+                      ? "bg-purple-500/10 border-purple-500 ring-2 ring-purple-500/20 shadow-sm"
+                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 mb-1">
+                    <span className="text-[11px] font-bold">100% OFF Pass</span>
+                    <Tag className="size-3.5" />
+                  </div>
+                  <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
+                    {promo100Count}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">₹0 promo pass</p>
+                </button>
+              );
+            })()}
+
+            {/* 4. FREE TRIAL */}
+            {(() => {
+              const now = Date.now();
+              const trialCount = creators.filter((c) => {
+                if (c.status === "Draft" || c.id.startsWith("draft-")) return false;
+                const hasPaidOrPromo = subscriptions.some(
+                  (s) =>
+                    s.creatorId === c.id &&
+                    !s.isTrial &&
+                    s.planId !== "trial-3d" &&
+                    new Date(s.expiresAt || s.startedAt).getTime() > now,
+                );
+                if (hasPaidOrPromo) return false;
+                const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+                return (Boolean(c.trialStartedAt) && expTime > now) || (c.status === "Active" && expTime > now);
+              }).length;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatorFunnelFilter("trial");
+                    setCreatorStatusFilter("All");
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    creatorFunnelFilter === "trial"
+                      ? "bg-sky-500/10 border-sky-500 ring-2 ring-sky-500/20 shadow-sm"
+                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-sky-600 dark:text-sky-400 mb-1">
+                    <span className="text-[11px] font-bold">Free Trial</span>
+                    <Zap className="size-3.5" />
+                  </div>
+                  <p className="text-xl font-bold text-sky-600 dark:text-sky-400">
+                    {trialCount}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">3-day trial active</p>
+                </button>
+              );
+            })()}
+
+            {/* 5. ABANDONED / INCOMPLETE DRAFTS */}
+            {(() => {
+              const draftCount = creators.filter(
+                (c) => c.status === "Draft" || c.id.startsWith("draft-"),
+              ).length;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatorFunnelFilter("draft");
+                    setCreatorStatusFilter("All");
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    creatorFunnelFilter === "draft"
+                      ? "bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-sm"
+                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 mb-1">
+                    <span className="text-[11px] font-bold">Backed Out</span>
+                    <Clock className="size-3.5" />
+                  </div>
+                  <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
+                    {draftCount}
+                  </p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Incomplete leads</p>
+                </button>
+              );
+            })()}
+
+            {/* 6. EXPIRED PLANS */}
+            {(() => {
+              const now = Date.now();
+              const expiredCount = creators.filter((c) => {
+                if (c.status === "Draft" || c.id.startsWith("draft-")) return false;
+                const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+                return c.status === "Expired" || (expTime > 0 && expTime <= now);
+              }).length;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatorFunnelFilter("expired");
+                    setCreatorStatusFilter("All");
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    creatorFunnelFilter === "expired"
+                      ? "bg-rose/10 border-rose ring-2 ring-rose/20 shadow-sm"
+                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-rose mb-1">
+                    <span className="text-[11px] font-bold">Expired</span>
+                    <AlertTriangle className="size-3.5" />
+                  </div>
+                  <p className="text-xl font-bold text-rose">{expiredCount}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Need renewal</p>
+                </button>
+              );
+            })()}
+
+            {/* 7. INACTIVE / SUSPENDED */}
+            {(() => {
+              const inactiveCount = creators.filter(
+                (c) => c.status === "Inactive" || c.status === "Suspended",
+              ).length;
+              return (
+                <button
+                  type="button"
+                  onClick={() => {
+                    setCreatorFunnelFilter("inactive");
+                    setCreatorStatusFilter("All");
+                  }}
+                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
+                    creatorFunnelFilter === "inactive"
+                      ? "bg-foreground/10 border-foreground ring-2 ring-foreground/20 shadow-sm"
+                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+                  }`}
+                >
+                  <div className="flex items-center justify-between text-muted-foreground mb-1">
+                    <span className="text-[11px] font-semibold">Inactive / Hold</span>
+                    <LogOut className="size-3.5" />
+                  </div>
+                  <p className="text-xl font-bold text-foreground">{inactiveCount}</p>
+                  <p className="text-[10px] text-muted-foreground mt-0.5">Paused / Suspended</p>
+                </button>
+              );
+            })()}
+          </div>
+
           {/* SEARCH & FILTERS BAR */}
           <Card className="p-4 bg-secondary/30 border border-border/80">
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -1804,7 +2151,7 @@ function AdminDashboard() {
                 <TextInput
                   value={creatorSearch}
                   onChange={(e) => setCreatorSearch(e.target.value)}
-                  placeholder="Search creators by name, instagram, city, locality, phone..."
+                  placeholder="Search by name, instagram, mobile, email, city, locality..."
                   className="pl-10 text-xs sm:text-sm bg-background"
                 />
                 {creatorSearch && (
@@ -1819,6 +2166,20 @@ function AdminDashboard() {
               </div>
 
               <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <select
+                  value={creatorFunnelFilter}
+                  onChange={(e) => setCreatorFunnelFilter(e.target.value as any)}
+                  className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                >
+                  <option value="all">Funnel: All Profiles</option>
+                  <option value="paid">💎 Paid Subscribers (Real Money)</option>
+                  <option value="promo100">🎟️ 100% OFF Passes (₹0)</option>
+                  <option value="trial">⚡ Free Trial Active</option>
+                  <option value="draft">⏳ Backed Out / Draft Leads</option>
+                  <option value="expired">🔴 Expired Subscriptions</option>
+                  <option value="inactive">⚠️ Inactive / Suspended</option>
+                </select>
+
                 <select
                   value={creatorStatusFilter}
                   onChange={(e) => setCreatorStatusFilter(e.target.value)}
@@ -1835,7 +2196,7 @@ function AdminDashboard() {
                 <select
                   value={creatorCategoryFilter}
                   onChange={(e) => setCreatorCategoryFilter(e.target.value)}
-                  className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden max-w-[160px]"
+                  className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden max-w-[150px]"
                 >
                   <option value="All">All Categories</option>
                   {CATEGORIES.map((cat) => (
@@ -1845,12 +2206,13 @@ function AdminDashboard() {
                   ))}
                 </select>
 
-                {(creatorSearch || creatorStatusFilter !== "All" || creatorCategoryFilter !== "All") && (
+                {(creatorSearch || creatorFunnelFilter !== "all" || creatorStatusFilter !== "All" || creatorCategoryFilter !== "All") && (
                   <Button
                     type="button"
                     variant="ghost"
                     onClick={() => {
                       setCreatorSearch("");
+                      setCreatorFunnelFilter("all");
                       setCreatorStatusFilter("All");
                       setCreatorCategoryFilter("All");
                     }}
@@ -1861,39 +2223,12 @@ function AdminDashboard() {
                 )}
               </div>
             </div>
-
-            <div className="mt-2.5 flex items-center justify-between text-xs text-muted-foreground pt-2 border-t border-border/50">
-              <span>
-                Showing <strong className="text-foreground">{
-                  creators.filter((c) => {
-                    const q = creatorSearch.toLowerCase().trim();
-                    if (q) {
-                      const matchName = c.name?.toLowerCase().includes(q);
-                      const matchDisplay = c.displayName?.toLowerCase().includes(q);
-                      const matchInsta = c.instagram?.toLowerCase().includes(q);
-                      const matchCity = c.city?.toLowerCase().includes(q);
-                      const matchLocality = c.locality?.toLowerCase().includes(q);
-                      const matchPhone = c.contact?.phone?.toLowerCase().includes(q);
-                      const matchEmail = c.contact?.email?.toLowerCase().includes(q);
-                      if (!matchName && !matchDisplay && !matchInsta && !matchCity && !matchLocality && !matchPhone && !matchEmail) {
-                        return false;
-                      }
-                    }
-                    if (creatorStatusFilter !== "All" && c.status !== creatorStatusFilter) return false;
-                    if (creatorCategoryFilter !== "All" && !c.categories?.includes(creatorCategoryFilter)) return false;
-                    return true;
-                  }).length
-                }</strong> of {creators.length} creators
-              </span>
-              <span className="text-[11px] font-medium text-tealdeep">
-                Click &quot;Edit&quot; on any creator to modify photo, contact, pricing &amp; bio
-              </span>
-            </div>
           </Card>
 
-          {/* CREATOR LIST */}
-          {creators
-            .filter((c) => {
+          {/* CREATOR LIST WITH LIFECYCLE & FUNNEL INTELLIGENCE */}
+          {(() => {
+            const now = Date.now();
+            const filtered = creators.filter((c) => {
               const q = creatorSearch.toLowerCase().trim();
               if (q) {
                 const matchName = c.name?.toLowerCase().includes(q);
@@ -1907,134 +2242,546 @@ function AdminDashboard() {
                   return false;
                 }
               }
+
+              const isDraft = c.status === "Draft" || c.id.startsWith("draft-");
+              const creatorSubs = subscriptions.filter((s) => s.creatorId === c.id);
+              const hasRealPaidSub = creatorSubs.some(
+                (s) =>
+                  !s.isTrial &&
+                  s.planId !== "trial-3d" &&
+                  (s.price ?? 0) > 0 &&
+                  (s.expiresAt ? new Date(s.expiresAt).getTime() > now : s.status === "active"),
+              );
+              const hasPromo100Sub = !hasRealPaidSub && creatorSubs.some(
+                (s) =>
+                  !s.isTrial &&
+                  s.planId !== "trial-3d" &&
+                  (s.price === 0 || s.price == null) &&
+                  (s.expiresAt ? new Date(s.expiresAt).getTime() > now : s.status === "active" || s.isQueued),
+              );
+              const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+              const isExpired = !isDraft && (c.status === "Expired" || (expTime > 0 && expTime <= now));
+              const isTrial =
+                !isDraft &&
+                !hasRealPaidSub &&
+                !hasPromo100Sub &&
+                !isExpired &&
+                ((Boolean(c.trialStartedAt) && expTime > now) ||
+                  creatorSubs.some((s) => (s.isTrial || s.planId === "trial-3d") && (s.expiresAt ? new Date(s.expiresAt).getTime() > now : true)));
+              const isInactive = c.status === "Inactive" || c.status === "Suspended";
+
+              if (creatorFunnelFilter === "paid" && !hasRealPaidSub) return false;
+              if (creatorFunnelFilter === "promo100" && !hasPromo100Sub) return false;
+              if (creatorFunnelFilter === "trial" && !isTrial) return false;
+              if (creatorFunnelFilter === "draft" && !isDraft) return false;
+              if (creatorFunnelFilter === "expired" && !isExpired) return false;
+              if (creatorFunnelFilter === "inactive" && !isInactive) return false;
+
               if (creatorStatusFilter !== "All" && c.status !== creatorStatusFilter) return false;
               if (creatorCategoryFilter !== "All" && !c.categories?.includes(creatorCategoryFilter)) return false;
+
               return true;
-            })
-            .map((c) => (
-              <Card key={c.id} className="p-4.5 hover:border-primary/40 transition-colors shadow-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                  <div className="flex min-w-0 items-start gap-3.5">
-                    <div className="relative shrink-0">
-                      {c.photo ? (
-                        <img
-                          src={c.photo}
-                          alt={c.name}
-                          loading="lazy"
-                          width={816}
-                          height={816}
-                          className="size-14 shrink-0 rounded-2xl object-cover ring-1 ring-border shadow-xs bg-secondary"
-                        />
-                      ) : (
-                        <div className="size-14 shrink-0 rounded-2xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground/50">
-                          <User className="size-7" />
+            });
+
+            if (filtered.length === 0) {
+              return (
+                <Card className="p-8 text-center text-sm text-muted-foreground">
+                  No creators match the selected filters or search query.
+                </Card>
+              );
+            }
+
+            return (
+              <div className="grid gap-4">
+                {filtered.map((c) => {
+                  const isDraft = c.status === "Draft" || c.id.startsWith("draft-");
+                  // ── Comprehensive Subscriptions Inspection (Active + Queued) ──
+                  const creatorSubs = subscriptions.filter((s) => s.creatorId === c.id);
+                  const activeSub = creatorSubs.find((s) => {
+                    const started = s.startedAt ? new Date(s.startedAt).getTime() : 0;
+                    const expires = s.expiresAt ? new Date(s.expiresAt).getTime() : Infinity;
+                    return (
+                      !s.isQueued &&
+                      s.status !== "queued" &&
+                      started <= now &&
+                      expires > now
+                    );
+                  }) || creatorSubs.find((s) => !s.isQueued && s.status === "active");
+
+                  const queuedSubs = creatorSubs.filter((s) => {
+                    const started = s.startedAt ? new Date(s.startedAt).getTime() : 0;
+                    return s.isQueued || s.status === "queued" || started > now;
+                  });
+
+                  const activeRealPaidSub = activeSub && !activeSub.isTrial && activeSub.planId !== "trial-3d" && (activeSub.price ?? 0) > 0 ? activeSub : null;
+                  const activePromo100Sub = activeSub && !activeSub.isTrial && activeSub.planId !== "trial-3d" && (activeSub.price === 0 || activeSub.price == null) ? activeSub : null;
+                  const activeTrialSub = activeSub && (activeSub.isTrial || activeSub.planId === "trial-3d") ? activeSub : null;
+                  const latestQueuedSub = queuedSubs[0];
+
+                  const creatorExplicitExpTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+                  let latestSubExpTime = 0;
+                  for (const s of creatorSubs) {
+                    if (s.expiresAt) {
+                      const t = new Date(s.expiresAt).getTime();
+                      if (t > latestSubExpTime) latestSubExpTime = t;
+                    }
+                  }
+                  const expTime = Math.max(creatorExplicitExpTime, latestSubExpTime);
+                  const effectiveExpiryDate = expTime > 0 ? new Date(expTime) : null;
+                  const hasExpiry = expTime > 0;
+                  const isExpired = !isDraft && (c.status === "Expired" || (hasExpiry && expTime <= now));
+                  
+                  const isPaidSubscriber = Boolean(activeRealPaidSub) || (!activeTrialSub && !activePromo100Sub && queuedSubs.some(s => (s.price ?? 0) > 0) && hasExpiry && expTime > now);
+                  const isPromo100Subscriber = !isPaidSubscriber && (Boolean(activePromo100Sub) || (!activeTrialSub && queuedSubs.some(s => (s.price === 0 || s.price == null)) && hasExpiry && expTime > now));
+                  const isTrial = !isDraft && !isExpired && !isPaidSubscriber && !isPromo100Subscriber && (Boolean(activeTrialSub) || Boolean(c.trialStartedAt && hasExpiry && expTime > now));
+                  const isLifetimeActive = !isDraft && !isPaidSubscriber && !isPromo100Subscriber && !isTrial && !isExpired && c.status === "Active" && !hasExpiry;
+
+                  const daysRemaining = hasExpiry && expTime > now ? Math.ceil((expTime - now) / (1000 * 60 * 60 * 24)) : null;
+                  const daysExpiredAgo = hasExpiry && expTime <= now ? Math.max(1, Math.floor((now - expTime) / (1000 * 60 * 60 * 24))) : null;
+
+                  const phoneClean = (c.contact?.phone || "").replace(/[^0-9]/g, "");
+                  const waNumber = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
+                  const waMsg = isDraft
+                    ? `Hi ${c.name}, saw you started registering on Influencer Dhundo! Need any help completing your profile to get business deals?`
+                    : isTrial
+                      ? `Hi ${c.name}, how is your free trial on Influencer Dhundo going? Let us know if you have any questions!`
+                      : isExpired
+                        ? `Hi ${c.name}, your Influencer Dhundo pass has expired. Renew today to keep receiving business enquiries!`
+                        : `Hi ${c.name}, reaching out from Influencer Dhundo team!`;
+                  const waUrl = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(waMsg)}` : null;
+
+                  return (
+                    <Card
+                      key={c.id}
+                      className={`p-5 transition-all shadow-xs border ${
+                        isDraft
+                          ? "border-amber-500/40 bg-amber-500/[0.02]"
+                          : isPaidSubscriber
+                            ? "border-emerald-500/40 bg-emerald-500/[0.02]"
+                            : isTrial
+                              ? "border-sky-500/40 bg-sky-500/[0.02]"
+                              : isExpired
+                                ? "border-rose/40 bg-rose/[0.02]"
+                                : "border-border/80"
+                      }`}
+                    >
+                      <div className="flex flex-col gap-4">
+                        {/* TOP ROW: PROFILE PHOTO, NAME, CONTACT, MANAGEMENT BUTTONS */}
+                        <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                          <div className="flex min-w-0 items-start gap-3.5">
+                            <div className="relative shrink-0">
+                              {c.photo ? (
+                                <img
+                                  src={c.photo}
+                                  alt={c.name}
+                                  loading="lazy"
+                                  width={816}
+                                  height={816}
+                                  className="size-14 shrink-0 rounded-2xl object-cover ring-1 ring-border shadow-xs bg-secondary"
+                                />
+                              ) : (
+                                <div className="size-14 shrink-0 rounded-2xl bg-secondary ring-1 ring-border flex items-center justify-center text-muted-foreground/50">
+                                  <User className="size-7" />
+                                </div>
+                              )}
+                              {c.featured && (
+                                <span
+                                  className="absolute -top-1 -right-1 size-3.5 rounded-full bg-saffrondeep ring-2 ring-background shadow-xs"
+                                  title="Featured Creator"
+                                />
+                              )}
+                            </div>
+
+                            <div className="min-w-0 space-y-1">
+                              {/* NAME & PRIMARY BADGES */}
+                              <div className="flex flex-wrap items-center gap-2">
+                                <p className="font-bold text-foreground text-base leading-tight">
+                                  {c.name}
+                                </p>
+                                {c.displayName && c.displayName !== c.name && (
+                                  <span className="text-xs text-muted-foreground font-medium">
+                                    ({c.displayName})
+                                  </span>
+                                )}
+
+                                <StatusPill status={isExpired ? "Expired" : c.status} />
+
+                                {c.featured ? (
+                                  <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[10px] font-semibold text-saffrondeep border border-primary/20">
+                                    Featured
+                                  </span>
+                                ) : null}
+                              </div>
+
+                              {/* LOCATION, FOLLOWERS & PRICE */}
+                              <p className="text-xs text-muted-foreground flex flex-wrap items-center gap-1.5">
+                                <span className="text-foreground/80 font-medium">
+                                  {[c.locality, c.city].filter(Boolean).join(", ") || "Location unassigned"}
+                                </span>
+                                <span>·</span>
+                                <span>{formatFollowers(c.followers)} followers</span>
+                                <span>·</span>
+                                <span className="text-saffrondeep font-semibold">
+                                  {formatPrice(c.startingPrice)}
+                                </span>
+                                {c.categories?.length > 0 && (
+                                  <>
+                                    <span>·</span>
+                                    <span>{c.categories.slice(0, 3).join(", ")}{c.categories.length > 3 ? ` +${c.categories.length - 3}` : ""}</span>
+                                  </>
+                                )}
+                              </p>
+
+                              {/* CONTACT DETAILS & 1-CLICK REACHOUT */}
+                              <div className="flex flex-wrap items-center gap-2 pt-0.5 text-xs text-muted-foreground">
+                                {c.contact?.phone ? (
+                                  <span className="font-mono flex items-center gap-1 text-foreground/90">
+                                    <Phone className="size-3 text-muted-foreground" />
+                                    {c.contact.phone}
+                                  </span>
+                                ) : null}
+
+                                {c.contact?.email ? (
+                                  <span className="font-mono flex items-center gap-1 text-foreground/90">
+                                    <Mail className="size-3 text-muted-foreground" />
+                                    {c.contact.email}
+                                  </span>
+                                ) : null}
+
+                                {c.instagram ? (
+                                  <a
+                                    href={`https://instagram.com/${c.instagram.replace("@", "")}`}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="text-tealdeep font-medium hover:underline flex items-center gap-0.5"
+                                  >
+                                    <span>{c.instagram}</span>
+                                    <ExternalLink className="size-2.5" />
+                                  </a>
+                                ) : null}
+
+                                {waUrl && (
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 px-2 py-0.5 text-[11px] font-bold hover:bg-emerald-500/25 transition-colors"
+                                  >
+                                    <MessageSquare className="size-3" />
+                                    WhatsApp
+                                  </a>
+                                )}
+
+                                {c.contact?.phone && (
+                                  <a
+                                    href={`tel:${c.contact.phone}`}
+                                    className="inline-flex items-center gap-1 rounded-lg bg-secondary text-foreground px-2 py-0.5 text-[11px] font-medium hover:bg-secondary/80 transition-colors"
+                                  >
+                                    <PhoneCall className="size-3" />
+                                    Call
+                                  </a>
+                                )}
+                              </div>
+                            </div>
+                          </div>
+
+                          {/* RIGHT: ADMIN CONTROLS */}
+                          <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 lg:pt-0 border-t lg:border-t-0 border-border/50">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="px-2.5 py-1.5 text-xs flex items-center gap-1 ring-1 ring-border bg-background hover:bg-secondary cursor-pointer"
+                              onClick={() => setEditingCreator(c)}
+                            >
+                              <Pencil className="size-3 text-primary" />
+                              <span>Edit</span>
+                            </Button>
+
+                            <select
+                              value={c.status}
+                              onChange={(e) =>
+                                setCreatorStatus(c.id, e.target.value as CreatorStatus)
+                              }
+                              className="rounded-xl bg-background px-2.5 py-1.5 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                            >
+                              {STATUSES.map((s) => (
+                                <option key={s} value={s}>
+                                  {s}
+                                </option>
+                              ))}
+                            </select>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="px-2.5 py-1.5 text-xs ring-1 ring-border"
+                              onClick={() => toggleFeatured(c.id)}
+                            >
+                              {c.featured ? "★ Unfeature" : "☆ Feature"}
+                            </Button>
+
+                            {!isDraft && (
+                              <Link
+                                to="/creators/$creatorId"
+                                params={{ creatorId: getCreatorProfileSlug(c) }}
+                                className="rounded-xl bg-background px-2.5 py-1.5 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
+                              >
+                                View
+                              </Link>
+                            )}
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="px-2 py-1.5 text-xs text-rose hover:bg-rose/10"
+                              onClick={() => removeCreator(c.id)}
+                            >
+                              <Trash2 className="size-3.5" />
+                            </Button>
+                          </div>
                         </div>
-                      )}
-                      {c.featured && (
-                        <span
-                          className="absolute -top-1 -right-1 size-3.5 rounded-full bg-saffrondeep ring-2 ring-background shadow-xs"
-                          title="Featured Creator"
-                        />
-                      )}
-                    </div>
 
-                    <div className="min-w-0">
-                      <div className="flex flex-wrap items-center gap-2">
-                        <p className="font-bold text-foreground text-base leading-tight">
-                          {c.name}
-                        </p>
-                        {c.displayName && c.displayName !== c.name && (
-                          <span className="text-xs text-muted-foreground font-medium">
-                            ({c.displayName})
-                          </span>
-                        )}
-                        <StatusPill status={c.status} />
-                        {c.featured ? (
-                          <span className="rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-semibold text-saffrondeep border border-primary/20">
-                            Featured
-                          </span>
-                        ) : null}
+                        {/* ── DEDICATED PLAN DURATION & VALIDITY STATUS BAR ── */}
+                        <div
+                          className={`p-3 rounded-xl border flex flex-col md:flex-row md:items-center justify-between gap-3 text-xs ${
+                            isDraft
+                              ? "bg-amber-500/10 border-amber-500/30"
+                              : queuedSubs.length > 0 && isTrial
+                                ? "bg-gradient-to-r from-sky-500/10 via-purple-500/10 to-emerald-500/10 border-sky-500/30"
+                                : isPaidSubscriber
+                                  ? "bg-emerald-500/10 border-emerald-500/30"
+                                  : isPromo100Subscriber
+                                    ? "bg-purple-500/10 border-purple-500/30"
+                                    : isTrial
+                                      ? "bg-sky-500/10 border-sky-500/30"
+                                      : isExpired
+                                        ? "bg-rose/10 border-rose/30"
+                                        : "bg-secondary/60 border-border/80"
+                          }`}
+                        >
+                          {/* PLAN NAME & EXPIRATION STATUS */}
+                          <div className="flex flex-wrap items-center gap-2">
+                            {isDraft ? (
+                              <span className="flex items-center gap-1.5 font-bold text-amber-800 dark:text-amber-300">
+                                <Clock className="size-4 text-amber-600" />
+                                <span>{c.acceptsProductsDetails || "Incomplete Registration (Backed Out)"}</span>
+                              </span>
+                            ) : isTrial ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="flex items-center gap-1.5 font-bold text-sky-800 dark:text-sky-300">
+                                  <Zap className="size-4 text-sky-600" />
+                                  <span>Active: 3-Day Free Trial</span>
+                                  {activeTrialSub?.expiresAt && (
+                                    <span className="font-normal text-sky-700 dark:text-sky-400">
+                                      (expires {new Date(activeTrialSub.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short" })})
+                                    </span>
+                                  )}
+                                </span>
+
+                                {/* QUEUED SUBSCRIPTIONS BADGE */}
+                                {queuedSubs.map((qs, i) => (
+                                  <span
+                                    key={qs.id || i}
+                                    className={`flex flex-wrap items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold border shadow-2xs ${
+                                      (qs.price ?? 0) > 0
+                                        ? "bg-emerald-500/25 text-emerald-950 dark:text-emerald-200 border-emerald-500/50"
+                                        : "bg-purple-500/25 text-purple-950 dark:text-purple-200 border-purple-500/50"
+                                    }`}
+                                  >
+                                    <Layers className={`size-3.5 ${(qs.price ?? 0) > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-purple-700 dark:text-purple-400"}`} />
+                                    <span>
+                                      Queued: {qs.duration}{" "}
+                                      {(qs.price ?? 0) > 0
+                                        ? `(${formatPrice(qs.price)})`
+                                        : `(100% OFF Pass${qs.referralCodeUsed ? ` • ${qs.referralCodeUsed}` : ""})`}
+                                    </span>
+                                    {qs.startedAt && (
+                                      <span className="bg-background/80 rounded px-1.5 py-0.5 font-semibold text-[11px] text-foreground border border-border/60">
+                                        📅 Starts: {new Date(qs.startedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                    )}
+                                    {qs.expiresAt && (
+                                      <span className="bg-background/80 rounded px-1.5 py-0.5 font-semibold text-[11px] text-foreground border border-border/60">
+                                        🏁 Ends: {new Date(qs.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : isPaidSubscriber ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
+                                  <CreditCard className="size-4 text-emerald-600" />
+                                  <span>Paid Plan: {activeRealPaidSub?.duration || latestQueuedSub?.duration || "Paid Subscription"}</span>
+                                  {(activeRealPaidSub?.price != null || latestQueuedSub?.price != null) && (
+                                    <span className="font-semibold text-emerald-700 dark:text-emerald-400">
+                                      ({formatPrice(activeRealPaidSub?.price ?? latestQueuedSub?.price ?? 0)})
+                                    </span>
+                                  )}
+                                </span>
+
+                                {/* ADDITIONAL QUEUED PLANS */}
+                                {queuedSubs.filter((qs) => qs !== activeRealPaidSub).map((qs, i) => (
+                                  <span
+                                    key={qs.id || i}
+                                    className={`flex flex-wrap items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold border shadow-2xs ${
+                                      (qs.price ?? 0) > 0
+                                        ? "bg-emerald-500/25 text-emerald-950 dark:text-emerald-200 border-emerald-500/50"
+                                        : "bg-purple-500/25 text-purple-950 dark:text-purple-200 border-purple-500/50"
+                                    }`}
+                                  >
+                                    <Layers className={`size-3.5 ${(qs.price ?? 0) > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-purple-700 dark:text-purple-400"}`} />
+                                    <span>
+                                      Queued: {qs.duration}{" "}
+                                      {(qs.price ?? 0) > 0
+                                        ? `(${formatPrice(qs.price)})`
+                                        : `(100% OFF Pass${qs.referralCodeUsed ? ` • ${qs.referralCodeUsed}` : ""})`}
+                                    </span>
+                                    {qs.startedAt && (
+                                      <span className="bg-background/80 rounded px-1.5 py-0.5 font-semibold text-[11px] text-foreground border border-border/60">
+                                        📅 Starts: {new Date(qs.startedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                    )}
+                                    {qs.expiresAt && (
+                                      <span className="bg-background/80 rounded px-1.5 py-0.5 font-semibold text-[11px] text-foreground border border-border/60">
+                                        🏁 Ends: {new Date(qs.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : isPromo100Subscriber ? (
+                              <div className="flex flex-wrap items-center gap-2">
+                                <span className="flex items-center gap-1.5 font-bold text-purple-800 dark:text-purple-300">
+                                  <Tag className="size-4 text-purple-600" />
+                                  <span>100% OFF Pass: {activePromo100Sub?.duration || latestQueuedSub?.duration || "1 Month"}</span>
+                                  <span className="font-semibold text-purple-700 dark:text-purple-400">
+                                    (₹0 {activePromo100Sub?.referralCodeUsed || latestQueuedSub?.referralCodeUsed ? `• ${activePromo100Sub?.referralCodeUsed || latestQueuedSub?.referralCodeUsed}` : "Promo"})
+                                  </span>
+                                </span>
+
+                                {/* ADDITIONAL QUEUED PLANS */}
+                                {queuedSubs.filter((qs) => qs !== activePromo100Sub).map((qs, i) => (
+                                  <span
+                                    key={qs.id || i}
+                                    className={`flex flex-wrap items-center gap-1.5 rounded-lg px-3 py-1 text-xs font-bold border shadow-2xs ${
+                                      (qs.price ?? 0) > 0
+                                        ? "bg-emerald-500/25 text-emerald-950 dark:text-emerald-200 border-emerald-500/50"
+                                        : "bg-purple-500/25 text-purple-950 dark:text-purple-200 border-purple-500/50"
+                                    }`}
+                                  >
+                                    <Layers className={`size-3.5 ${(qs.price ?? 0) > 0 ? "text-emerald-700 dark:text-emerald-400" : "text-purple-700 dark:text-purple-400"}`} />
+                                    <span>
+                                      Queued: {qs.duration}{" "}
+                                      {(qs.price ?? 0) > 0
+                                        ? `(${formatPrice(qs.price)})`
+                                        : `(100% OFF Pass${qs.referralCodeUsed ? ` • ${qs.referralCodeUsed}` : ""})`}
+                                    </span>
+                                    {qs.startedAt && (
+                                      <span className="bg-background/80 rounded px-1.5 py-0.5 font-semibold text-[11px] text-foreground border border-border/60">
+                                        📅 Starts: {new Date(qs.startedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                    )}
+                                    {qs.expiresAt && (
+                                      <span className="bg-background/80 rounded px-1.5 py-0.5 font-semibold text-[11px] text-foreground border border-border/60">
+                                        🏁 Ends: {new Date(qs.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                      </span>
+                                    )}
+                                  </span>
+                                ))}
+                              </div>
+                            ) : isExpired ? (
+                              <span className="flex items-center gap-1.5 font-bold text-rose">
+                                <AlertTriangle className="size-4" />
+                                <span>Plan Expired (Needs Renewal)</span>
+                              </span>
+                            ) : isLifetimeActive ? (
+                              <span className="flex items-center gap-1.5 font-bold text-tealdeep">
+                                <CheckCircle2 className="size-4" />
+                                <span>Plan: Directory Active (Unrestricted Access)</span>
+                              </span>
+                            ) : (
+                              <span className="flex items-center gap-1.5 font-semibold text-muted-foreground">
+                                <span>Status: {c.status}</span>
+                              </span>
+                            )}
+
+                            {/* TOTAL DAYS REMAINING COUNTDOWN PILL */}
+                            {daysRemaining !== null ? (
+                              <span className="rounded-lg bg-background px-2.5 py-1 text-xs font-bold text-foreground border border-border shadow-2xs">
+                                ⏳ {daysRemaining} Day{daysRemaining === 1 ? "" : "s"} Total Validity
+                                {effectiveExpiryDate ? ` · Valid until ${effectiveExpiryDate.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}` : ""}
+                              </span>
+                            ) : daysExpiredAgo !== null ? (
+                              <span className="rounded-lg bg-rose/20 px-2.5 py-1 text-xs font-bold text-rose border border-rose/40">
+                                Ended {daysExpiredAgo} day{daysExpiredAgo === 1 ? "" : "s"} ago ({effectiveExpiryDate ? effectiveExpiryDate.toLocaleDateString("en-IN", { day: "numeric", month: "short" }) : ""})
+                              </span>
+                            ) : isLifetimeActive ? (
+                              <span className="rounded-lg bg-tealdeep/15 px-2.5 py-1 text-xs font-bold text-tealdeep border border-tealdeep/30">
+                                ✓ No expiration date
+                              </span>
+                            ) : null}
+
+                            {/* LAST TRANSACTION NOTE */}
+                            {latestQueuedSub?.referralCodeUsed && (
+                              <span className="rounded-md bg-background/80 px-2 py-0.5 text-[11px] font-mono text-muted-foreground border border-border">
+                                Coupon: {latestQueuedSub.referralCodeUsed}
+                              </span>
+                            )}
+                          </div>
+
+                          {/* QUICK PLAN CHANGER / EXTENDER BUTTONS */}
+                          <div className="flex flex-wrap items-center gap-1.5 shrink-0">
+                            <span className="text-[11px] text-muted-foreground font-semibold mr-0.5">Quick Plan:</span>
+                            <button
+                              type="button"
+                              onClick={() => handleGrantTrial(c.id)}
+                              className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-800 dark:text-sky-300 text-xs font-bold border border-sky-500/30 transition-colors cursor-pointer"
+                              title="Grant 3-day free trial"
+                            >
+                              +3d Trial
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleActivatePass(c, "1m", "1 Month")}
+                              className="px-2.5 py-1 rounded-lg bg-tealdeep/15 hover:bg-tealdeep/25 text-tealdeep text-xs font-bold border border-tealdeep/30 transition-colors cursor-pointer"
+                              title="Activate 1-month paid pass"
+                            >
+                              +1M
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleActivatePass(c, "3m", "3 Months")}
+                              className="px-2.5 py-1 rounded-lg bg-primary/15 hover:bg-primary/25 text-saffrondeep text-xs font-bold border border-primary/30 transition-colors cursor-pointer"
+                              title="Activate 3-months paid pass"
+                            >
+                              +3M
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExtendExpiry(c, 7)}
+                              className="px-2 py-1 rounded-lg bg-background hover:bg-secondary text-foreground text-xs font-semibold border border-border transition-colors cursor-pointer"
+                              title="Extend expiration by 7 days"
+                            >
+                              +7d
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExtendExpiry(c, 30)}
+                              className="px-2 py-1 rounded-lg bg-background hover:bg-secondary text-foreground text-xs font-semibold border border-border transition-colors cursor-pointer"
+                              title="Extend expiration by 30 days"
+                            >
+                              +30d
+                            </button>
+                          </div>
+                        </div>
                       </div>
-
-                      <p className="text-xs text-muted-foreground mt-1 flex flex-wrap items-center gap-1.5">
-                        <span className="text-foreground/80 font-medium">
-                          {[c.locality, c.city].filter(Boolean).join(", ") || "Location unassigned"}
-                        </span>
-                        <span>·</span>
-                        <span>{formatFollowers(c.followers)} followers</span>
-                        <span>·</span>
-                        <span className="text-saffrondeep font-semibold">
-                          {formatPrice(c.startingPrice)}
-                        </span>
-                        {c.categories?.length > 0 && (
-                          <>
-                            <span>·</span>
-                            <span>{c.categories.slice(0, 3).join(", ")}{c.categories.length > 3 ? ` +${c.categories.length - 3}` : ""}</span>
-                          </>
-                        )}
-                      </p>
-
-                      <p className="text-xs text-muted-foreground mt-0.5 font-mono">
-                        {c.contact.phone || "No phone"} · {c.contact.email || "No email"}
-                        {c.instagram && ` · ${c.instagram}`}
-                      </p>
-                    </div>
-                  </div>
-
-                  <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 sm:pt-0 border-t sm:border-t-0 border-border/50">
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-3 py-2 text-xs flex items-center gap-1.5 ring-1 ring-border bg-background hover:bg-secondary cursor-pointer"
-                      onClick={() => setEditingCreator(c)}
-                    >
-                      <Pencil className="size-3.5 text-primary" />
-                      <span>Edit</span>
-                    </Button>
-
-                    <select
-                      value={c.status}
-                      onChange={(e) =>
-                        setCreatorStatus(c.id, e.target.value as CreatorStatus)
-                      }
-                      className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
-                    >
-                      {STATUSES.map((s) => (
-                        <option key={s} value={s}>
-                          {s}
-                        </option>
-                      ))}
-                    </select>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-3 py-2 text-xs"
-                      onClick={() => toggleFeatured(c.id)}
-                    >
-                      {c.featured ? "Unfeature" : "Feature"}
-                    </Button>
-
-                    <Link
-                      to="/creators/$creatorId"
-                      params={{ creatorId: getCreatorProfileSlug(c) }}
-                      className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
-                    >
-                      View
-                    </Link>
-
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      className="px-3 py-2 text-xs text-rose hover:bg-rose/10"
-                      onClick={() => removeCreator(c.id)}
-                    >
-                      Remove
-                    </Button>
-                  </div>
-                </div>
-              </Card>
-            ))}
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
         </div>
       ) : null}
 
@@ -2542,6 +3289,20 @@ function AdminDashboard() {
 
                         {/* ACTION BUTTONS */}
                         <div className="flex flex-wrap items-center gap-2">
+                          {/* VIEW REFERRER ATTRIBUTION */}
+                          <Button
+                            variant="ghost"
+                            className="px-3 py-1.5 text-xs flex items-center gap-1.5 ring-1 ring-emerald-500/40 text-emerald-800 dark:text-emerald-300 hover:bg-emerald-500/10 font-bold bg-emerald-500/5"
+                            onClick={() => {
+                              setSelectedAttributionCode(dc.code);
+                              setAttributionModalCode(dc);
+                            }}
+                            title="View which creators referred these code redemptions"
+                          >
+                            <Users className="size-3.5 text-emerald-600" />
+                            <span>Referrers ({dc.usageCount})</span>
+                          </Button>
+
                           {/* EDIT CODE */}
                           <Button
                             variant="ghost"
@@ -2598,6 +3359,333 @@ function AdminDashboard() {
               </div>
             )}
           </div>
+
+          {/* ── CAMPAIGN REFERRAL ATTRIBUTION MATRIX ────────────────────── */}
+          <Card className="p-6 border border-emerald-500/30 bg-emerald-500/[0.02] shadow-sm">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/80">
+              <div className="flex items-center gap-2.5">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 shadow-2xs">
+                  <Users className="size-5" />
+                </div>
+                <div>
+                  <h2 className="text-base font-bold text-foreground">Promo Code × Referrer Attribution Matrix</h2>
+                  <p className="text-xs text-muted-foreground">
+                    Track exactly which referring creators brought subscribers who redeemed each promo or 100% OFF pass.
+                  </p>
+                </div>
+              </div>
+
+              {/* PROMO CODE SELECTOR DROPDOWN */}
+              <div className="flex items-center gap-2">
+                <span className="text-xs font-semibold text-muted-foreground shrink-0">Filter by Code:</span>
+                <select
+                  value={selectedAttributionCode}
+                  onChange={(e) => setSelectedAttributionCode(e.target.value)}
+                  className="rounded-xl bg-background px-3 py-1.5 text-xs font-bold font-mono ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                >
+                  <option value="all">All Promo Codes Combined</option>
+                  {discountCodes.map((dc) => (
+                    <option key={dc.id} value={dc.code}>
+                      {dc.code} ({dc.discountPercent}% OFF) · {dc.usageCount} uses
+                    </option>
+                  ))}
+                </select>
+              </div>
+            </div>
+
+            {/* ATTRIBUTION CALCULATIONS & BREAKDOWN */}
+            {(() => {
+              // 1. Filter relevant subscriptions matching selected code (or all promo codes)
+              const matchingSubs = subscriptions.filter((s) => {
+                if (!s.referralCodeUsed) return false;
+                const codeUsed = s.referralCodeUsed.trim().toUpperCase();
+                if (selectedAttributionCode === "all") {
+                  return discountCodes.some((dc) => dc.code.toUpperCase() === codeUsed);
+                }
+                return codeUsed === selectedAttributionCode.toUpperCase();
+              });
+
+              if (matchingSubs.length === 0) {
+                return (
+                  <div className="p-8 text-center text-sm text-muted-foreground">
+                    <p className="font-medium text-foreground">No promo code redemptions recorded for this selection yet.</p>
+                    <p className="text-xs text-muted-foreground mt-1">
+                      When a creator subscribes using a discount code, this matrix will automatically map who referred them.
+                    </p>
+                  </div>
+                );
+              }
+
+              // 2. Group redemptions by Referrer ID (or 'organic' for direct signups)
+              type ReferrerAttributionGroup = {
+                referrerId: string;
+                referrer: Creator | null;
+                isOrganic: boolean;
+                redemptionsCount: number;
+                totalRevenue: number;
+                creators: Array<{
+                  creator: Creator | null;
+                  creatorId: string;
+                  sub: typeof matchingSubs[0];
+                  code: string;
+                }>;
+              };
+
+              const groupsMap = new Map<string, ReferrerAttributionGroup>();
+
+              matchingSubs.forEach((s) => {
+                const creator = creators.find((c) => c.id === s.creatorId) || null;
+                const referrerId = creator?.referredBy?.trim() || "organic";
+                const isOrganic = referrerId === "organic";
+                const referrer = !isOrganic ? (creators.find((c) => c.id === referrerId) || null) : null;
+
+                if (!groupsMap.has(referrerId)) {
+                  groupsMap.set(referrerId, {
+                    referrerId,
+                    referrer,
+                    isOrganic,
+                    redemptionsCount: 0,
+                    totalRevenue: 0,
+                    creators: [],
+                  });
+                }
+
+                const group = groupsMap.get(referrerId)!;
+                group.redemptionsCount += 1;
+                group.totalRevenue += s.price || 0;
+                group.creators.push({
+                  creator,
+                  creatorId: s.creatorId,
+                  sub: s,
+                  code: s.referralCodeUsed || "",
+                });
+              });
+
+              const groups = Array.from(groupsMap.values()).sort((a, b) => b.redemptionsCount - a.redemptionsCount);
+              const totalRedemptions = matchingSubs.length;
+              const referredRedemptions = groups.filter((g) => !g.isOrganic).reduce((sum, g) => sum + g.redemptionsCount, 0);
+              const organicRedemptions = groups.find((g) => g.isOrganic)?.redemptionsCount || 0;
+
+              return (
+                <div className="space-y-5 pt-4">
+                  {/* SUMMARY STATS TILES */}
+                  <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+                    <div className="rounded-xl bg-background border border-border p-3.5 shadow-2xs">
+                      <span className="text-[11px] font-bold text-muted-foreground uppercase tracking-wider">Total Code Redemptions</span>
+                      <p className="text-2xl font-bold text-foreground mt-0.5">{totalRedemptions}</p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Across selected campaign filter</p>
+                    </div>
+
+                    <div className="rounded-xl bg-emerald-500/10 border border-emerald-500/30 p-3.5 shadow-2xs">
+                      <span className="text-[11px] font-bold text-emerald-800 dark:text-emerald-300 uppercase tracking-wider">Referred by Creators</span>
+                      <p className="text-2xl font-bold text-emerald-700 dark:text-emerald-400 mt-0.5">
+                        {referredRedemptions} <span className="text-xs font-normal text-muted-foreground">({Math.round((referredRedemptions / totalRedemptions) * 100)}%)</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Joined via personal referral links</p>
+                    </div>
+
+                    <div className="rounded-xl bg-sky-500/10 border border-sky-500/30 p-3.5 shadow-2xs">
+                      <span className="text-[11px] font-bold text-sky-800 dark:text-sky-300 uppercase tracking-wider">Direct / Organic</span>
+                      <p className="text-2xl font-bold text-sky-700 dark:text-sky-400 mt-0.5">
+                        {organicRedemptions} <span className="text-xs font-normal text-muted-foreground">({Math.round((organicRedemptions / totalRedemptions) * 100)}%)</span>
+                      </p>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">Used code without referral link</p>
+                    </div>
+                  </div>
+
+                  {/* REFERRER PERFORMANCE LEADERBOARD TABLE */}
+                  <div className="space-y-3">
+                    <h3 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                      <Award className="size-3.5 text-primary" />
+                      <span>Referrer Breakdown Leaderboard</span>
+                    </h3>
+
+                    <div className="grid gap-3">
+                      {groups.map((g) => {
+                        const isExpanded = expandedReferrerId === g.referrerId;
+                        const percentOfTotal = Math.round((g.redemptionsCount / totalRedemptions) * 100);
+
+                        const refPhone = (g.referrer?.contact?.phone || "").replace(/[^0-9]/g, "");
+                        const refWaNumber = refPhone.length === 10 ? `91${refPhone}` : refPhone;
+                        const refWaMsg = `Hi ${g.referrer?.name || "there"}, amazing news! ${g.redemptionsCount} creators have signed up and redeemed passes using your referral link on Influencer Dhundo! Thank you for sharing!`;
+                        const refWaUrl = refWaNumber ? `https://wa.me/${refWaNumber}?text=${encodeURIComponent(refWaMsg)}` : null;
+
+                        return (
+                          <div
+                            key={g.referrerId}
+                            className={`rounded-2xl border transition-all ${
+                              g.isOrganic
+                                ? "bg-secondary/40 border-border"
+                                : "bg-background border-emerald-500/30 hover:border-emerald-500/50"
+                            }`}
+                          >
+                            {/* GROUP HEADER ROW */}
+                            <div className="p-4 flex flex-col md:flex-row md:items-center justify-between gap-3">
+                              <div className="flex items-center gap-3 min-w-0">
+                                {g.isOrganic ? (
+                                  <div className="size-10 rounded-xl bg-secondary border border-border flex items-center justify-center text-muted-foreground shrink-0">
+                                    <Globe className="size-5" />
+                                  </div>
+                                ) : g.referrer?.photo ? (
+                                  <img
+                                    src={g.referrer.photo}
+                                    alt={g.referrer.name}
+                                    className="size-10 rounded-xl object-cover ring-1 ring-border shrink-0"
+                                  />
+                                ) : (
+                                  <div className="size-10 rounded-xl bg-primary/10 text-primary border border-primary/20 flex items-center justify-center font-bold text-sm shrink-0">
+                                    {(g.referrer?.name || g.referrerId).slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+
+                                <div className="min-w-0">
+                                  <div className="flex items-center gap-2">
+                                    <h4 className="text-sm font-bold text-foreground">
+                                      {g.isOrganic
+                                        ? "Direct / Organic (No Referral Link)"
+                                        : g.referrer?.name || `Creator: ${g.referrerId}`}
+                                    </h4>
+                                    {!g.isOrganic && g.referrer?.referralCode && (
+                                      <span className="font-mono text-[11px] bg-secondary px-2 py-0.5 rounded-md font-semibold text-muted-foreground border border-border">
+                                        {g.referrer.referralCode}
+                                      </span>
+                                    )}
+                                  </div>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    {g.isOrganic
+                                      ? "Creators entered the promo code directly without clicking a creator's link"
+                                      : [g.referrer?.city, g.referrer?.instagram, g.referrer?.contact?.phone].filter(Boolean).join(" · ")}
+                                  </p>
+                                </div>
+                              </div>
+
+                              {/* STATS & DRILL-DOWN TOGGLE */}
+                              <div className="flex items-center gap-3 shrink-0 self-end md:self-center">
+                                <div className="text-right">
+                                  <span className="text-sm font-bold text-emerald-700 dark:text-emerald-400">
+                                    {g.redemptionsCount} Creator{g.redemptionsCount === 1 ? "" : "s"}
+                                  </span>
+                                  <div className="flex items-center gap-1.5 justify-end text-[11px] text-muted-foreground">
+                                    <div className="w-16 h-1.5 bg-secondary rounded-full overflow-hidden border border-border/60">
+                                      <div
+                                        className="h-full bg-emerald-500 rounded-full"
+                                        style={{ width: `${percentOfTotal}%` }}
+                                      />
+                                    </div>
+                                    <span>{percentOfTotal}%</span>
+                                  </div>
+                                </div>
+
+                                {/* 1-CLICK WHATSAPP TO REFERRER */}
+                                {refWaUrl && (
+                                  <a
+                                    href={refWaUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-xl bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 px-3 py-1.5 text-xs font-bold hover:bg-emerald-500/25 transition-colors"
+                                    title="Send update on WhatsApp to this referrer"
+                                  >
+                                    <MessageSquare className="size-3.5" />
+                                    <span>WhatsApp Referrer</span>
+                                  </a>
+                                )}
+
+                                {/* TOGGLE DRILLDOWN */}
+                                <button
+                                  type="button"
+                                  onClick={() => setExpandedReferrerId(isExpanded ? null : g.referrerId)}
+                                  className="px-3 py-1.5 rounded-xl bg-secondary hover:bg-secondary/80 text-foreground text-xs font-semibold border border-border transition-colors cursor-pointer"
+                                >
+                                  {isExpanded ? "Hide Details ▲" : "View Creators ▼"}
+                                </button>
+                              </div>
+                            </div>
+
+                            {/* EXPANDED DRILLDOWN OF INDIVIDUAL REFERRED CREATORS */}
+                            {isExpanded && (
+                              <div className="border-t border-border/80 bg-secondary/15 p-4 rounded-b-2xl space-y-2">
+                                <div className="flex items-center justify-between text-xs font-semibold text-muted-foreground mb-2">
+                                  <span>Referred Creator Profile</span>
+                                  <span>Plan &amp; Code Used</span>
+                                </div>
+
+                                <div className="grid gap-2">
+                                  {g.creators.map((item, idx) => {
+                                    const c = item.creator;
+                                    const cPhone = (c?.contact?.phone || "").replace(/[^0-9]/g, "");
+                                    const cWa = cPhone.length === 10 ? `91${cPhone}` : cPhone;
+                                    const cWaMsg = `Hi ${c?.name || "there"}, welcome to Influencer Dhundo! Saw you activated your pass via ${g.referrer?.name || "a referral"}. Let us know if you need any help with brand collaborations!`;
+                                    const cWaUrl = cWa ? `https://wa.me/${cWa}?text=${encodeURIComponent(cWaMsg)}` : null;
+
+                                    return (
+                                      <div
+                                        key={item.creatorId + idx}
+                                        className="flex items-center justify-between p-2.5 rounded-xl bg-background border border-border text-xs gap-3"
+                                      >
+                                        <div className="flex items-center gap-2.5 min-w-0">
+                                          {c?.photo ? (
+                                            <img
+                                              src={c.photo}
+                                              alt={c.name}
+                                              className="size-7 rounded-lg object-cover ring-1 ring-border shrink-0"
+                                            />
+                                          ) : (
+                                            <div className="size-7 rounded-lg bg-secondary flex items-center justify-center text-[10px] font-bold shrink-0">
+                                              {(c?.name || item.creatorId).slice(0, 2).toUpperCase()}
+                                            </div>
+                                          )}
+                                          <div className="min-w-0">
+                                            <div className="flex items-center gap-1.5">
+                                              <span className="font-bold text-foreground truncate">
+                                                {c?.name || item.creatorId}
+                                              </span>
+                                              {c?.instagram && (
+                                                <span className="text-tealdeep font-mono text-[11px]">
+                                                  {c.instagram}
+                                                </span>
+                                              )}
+                                            </div>
+                                            <span className="text-[11px] text-muted-foreground">
+                                              {[c?.locality, c?.city, c?.contact?.phone].filter(Boolean).join(" · ") || "No phone"}
+                                            </span>
+                                          </div>
+                                        </div>
+
+                                        <div className="flex items-center gap-2 shrink-0">
+                                          <span className="font-mono font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20">
+                                            {item.sub.duration} {item.sub.price === 0 ? "(Free Pass)" : `(₹${item.sub.price})`}
+                                          </span>
+                                          <span className="font-mono text-[10px] text-muted-foreground bg-secondary px-1.5 py-0.5 rounded">
+                                            Code: {item.code}
+                                          </span>
+
+                                          {cWaUrl && (
+                                            <a
+                                              href={cWaUrl}
+                                              target="_blank"
+                                              rel="noreferrer"
+                                              className="text-emerald-700 hover:text-emerald-800 p-1 hover:bg-emerald-500/10 rounded"
+                                              title="WhatsApp this creator"
+                                            >
+                                              <MessageSquare className="size-3.5" />
+                                            </a>
+                                          )}
+                                        </div>
+                                      </div>
+                                    );
+                                  })}
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
+                    </div>
+                  </div>
+                </div>
+              );
+            })()}
+          </Card>
 
           {/* EDIT DISCOUNT CODE MODAL */}
           {editingCode && (
@@ -2881,44 +3969,516 @@ function AdminDashboard() {
               </Card>
             </div>
           )}
+
+          {/* DEDICATED ATTRIBUTION DRILLDOWN MODAL */}
+          {attributionModalCode && (
+            <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 p-4 backdrop-blur-xs overflow-y-auto">
+              <div
+                className="fixed inset-0"
+                onClick={() => setAttributionModalCode(null)}
+              />
+              <Card className="relative z-10 w-full max-w-3xl max-h-[90vh] overflow-y-auto p-6 shadow-2xl border border-border bg-card">
+                <div className="flex items-center justify-between border-b border-border pb-3 mb-4">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex size-9 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-700 dark:text-emerald-300">
+                      <Users className="size-5" />
+                    </div>
+                    <div>
+                      <h3 className="text-base font-bold text-foreground flex items-center gap-2">
+                        <span>Attribution: {attributionModalCode.code}</span>
+                        <span className="text-xs font-mono font-bold bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 px-2 py-0.5 rounded-full border border-emerald-500/30">
+                          {attributionModalCode.discountPercent}% OFF
+                        </span>
+                      </h3>
+                      <p className="text-xs text-muted-foreground">
+                        Which creators brought users who redeemed promo code <strong>{attributionModalCode.code}</strong> ({attributionModalCode.usageCount} total redemptions)
+                      </p>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setAttributionModalCode(null)}
+                    className="rounded-lg p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground"
+                  >
+                    <X className="size-4" />
+                  </button>
+                </div>
+
+                {(() => {
+                  const matchingSubs = subscriptions.filter(
+                    (s) => s.referralCodeUsed?.trim().toUpperCase() === attributionModalCode.code.toUpperCase()
+                  );
+
+                  if (matchingSubs.length === 0) {
+                    return (
+                      <div className="p-8 text-center text-sm text-muted-foreground">
+                        No redemptions found for this coupon code yet.
+                      </div>
+                    );
+                  }
+
+                  type ReferrerAttributionGroup = {
+                    referrerId: string;
+                    referrer: Creator | null;
+                    isOrganic: boolean;
+                    redemptionsCount: number;
+                    creators: Array<{
+                      creator: Creator | null;
+                      creatorId: string;
+                      sub: typeof matchingSubs[0];
+                    }>;
+                  };
+
+                  const groupsMap = new Map<string, ReferrerAttributionGroup>();
+
+                  matchingSubs.forEach((s) => {
+                    const creator = creators.find((c) => c.id === s.creatorId) || null;
+                    const referrerId = creator?.referredBy?.trim() || "organic";
+                    const isOrganic = referrerId === "organic";
+                    const referrer = !isOrganic ? (creators.find((c) => c.id === referrerId) || null) : null;
+
+                    if (!groupsMap.has(referrerId)) {
+                      groupsMap.set(referrerId, {
+                        referrerId,
+                        referrer,
+                        isOrganic,
+                        redemptionsCount: 0,
+                        creators: [],
+                      });
+                    }
+
+                    const group = groupsMap.get(referrerId)!;
+                    group.redemptionsCount += 1;
+                    group.creators.push({
+                      creator,
+                      creatorId: s.creatorId,
+                      sub: s,
+                    });
+                  });
+
+                  const groups = Array.from(groupsMap.values()).sort((a, b) => b.redemptionsCount - a.redemptionsCount);
+
+                  return (
+                    <div className="space-y-4">
+                      <div className="grid gap-3">
+                        {groups.map((g) => {
+                          const percentOfTotal = Math.round((g.redemptionsCount / matchingSubs.length) * 100);
+                          const refPhone = (g.referrer?.contact?.phone || "").replace(/[^0-9]/g, "");
+                          const refWaNumber = refPhone.length === 10 ? `91${refPhone}` : refPhone;
+                          const refWaMsg = `Hi ${g.referrer?.name || "there"}, awesome! ${g.redemptionsCount} creators have signed up using your link with code ${attributionModalCode.code} on Influencer Dhundo!`;
+                          const refWaUrl = refWaNumber ? `https://wa.me/${refWaNumber}?text=${encodeURIComponent(refWaMsg)}` : null;
+
+                          return (
+                            <div
+                              key={g.referrerId}
+                              className="rounded-2xl border border-border bg-secondary/20 p-4 space-y-3"
+                            >
+                              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2">
+                                <div className="flex items-center gap-2.5">
+                                  {g.isOrganic ? (
+                                    <div className="size-8 rounded-lg bg-secondary flex items-center justify-center text-muted-foreground border border-border">
+                                      <Globe className="size-4" />
+                                    </div>
+                                  ) : (
+                                    <div className="size-8 rounded-lg bg-primary/15 text-primary flex items-center justify-center font-bold text-xs">
+                                      {(g.referrer?.name || g.referrerId).slice(0, 2).toUpperCase()}
+                                    </div>
+                                  )}
+                                  <div>
+                                    <p className="text-sm font-bold text-foreground">
+                                      {g.isOrganic ? "Direct / Organic (No Referrer)" : g.referrer?.name || g.referrerId}
+                                    </p>
+                                    {!g.isOrganic && g.referrer?.contact?.phone && (
+                                      <p className="text-[11px] text-muted-foreground">{g.referrer.contact.phone}</p>
+                                    )}
+                                  </div>
+                                </div>
+
+                                <div className="flex items-center gap-2">
+                                  <span className="font-bold text-xs text-emerald-700 dark:text-emerald-400 bg-emerald-500/10 px-2.5 py-1 rounded-lg border border-emerald-500/20">
+                                    {g.redemptionsCount} Creator{g.redemptionsCount === 1 ? "" : "s"} ({percentOfTotal}%)
+                                  </span>
+                                  {refWaUrl && (
+                                    <a
+                                      href={refWaUrl}
+                                      target="_blank"
+                                      rel="noreferrer"
+                                      className="inline-flex items-center gap-1 rounded-lg bg-emerald-500/15 text-emerald-800 dark:text-emerald-300 px-2.5 py-1 text-xs font-bold hover:bg-emerald-500/25"
+                                    >
+                                      <MessageSquare className="size-3" />
+                                      WhatsApp
+                                    </a>
+                                  )}
+                                </div>
+                              </div>
+
+                              {/* LIST OF CREATORS */}
+                              <div className="grid gap-1.5 pt-1">
+                                {g.creators.map((item, idx) => {
+                                  const c = item.creator;
+                                  const cPhone = (c?.contact?.phone || "").replace(/[^0-9]/g, "");
+                                  const cWa = cPhone.length === 10 ? `91${cPhone}` : cPhone;
+                                  const cWaUrl = cWa ? `https://wa.me/${cWa}` : null;
+
+                                  return (
+                                    <div
+                                      key={item.creatorId + idx}
+                                      className="flex items-center justify-between p-2 rounded-lg bg-background border border-border/80 text-xs"
+                                    >
+                                      <div className="flex items-center gap-2 min-w-0">
+                                        <span className="font-semibold text-foreground truncate">
+                                          {c?.name || item.creatorId}
+                                        </span>
+                                        {c?.instagram && (
+                                          <span className="text-tealdeep font-mono text-[11px] truncate">
+                                            {c.instagram}
+                                          </span>
+                                        )}
+                                        {c?.contact?.phone && (
+                                          <span className="text-muted-foreground text-[11px]">
+                                            · {c.contact.phone}
+                                          </span>
+                                        )}
+                                      </div>
+                                      <div className="flex items-center gap-1.5 shrink-0">
+                                        <span className="font-mono text-[11px] font-bold text-emerald-700 dark:text-emerald-300">
+                                          {item.sub.duration} {item.sub.price === 0 ? "(Free)" : `(₹${item.sub.price})`}
+                                        </span>
+                                        {cWaUrl && (
+                                          <a
+                                            href={cWaUrl}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="text-emerald-600 hover:text-emerald-700 p-1"
+                                          >
+                                            <MessageSquare className="size-3" />
+                                          </a>
+                                        )}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            </div>
+                          );
+                        })}
+                      </div>
+
+                      <div className="flex justify-end pt-2 border-t border-border">
+                        <Button
+                          variant="ink"
+                          type="button"
+                          onClick={() => setAttributionModalCode(null)}
+                          className="px-4 py-2 text-xs"
+                        >
+                          Close
+                        </Button>
+                      </div>
+                    </div>
+                  );
+                })()}
+              </Card>
+            </div>
+          )}
         </div>
       ) : null}
 
       {/* ── TAB 3: SUBSCRIPTIONS ────────────────────────────────────────── */}
       {tab === "Subscriptions" ? (
-        <Card className="mt-5">
-          {subscriptions.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No subscriptions recorded yet.</p>
-          ) : (
-            <ul className="space-y-3 text-sm">
-              {subscriptions.map((s) => {
-                const isQueued = s.isQueued || s.status === "queued" || new Date(s.startedAt).getTime() > Date.now();
-                return (
-                  <li key={s.id || s.startedAt} className="flex flex-wrap items-center justify-between gap-2 border-b border-border/40 pb-2.5 last:border-0">
-                    <div className="flex items-center gap-2">
-                      <span className="font-semibold">
-                        {creators.find((c) => c.id === s.creatorId)?.name ?? s.creatorId}
-                      </span>
-                      {isQueued ? (
-                        <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[11px] font-bold text-tealdeep">
-                          Queued (starts {new Date(s.startedAt).toLocaleDateString("en-IN")})
-                        </span>
-                      ) : (
-                        <span className="rounded-full bg-primary/15 px-2 py-0.5 text-[11px] font-bold text-saffrondeep">
-                          Active
-                        </span>
-                      )}
-                    </div>
-                    <span className="text-muted-foreground">
-                      {s.duration} · {formatPrice(s.price)} ·{" "}
-                      {new Date(s.startedAt).toLocaleDateString("en-IN")}
-                    </span>
-                  </li>
-                );
-              })}
-            </ul>
-          )}
-        </Card>
+        <div className="mt-5 space-y-5">
+          {/* SUBSCRIPTION FINANCIAL SUMMARY CARDS */}
+          {(() => {
+            const now = Date.now();
+            const totalRevenue = subscriptions
+              .filter((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price || 0) > 0)
+              .reduce((sum, s) => sum + (s.price || 0), 0);
+            const paidSubs = subscriptions.filter((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price || 0) > 0);
+            const promo100Subs = subscriptions.filter((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price === 0 || s.price == null));
+            const trialSubs = subscriptions.filter((s) => s.isTrial || s.planId === "trial-3d");
+            const activeSubs = subscriptions.filter((s) => {
+              const exp = s.expiresAt ? new Date(s.expiresAt).getTime() : 0;
+              return exp > now || (!s.expiresAt && s.status === "active");
+            });
+
+            return (
+              <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
+                <Card className="p-4 bg-emerald-500/10 border-emerald-500/20">
+                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-1">
+                    <span className="text-xs font-bold">Total Revenue</span>
+                    <IndianRupee className="size-4" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">₹{totalRevenue.toLocaleString("en-IN")}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Across paid purchases (₹)</p>
+                </Card>
+
+                <Card className="p-4 bg-primary/10 border-primary/20">
+                  <div className="flex items-center justify-between text-saffrondeep mb-1">
+                    <span className="text-xs font-bold">Paid Purchases</span>
+                    <CreditCard className="size-4" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{paidSubs.length}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Real money paid (₹)</p>
+                </Card>
+
+                <Card className="p-4 bg-purple-500/10 border-purple-500/20">
+                  <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 mb-1">
+                    <span className="text-xs font-bold">100% OFF Passes</span>
+                    <Tag className="size-4" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{promo100Subs.length}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Promo codes (₹0)</p>
+                </Card>
+
+                <Card className="p-4 bg-sky-500/10 border-sky-500/20">
+                  <div className="flex items-center justify-between text-sky-600 dark:text-sky-400 mb-1">
+                    <span className="text-xs font-bold">Free Trials</span>
+                    <Zap className="size-4" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{trialSubs.length}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">3-Day free trials</p>
+                </Card>
+
+                <Card className="p-4 bg-tealdeep/10 border-tealdeep/20">
+                  <div className="flex items-center justify-between text-tealdeep mb-1">
+                    <span className="text-xs font-bold">Active Access</span>
+                    <Activity className="size-4" />
+                  </div>
+                  <p className="text-2xl font-bold text-foreground">{activeSubs.length}</p>
+                  <p className="text-[11px] text-muted-foreground mt-0.5">Currently valid access</p>
+                </Card>
+              </div>
+            );
+          })()}
+
+          {/* SEARCH & FILTERS BAR */}
+          <Card className="p-4 bg-secondary/30 border border-border/80">
+            <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
+              <div className="relative flex-1">
+                <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center pl-3.5 text-muted-foreground">
+                  <Search className="size-4" />
+                </div>
+                <TextInput
+                  value={subSearch}
+                  onChange={(e) => setSubSearch(e.target.value)}
+                  placeholder="Search subscriptions by creator name or ID..."
+                  className="pl-10 text-xs sm:text-sm bg-background"
+                />
+                {subSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setSubSearch("")}
+                    className="absolute inset-y-0 right-0 flex items-center pr-3 text-muted-foreground hover:text-foreground"
+                  >
+                    <X className="size-3.5" />
+                  </button>
+                )}
+              </div>
+
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <select
+                  value={subFilter}
+                  onChange={(e) => setSubFilter(e.target.value as any)}
+                  className="rounded-xl bg-background px-3 py-2 text-xs font-semibold ring-1 ring-border focus:ring-2 focus:ring-primary focus:outline-hidden"
+                >
+                  <option value="all">All Subscriptions ({subscriptions.length})</option>
+                  <option value="paid">💎 Paid Plans Only (Real Money)</option>
+                  <option value="promo100">🎟️ 100% OFF Passes (₹0)</option>
+                  <option value="trial">⚡ 3-Day Free Trials</option>
+                  <option value="active">🟢 Active Now</option>
+                  <option value="queued">⏳ Queued Renewals</option>
+                  <option value="expired">🔴 Expired</option>
+                </select>
+
+                {(subSearch || subFilter !== "all") && (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={() => {
+                      setSubSearch("");
+                      setSubFilter("all");
+                    }}
+                    className="text-xs text-muted-foreground hover:text-foreground px-2.5 py-2"
+                  >
+                    Reset
+                  </Button>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* SUBSCRIPTION RECORDS LIST */}
+          {(() => {
+            const now = Date.now();
+            const filteredSubs = subscriptions.filter((s) => {
+              const matchedCreator = creators.find((c) => c.id === s.creatorId);
+              const q = subSearch.toLowerCase().trim();
+              if (q) {
+                const matchName = matchedCreator?.name?.toLowerCase().includes(q);
+                const matchId = s.creatorId.toLowerCase().includes(q);
+                const matchPlan = s.duration?.toLowerCase().includes(q) || s.planId?.toLowerCase().includes(q);
+                if (!matchName && !matchId && !matchPlan) return false;
+              }
+
+              const isQueued = s.isQueued || s.status === "queued" || new Date(s.startedAt).getTime() > now;
+              const expTime = s.expiresAt ? new Date(s.expiresAt).getTime() : 0;
+              const isExpired = !isQueued && expTime > 0 && expTime <= now;
+              const isActive = !isQueued && !isExpired;
+              const isTrial = s.isTrial || s.planId === "trial-3d";
+              const isRealPaid = !isTrial && (s.price || 0) > 0;
+              const isPromo100 = !isTrial && (s.price === 0 || s.price == null);
+
+              if (subFilter === "paid" && !isRealPaid) return false;
+              if (subFilter === "promo100" && !isPromo100) return false;
+              if (subFilter === "trial" && !isTrial) return false;
+              if (subFilter === "active" && !isActive) return false;
+              if (subFilter === "queued" && !isQueued) return false;
+              if (subFilter === "expired" && !isExpired) return false;
+
+              return true;
+            });
+
+            if (filteredSubs.length === 0) {
+              return (
+                <Card className="p-8 text-center text-sm text-muted-foreground">
+                  No subscription records found matching the filters.
+                </Card>
+              );
+            }
+
+            return (
+              <div className="grid gap-3">
+                {filteredSubs.map((s) => {
+                  const matchedCreator = creators.find((c) => c.id === s.creatorId);
+                  const isQueued = s.isQueued || s.status === "queued" || new Date(s.startedAt).getTime() > now;
+                  const expTime = s.expiresAt ? new Date(s.expiresAt).getTime() : 0;
+                  const isExpired = !isQueued && expTime > 0 && expTime <= now;
+                  const isTrial = s.isTrial || s.planId === "trial-3d";
+                  const isRealPaid = !isTrial && (s.price || 0) > 0;
+                  const isPromo100 = !isTrial && (s.price === 0 || s.price == null);
+
+                  const daysLeft = expTime > now ? Math.ceil((expTime - now) / (1000 * 60 * 60 * 24)) : 0;
+
+                  return (
+                    <Card key={s.id || s.startedAt + s.creatorId} className="p-4 border border-border/80 hover:border-primary/40 transition-all">
+                      <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                        <div className="space-y-1.5 min-w-0">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="font-bold text-foreground text-sm">
+                              {matchedCreator?.name ?? s.creatorId}
+                            </span>
+                            {matchedCreator?.displayName && matchedCreator.displayName !== matchedCreator.name && (
+                              <span className="text-xs text-muted-foreground">
+                                ({matchedCreator.displayName})
+                              </span>
+                            )}
+
+                            {/* STATUS BADGES */}
+                            {isQueued ? (
+                              <span
+                                className={`rounded-full border px-2.5 py-0.5 text-[11px] font-bold flex items-center gap-1 ${
+                                  isRealPaid
+                                    ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                                    : isPromo100
+                                      ? "bg-purple-500/15 border-purple-500/30 text-purple-700 dark:text-purple-300"
+                                      : "bg-accent/20 border-tealdeep/30 text-tealdeep"
+                                }`}
+                              >
+                                <Clock className="size-3" />
+                                Queued ({isRealPaid ? "Paid" : isPromo100 ? "100% OFF" : "Trial"} • Starts {new Date(s.startedAt).toLocaleDateString("en-IN")})
+                              </span>
+                            ) : isExpired ? (
+                              <span className="rounded-full bg-rose/15 border border-rose/30 px-2.5 py-0.5 text-[11px] font-bold text-rose flex items-center gap-1">
+                                <AlertTriangle className="size-3" />
+                                Expired
+                              </span>
+                            ) : isTrial ? (
+                              <span className="rounded-full bg-sky-500/15 border border-sky-500/30 px-2.5 py-0.5 text-[11px] font-bold text-sky-700 dark:text-sky-300 flex items-center gap-1">
+                                <Zap className="size-3" />
+                                Free Trial ({daysLeft}d left)
+                              </span>
+                            ) : isPromo100 ? (
+                              <span className="rounded-full bg-purple-500/15 border border-purple-500/30 px-2.5 py-0.5 text-[11px] font-bold text-purple-700 dark:text-purple-300 flex items-center gap-1">
+                                <Tag className="size-3" />
+                                100% OFF Pass ({daysLeft}d left)
+                              </span>
+                            ) : (
+                              <span className="rounded-full bg-emerald-500/15 border border-emerald-500/30 px-2.5 py-0.5 text-[11px] font-bold text-emerald-700 dark:text-emerald-300 flex items-center gap-1">
+                                <CheckCircle2 className="size-3" />
+                                Active Paid ({daysLeft}d left)
+                              </span>
+                            )}
+                          </div>
+
+                          <div className="text-xs text-muted-foreground flex flex-wrap items-center gap-x-3 gap-y-1">
+                            <span>
+                              Plan: <strong className="text-foreground">{s.duration}</strong>
+                            </span>
+                            <span>·</span>
+                            <span>
+                              Amount:{" "}
+                              {isRealPaid ? (
+                                <strong className="text-emerald-600 dark:text-emerald-400 font-bold">{formatPrice(s.price)} (Paid)</strong>
+                              ) : isPromo100 ? (
+                                <strong className="text-purple-600 dark:text-purple-400 font-bold">₹0 (100% OFF Pass)</strong>
+                              ) : (
+                                <strong className="text-sky-600 dark:text-sky-400 font-bold">Free (Trial)</strong>
+                              )}
+                            </span>
+                            <span>·</span>
+                            <span>
+                              Started: {new Date(s.startedAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                            </span>
+                            {s.expiresAt && (
+                              <>
+                                <span>·</span>
+                                <span>
+                                  Expires: {new Date(s.expiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" })}
+                                </span>
+                              </>
+                            )}
+                            {s.referralCodeUsed && (
+                              <>
+                                <span>·</span>
+                                <span className="rounded-md bg-purple-500/15 border border-purple-500/30 px-1.5 py-0.5 text-[10px] font-mono text-purple-700 dark:text-purple-300 font-bold">
+                                  Promo: {s.referralCodeUsed}
+                                </span>
+                              </>
+                            )}
+                          </div>
+                        </div>
+
+                        {/* QUICK ACTION CONTROLS */}
+                        {matchedCreator && (
+                          <div className="flex items-center gap-2 shrink-0">
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="px-2.5 py-1.5 text-xs ring-1 ring-border bg-background hover:bg-secondary flex items-center gap-1 cursor-pointer"
+                              onClick={() => handleExtendExpiry(matchedCreator, 7)}
+                            >
+                              <Plus className="size-3" />
+                              <span>+7d</span>
+                            </Button>
+
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              className="px-2.5 py-1.5 text-xs text-tealdeep bg-tealdeep/10 hover:bg-tealdeep/20 ring-1 ring-tealdeep/30 flex items-center gap-1 cursor-pointer"
+                              onClick={() => handleActivatePass(matchedCreator, "1m", "1 Month")}
+                            >
+                              <Award className="size-3" />
+                              <span>+1M</span>
+                            </Button>
+                          </div>
+                        )}
+                      </div>
+                    </Card>
+                  );
+                })}
+              </div>
+            );
+          })()}
+        </div>
       ) : null}
 
       {/* ── TAB 4: BUSINESSES ───────────────────────────────────────────── */}

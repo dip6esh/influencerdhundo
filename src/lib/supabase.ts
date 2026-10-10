@@ -33,6 +33,8 @@ export interface PaymentRecord {
   planId: string;
   status: string;
   createdAt: string;
+  promoCodeUsed?: string | undefined;
+  referralCodeUsed?: string | undefined;
 }
 
 export interface CreatorRow {
@@ -75,37 +77,42 @@ export interface CreatorRow {
 }
 
 export function creatorToRow(c: Creator, authUserId?: string): CreatorRow {
+  const cleanId = (c.id || "").trim().toLowerCase().replace(/[^a-z0-9-]+/g, "").replace(/^-+|-+$/g, "");
   return {
-    id: c.id,
+    id: cleanId || c.id,
     auth_user_id: authUserId ?? null,
-    name: c.name,
-    display_name: c.displayName,
-    photo: c.photo || "",
-    city: c.city,
-    locality: c.locality,
-    state: c.state || "",
-    pincode: c.pincode || "",
+    name: (c.name || "").trim(),
+    display_name: (c.displayName || c.name || "").trim(),
+    photo: (c.photo || "").trim(),
+    city: (c.city || "").trim(),
+    locality: (c.locality || "").trim(),
+    state: (c.state || "").trim(),
+    pincode: (c.pincode || "").trim(),
     followers: c.followers || 0,
-    instagram: c.instagram || "",
+    instagram: (c.instagram || "").trim(),
     other_socials: c.otherSocials || [],
     categories: c.categories || [],
     content_types: c.contentTypes || [],
     languages: c.languages || [],
-    about: c.about || "",
+    about: (c.about || "").trim(),
     collab_type: c.collabType,
     starting_price: c.startingPrice || 0,
     travels: !!c.travels,
     travel_range: c.travelRange || null,
     accepts_products: c.acceptsProducts || "Depends",
-    accepts_products_details: c.acceptsProductsDetails || "",
-    turnaround: c.turnaround || "3–5 days",
+    accepts_products_details: (c.acceptsProductsDetails || "").trim(),
+    turnaround: (c.turnaround || "3–5 days").trim(),
     status: c.status || "Active",
     featured: !!c.featured,
     birth_date: c.birthDate || null,
     gender: c.gender || null,
-    contact: c.contact || { phone: "", whatsapp: "", email: "" },
-    referral_code: c.referralCode ?? null,
-    referred_by: c.referredBy ?? null,
+    contact: {
+      phone: (c.contact?.phone || "").trim(),
+      whatsapp: (c.contact?.whatsapp || c.contact?.phone || "").trim(),
+      email: (c.contact?.email || "").trim(),
+    },
+    referral_code: c.referralCode ? c.referralCode.trim() : null,
+    referred_by: c.referredBy ? c.referredBy.trim() : null,
     trial_started_at: c.trialStartedAt ?? null,
     subscription_expires_at: c.subscriptionExpiresAt ?? null,
     referral_bonus_days: c.referralBonusDays ?? 0,
@@ -264,6 +271,8 @@ export const supabaseDb = {
         referral_code_used: sub.referralCodeUsed ?? null,
         is_queued: sub.isQueued ?? false,
         status: sub.status ?? (sub.isQueued ? "queued" : "active"),
+        razorpay_order_id: sub.razorpayOrderId ?? null,
+        razorpay_payment_id: sub.razorpayPaymentId ?? null,
       });
       return !error;
     } catch (e) {
@@ -311,6 +320,8 @@ export const supabaseDb = {
         referralCodeUsed: row.referral_code_used as string | undefined,
         isQueued: Boolean(row.is_queued),
         status: (row.status as "active" | "queued" | "expired") || (row.is_queued ? "queued" : "active"),
+        razorpayOrderId: (row.razorpay_order_id as string | undefined) ?? undefined,
+        razorpayPaymentId: (row.razorpay_payment_id as string | undefined) ?? undefined,
       }));
     } catch (e) {
       console.warn("Supabase fetchSubscriptionsForCreator error:", e);
@@ -339,6 +350,8 @@ export const supabaseDb = {
         referralCodeUsed: row.referral_code_used as string | undefined,
         isQueued: Boolean(row.is_queued),
         status: (row.status as "active" | "queued" | "expired") || (row.is_queued ? "queued" : "active"),
+        razorpayOrderId: (row.razorpay_order_id as string | undefined) ?? undefined,
+        razorpayPaymentId: (row.razorpay_payment_id as string | undefined) ?? undefined,
       }));
     } catch (e) {
       console.warn("Supabase fetchAllSubscriptions error:", e);
@@ -367,6 +380,8 @@ export const supabaseDb = {
         planId: row.plan_id as string,
         status: (row.status as string) || "captured",
         createdAt: row.created_at as string,
+        promoCodeUsed: (row.promo_code_used as string) || (row.referral_code_used as string) || undefined,
+        referralCodeUsed: (row.referral_code_used as string) || (row.promo_code_used as string) || undefined,
       }));
     } catch (e) {
       console.warn("Supabase fetchPaymentsForCreator error:", e);
@@ -1432,7 +1447,12 @@ export const supabaseDb = {
   /** Validate a discount code for checkout (returns code details or error) */
   async validateDiscountCode(
     codeStr: string,
-    userContext?: { email?: string; phone?: string; planId?: string },
+    userContext?: {
+      email?: string | undefined;
+      phone?: string | undefined;
+      planId?: string | undefined;
+      creatorId?: string | undefined;
+    },
   ): Promise<
     | { valid: true; discountCode: DiscountCode }
     | { valid: false; error: string }
@@ -1453,6 +1473,23 @@ export const supabaseDb = {
       const now = new Date().getTime();
       const validUntil = new Date(row.valid_until).getTime();
       const validFrom = new Date(row.valid_from).getTime();
+
+      // 1. One-time redemption check per creator
+      if (userContext?.creatorId) {
+        const { data: pastSubs } = await supabase
+          .from("subscriptions")
+          .select("id")
+          .eq("creator_id", userContext.creatorId)
+          .ilike("referral_code_used", cleanCode)
+          .limit(1);
+
+        if (pastSubs && pastSubs.length > 0) {
+          return {
+            valid: false,
+            error: "You have already redeemed this promo code previously. Each discount code can only be used once per creator.",
+          };
+        }
+      }
 
       if (!row.is_active) {
         return { valid: false, error: "This coupon code is currently inactive." };

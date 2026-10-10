@@ -199,9 +199,19 @@ function Dashboard() {
   const baseUrl = typeof window !== "undefined" ? window.location.origin : "https://influencerdhundo.com";
   const referralLink = referralCode ? `${baseUrl}/creator/register?ref=${referralCode}` : "";
 
-  const referredCreators = creators.filter((c) => c.referredBy === mine?.id);
+  const referredCreators = creators.filter(
+    (c) =>
+      c.referredBy === mine?.id ||
+      (mine?.referralCode && c.referredBy?.trim().toUpperCase() === mine.referralCode.trim().toUpperCase()),
+  );
   const paidReferredCount = referredCreators.filter((c) =>
-    subscriptions.some((s) => s.creatorId === c.id && s.planId !== "trial-3d"),
+    subscriptions.some(
+      (s) =>
+        s.creatorId === c.id &&
+        s.planId !== "trial-3d" &&
+        !s.isTrial &&
+        (s.price ?? 0) > 0,
+    ),
   ).length;
 
   const totalBonusDaysEarned = referralEvents.reduce((acc, ev) => acc + (ev.daysDelta || 0), 0);
@@ -403,22 +413,21 @@ function Dashboard() {
             </div>
 
             {/* QUICK HEADER ACTIONS */}
-            <div className="flex flex-wrap items-center gap-2.5">
+            <div className="grid grid-cols-2 gap-2 w-full sm:w-auto sm:flex sm:items-center sm:gap-2.5">
               <Link
                 to="/creators/$creatorId"
                 params={{ creatorId: getCreatorProfileSlug(mine) }}
                 search={{ preview: true }}
-                className="inline-flex items-center gap-2 rounded-xl bg-background px-4 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border/80 hover:bg-secondary hover:ring-border transition-all shadow-xs"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-background px-3 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border/80 hover:bg-secondary hover:ring-border transition-all shadow-xs text-center"
               >
-                <ArrowUpRight className="size-4 text-muted-foreground" />
-                View Public Profile
+                <ArrowUpRight className="size-4 text-muted-foreground shrink-0" />
+                <span>View Profile</span>
               </Link>
               <Link
                 to="/creator/register"
-                className="inline-flex items-center gap-2 rounded-xl bg-foreground px-4 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-xs"
+                className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-3 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-xs text-center"
               >
-                <Check className="size-3.5 hidden" />
-                Edit Profile
+                <span>Edit Profile</span>
               </Link>
             </div>
           </div>
@@ -426,10 +435,10 @@ function Dashboard() {
           {/* MAIN PROFILE & SUBSCRIPTION CARDS */}
           <div className="mt-8 grid gap-6 md:grid-cols-3 items-stretch">
             {/* CREATOR PROFILE HERO CARD */}
-            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between gap-6">
-              <div className="space-y-6">
+            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-4.5 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between gap-5 sm:gap-6">
+              <div className="space-y-5 sm:space-y-6">
                 {/* 1. CLEAN IDENTITY HEADER */}
-                <div className="flex items-start gap-4 sm:gap-5">
+                <div className="flex items-start gap-3.5 sm:gap-5">
                   {/* Avatar */}
                   <div
                     className="relative group cursor-pointer shrink-0"
@@ -469,52 +478,52 @@ function Dashboard() {
                   </div>
 
                   {/* Creator Info */}
-                  <div className="min-w-0 flex-1 space-y-1.5">
+                  <div className="min-w-0 flex-1 space-y-1 sm:space-y-1.5">
                     {/* Line 1: Name + Status */}
-                    <div className="flex items-center gap-2.5 flex-wrap">
-                      <h2 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-foreground">
+                    <div className="flex items-center gap-2 flex-wrap">
+                      <h2 className="text-lg sm:text-2xl font-display font-bold tracking-tight text-foreground truncate max-w-full">
                         {mine.name || mine.displayName}
                       </h2>
                       {mine.status === "Active" ? (
-                        <span className="inline-flex items-center gap-1.5 rounded-full bg-tealdeep/10 text-tealdeep border border-tealdeep/25 px-2.5 py-0.5 text-xs font-semibold">
+                        <span className="inline-flex items-center gap-1.5 rounded-full bg-tealdeep/10 text-tealdeep border border-tealdeep/25 px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold shrink-0">
                           <span className="size-1.5 rounded-full bg-tealdeep animate-pulse" />
                           Active Creator
                         </span>
                       ) : (
-                        <span className="inline-flex items-center rounded-full bg-secondary text-muted-foreground border border-border px-2.5 py-0.5 text-xs font-semibold">
+                        <span className="inline-flex items-center rounded-full bg-secondary text-muted-foreground border border-border px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold shrink-0">
                           {mine.status}
                         </span>
                       )}
                     </div>
 
                     {/* Line 2: Location, Age, Gender */}
-                    <p className="text-xs sm:text-sm text-muted-foreground flex items-center gap-1.5 flex-wrap">
+                    <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-x-2 gap-y-1 flex-wrap">
                       <span className="inline-flex items-center gap-1 text-foreground/85 font-medium">
                         <MapPin className="size-3.5 text-primary shrink-0" />
-                        {[mine.locality, mine.city, mine.state].filter(Boolean).join(", ") || "Location not set"}
+                        <span>{[mine.locality, mine.city, mine.state].filter(Boolean).join(", ") || "Location not set"}</span>
                       </span>
                       {calculateAge(mine.birthDate) !== null && (
-                        <>
-                          <span className="text-border">•</span>
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <span>•</span>
                           <span>{calculateAge(mine.birthDate)} yrs old</span>
-                        </>
+                        </span>
                       )}
                       {mine.gender && (
-                        <>
-                          <span className="text-border">•</span>
+                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                          <span>•</span>
                           <span>{mine.gender}</span>
-                        </>
+                        </span>
                       )}
-                    </p>
+                    </div>
 
                     {/* Line 3: Actions & Social Handle */}
-                    <div className="flex items-center gap-2 pt-0.5 flex-wrap">
+                    <div className="flex items-center gap-2 pt-1 flex-wrap">
                       {mine.instagram && (
                         <a
                           href={getInstagramUrl(mine.instagram)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-semibold text-foreground/80 hover:text-foreground border border-border/70 transition-all hover:scale-102 shadow-2xs"
+                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-semibold text-foreground/80 hover:text-foreground border border-border/70 transition-all hover:scale-102 shadow-2xs shrink-0"
                           title="Open Instagram profile"
                         >
                           <InstagramIcon className="size-3.5 shrink-0" />
@@ -524,51 +533,51 @@ function Dashboard() {
                       <button
                         type="button"
                         onClick={() => setShowPhotoModal(true)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/60 hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground border border-border/60 transition-all cursor-pointer shadow-2xs"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/60 hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground border border-border/60 transition-all cursor-pointer shadow-2xs shrink-0"
                         title="Change or remove photo"
                       >
-                        <Camera className="size-3 text-primary" />
+                        <Camera className="size-3 text-primary shrink-0" />
                         <span>{mine.photo ? "Edit Photo" : "Add Photo"}</span>
                       </button>
                     </div>
                   </div>
                 </div>
 
-                {/* 2. BALANCED METRICS STRIP (4 Columns on Tablet/Desktop, 2x2 on Mobile) */}
-                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-3 pt-4 border-t border-border/60">
+                {/* 2. BALANCED METRICS STRIP (4 Columns on Desktop, 2x2 on Mobile) */}
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 pt-3.5 border-t border-border/60">
                   {/* Metric 1: Starting Rate */}
-                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                      <IndianRupee className="size-3 text-saffrondeep" />
-                      Starting Rate
+                      <IndianRupee className="size-3 text-saffrondeep shrink-0" />
+                      <span>Starting Rate</span>
                     </span>
                     <div className="mt-0.5">
-                      <p className="text-lg sm:text-xl font-display font-extrabold text-saffrondeep">
+                      <p className="text-base sm:text-xl font-display font-extrabold text-saffrondeep">
                         {formatPrice(mine.startingPrice)}
                       </p>
-                      <span className="text-[10px] text-muted-foreground block">per collaboration</span>
+                      <span className="text-[10px] text-muted-foreground block truncate">per collaboration</span>
                     </div>
                   </div>
 
                   {/* Metric 2: Audience Size */}
-                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                      <Users className="size-3 text-primary" />
-                      Audience
+                      <Users className="size-3 text-primary shrink-0" />
+                      <span>Audience</span>
                     </span>
                     <div className="mt-0.5">
-                      <p className="text-lg sm:text-xl font-display font-extrabold text-foreground">
+                      <p className="text-base sm:text-xl font-display font-extrabold text-foreground">
                         {formatFollowers(mine.followers)}
                       </p>
-                      <span className="text-[10px] text-muted-foreground block">followers</span>
+                      <span className="text-[10px] text-muted-foreground block truncate">followers</span>
                     </div>
                   </div>
 
                   {/* Metric 3: Categories */}
-                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                      <Tag className="size-3 text-saffrondeep" />
-                      Categories
+                      <Tag className="size-3 text-saffrondeep shrink-0" />
+                      <span>Categories</span>
                     </span>
                     <div className="mt-0.5">
                       <div className="flex flex-wrap gap-1">
@@ -576,7 +585,7 @@ function Dashboard() {
                           mine.categories.slice(0, 2).map((cat) => (
                             <span
                               key={cat}
-                              className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground border border-border/60"
+                              className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground border border-border/60 truncate max-w-[80px]"
                             >
                               {cat}
                             </span>
@@ -590,15 +599,15 @@ function Dashboard() {
                           </span>
                         )}
                       </div>
-                      <span className="text-[10px] text-muted-foreground block mt-0.5">niche focus</span>
+                      <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">niche focus</span>
                     </div>
                   </div>
 
                   {/* Metric 4: Directory Listing */}
-                  <div className="rounded-2xl bg-secondary/30 border border-border/70 p-3 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
-                      <Globe className="size-3 text-tealdeep" />
-                      Directory
+                      <Globe className="size-3 text-tealdeep shrink-0" />
+                      <span>Directory</span>
                     </span>
                     <div className="mt-0.5">
                       <p className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5 truncate">
@@ -624,14 +633,14 @@ function Dashboard() {
               </div>
 
               {/* 3. CARD FOOTER ACTION BAR */}
-              <div className="pt-4 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
+              <div className="pt-3.5 border-t border-border/60 flex flex-col sm:flex-row items-center justify-between gap-3">
                 <p className="text-xs text-muted-foreground text-center sm:text-left">
                   Want to update your collaboration rates, photos, or bio?
                 </p>
-                <div className="flex items-center gap-2.5 w-full sm:w-auto">
+                <div className="flex items-center gap-2 w-full sm:w-auto">
                   <Link
                     to="/creator/register"
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-secondary hover:bg-secondary/80 px-4 py-2 text-xs font-semibold text-foreground ring-1 ring-border transition-all shadow-2xs"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-secondary hover:bg-secondary/80 px-3.5 py-2 text-xs font-semibold text-foreground ring-1 ring-border transition-all shadow-2xs"
                   >
                     Edit Profile
                   </Link>
@@ -639,30 +648,30 @@ function Dashboard() {
                     to="/creators/$creatorId"
                     params={{ creatorId: getCreatorProfileSlug(mine) }}
                     search={{ preview: true }}
-                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground hover:bg-foreground/90 px-4 py-2 text-xs font-semibold text-background transition-all shadow-xs"
+                    className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground hover:bg-foreground/90 px-3.5 py-2 text-xs font-semibold text-background transition-all shadow-xs"
                   >
-                    <ArrowUpRight className="size-3.5" />
-                    Preview Listing
+                    <ArrowUpRight className="size-3.5 shrink-0" />
+                    <span>Preview</span>
                   </Link>
                 </div>
               </div>
             </Card>
 
             {/* SUBSCRIPTION STATUS CARD */}
-            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between">
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-5 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between">
               <div>
                 <div className="flex items-center justify-between pb-3 border-b border-border/60">
                   <h2 className="text-base font-display font-semibold text-foreground flex items-center gap-2">
-                    <IndianRupee className="size-4 text-primary" />
-                    Membership Plan
+                    <IndianRupee className="size-4 text-primary shrink-0" />
+                    <span>Membership Plan</span>
                   </h2>
                   {subActive ? (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-tealdeep">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-tealdeep shrink-0">
                       <span className="size-1.5 rounded-full bg-tealdeep" />
                       Active
                     </span>
                   ) : (
-                    <span className="inline-flex items-center gap-1 rounded-full bg-rose/15 px-2.5 py-0.5 text-[11px] font-bold text-rose">
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-rose/15 px-2.5 py-0.5 text-[11px] font-bold text-rose shrink-0">
                       Inactive
                     </span>
                   )}
@@ -697,7 +706,8 @@ function Dashboard() {
                       {subExpiry && (
                         <div className="flex items-center justify-between pt-1 border-t border-border/50">
                           <span className="text-muted-foreground flex items-center gap-1">
-                            <Clock className="size-3 text-primary" /> Time Left
+                            <Clock className="size-3 text-primary shrink-0" />
+                            <span>Time Left</span>
                           </span>
                           <span className="font-bold text-foreground">
                             {subActive ? formatTimeRemaining(subExpiry) : "Expired"}
@@ -725,9 +735,10 @@ function Dashboard() {
                       <div className="mt-3 pt-3 border-t border-border/60">
                         <div className="flex items-center justify-between text-xs font-semibold uppercase tracking-wider text-tealdeep mb-2">
                           <span className="flex items-center gap-1">
-                            <CalendarClock className="size-3.5" /> Next in Queue
+                            <CalendarClock className="size-3.5 shrink-0" />
+                            <span>Next in Queue</span>
                           </span>
-                          <span className="rounded-full bg-accent/20 text-tealdeep px-2 py-0.5 text-[10px] font-bold">
+                          <span className="rounded-full bg-accent/20 text-tealdeep px-2 py-0.5 text-[10px] font-bold shrink-0">
                             Auto-activates
                           </span>
                         </div>
@@ -764,37 +775,38 @@ function Dashboard() {
                   to="/creator/plans"
                   className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
                 >
-                  <IndianRupee className="size-3.5" />
-                  {queuedSubs.length > 0
-                    ? "Manage Subscription"
-                    : isTrial && subActive
-                      ? "Upgrade to Paid Plan"
-                      : subActive
-                        ? "Renew / Upgrade Plan"
-                        : "Choose a Plan"}
+                  <IndianRupee className="size-3.5 shrink-0" />
+                  <span>
+                    {queuedSubs.length > 0
+                      ? "Manage Subscription"
+                      : isTrial && subActive
+                        ? "Upgrade to Paid Plan"
+                        : subActive
+                          ? "Renew / Upgrade Plan"
+                          : "Choose a Plan"}
+                  </span>
                 </Link>
               </div>
             </Card>
           </div>
 
           {/* ── REFERRAL PROGRAM & REWARDS SECTION ─────────────────────────────────── */}
-          <div className="mt-10">
-            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative">
+          <div className="mt-8 sm:mt-10">
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-4.5 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative">
               <div className="pointer-events-none absolute -top-24 -right-24 size-48 rounded-full bg-accent/10 blur-3xl" />
 
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-6 border-b border-border/60">
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 sm:pb-6 border-b border-border/60">
                 <div>
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-xs font-bold text-tealdeep border border-accent/25 mb-2">
-                    <Gift className="size-3.5 text-tealdeep" />
-                    Referral Program — Earn +7 Days Free
+                    <Gift className="size-3.5 text-tealdeep shrink-0" />
+                    <span>Referral Program — Earn +7 Days Free</span>
                   </div>
-                  <h2 className="text-2xl font-display font-semibold tracking-tight">
-                    Invite Creators & Extend Your Subscription
+                  <h2 className="text-xl sm:text-2xl font-display font-semibold tracking-tight text-foreground">
+                    Invite Creators &amp; Extend Your Subscription
                   </h2>
-                  <p className="mt-1 text-sm text-muted-foreground max-w-xl">
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-xl">
                     Share your unique link. When a creator signs up and buys any paid plan, you
                     receive <strong>+7 extra days</strong> added directly to your subscription.
-                    Stack unlimited bonus days!
                   </p>
                 </div>
 
@@ -820,53 +832,57 @@ function Dashboard() {
               </div>
 
               {/* STATS TILES */}
-              <div className="mt-6 grid grid-cols-2 md:grid-cols-4 gap-4">
-                <div className="rounded-2xl bg-background/60 border border-border/60 p-4">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Users className="size-3.5 text-primary" /> Total Invites
+              <div className="mt-5 sm:mt-6 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
+                  <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Users className="size-3.5 text-primary shrink-0" />
+                    <span>Total Invites</span>
                   </span>
-                  <p className="mt-1 text-2xl font-display font-bold text-foreground">
+                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-foreground">
                     {referredCreators.length}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Creators registered</p>
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Creators registered</p>
                 </div>
 
-                <div className="rounded-2xl bg-background/60 border border-border/60 p-4">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Zap className="size-3.5 text-primary" /> Paid Conversions
+                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
+                  <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Zap className="size-3.5 text-primary shrink-0" />
+                    <span>Paid Conversions</span>
                   </span>
-                  <p className="mt-1 text-2xl font-display font-bold text-tealdeep">
+                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-tealdeep">
                     {paidReferredCount}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">Subscribed creators</p>
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Subscribed creators</p>
                 </div>
 
-                <div className="rounded-2xl bg-background/60 border border-border/60 p-4">
-                  <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Gift className="size-3.5 text-saffrondeep" /> Bonus Days Earned
+                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
+                  <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
+                    <Gift className="size-3.5 text-saffrondeep shrink-0" />
+                    <span>Bonus Days</span>
                   </span>
-                  <p className="mt-1 text-2xl font-display font-bold text-saffrondeep">
+                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-saffrondeep">
                     +{netBonusDays} Days
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">+7 days per paid referral</p>
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">+7 days per referral</p>
                 </div>
 
-                <div className="rounded-2xl bg-background/60 border border-border/60 p-4 relative group">
+                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4 relative group">
                   <div className="flex items-center justify-between">
-                    <span className="text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <Clock className="size-3.5 text-primary" /> Referral Code
+                    <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Clock className="size-3.5 text-primary shrink-0" />
+                      <span>Referral Code</span>
                     </span>
-                   {/* Hide copy button when locked */}
+                    {/* Hide copy button when locked */}
                     {isReferralUnlocked && (
                       <button
                         type="button"
                         onClick={handleCopyCode}
                         title={copiedCode ? "Copied!" : "Copy referral code"}
                         aria-label="Copy referral code"
-                        className="inline-flex size-6 items-center justify-center rounded-lg text-foreground hover:bg-secondary transition-all cursor-pointer"
+                        className="inline-flex size-5 sm:size-6 items-center justify-center rounded-lg text-foreground hover:bg-secondary transition-all cursor-pointer"
                       >
                         {copiedCode ? (
-                          <Check className="size-3.5 text-foreground stroke-[2.5]" />
+                          <Check className="size-3.5 text-tealdeep stroke-[2.5]" />
                         ) : (
                           <Copy className="size-3.5 text-foreground" />
                         )}
@@ -874,23 +890,23 @@ function Dashboard() {
                     )}
                   </div>
                   <p
-                    className={`mt-1 text-lg font-mono font-bold text-foreground tracking-wider truncate transition-all select-none ${
+                    className={`mt-1 text-base sm:text-lg font-mono font-bold text-foreground tracking-wider truncate transition-all select-none ${
                       isReferralUnlocked ? "" : "blur-sm opacity-50 pointer-events-none"
                     }`}
                   >
                     {isReferralUnlocked ? referralCode : "DHUNDO-XXXXXX"}
                   </p>
-                  <p className="text-[11px] text-muted-foreground mt-0.5">
-                    {isReferralUnlocked ? "Permanent account code" : "Unlocks on paid plan"}
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
+                    {isReferralUnlocked ? "Permanent code" : "Unlocks on paid plan"}
                   </p>
                 </div>
               </div>
 
-              {/* LINK SHARING BOX — locked for trial users */}
+              {/* LINK SHARING BOX */}
               {isReferralUnlocked ? (
-                <div className="mt-6 rounded-2xl bg-secondary/60 border border-border/80 p-4 sm:p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-2.5">
-                    <label className="block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="mt-5 sm:mt-6 rounded-2xl bg-secondary/60 border border-border/80 p-3.5 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
+                    <label className="block text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">
                       Your Unique Referral Link &amp; Code
                     </label>
                     <span className="text-[11px] text-muted-foreground">
@@ -904,25 +920,25 @@ function Dashboard() {
                         type="text"
                         readOnly
                         value={referralLink}
-                        className="w-full truncate rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-mono text-foreground border border-border focus:outline-none select-all shadow-xs"
+                        className="w-full truncate rounded-xl bg-background px-3 py-2.5 text-xs sm:text-sm font-mono text-foreground border border-border focus:outline-none select-all shadow-xs"
                       />
                     </div>
 
-                    <div className="flex flex-wrap sm:flex-nowrap items-center gap-2 shrink-0">
+                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full lg:w-auto shrink-0">
                       <button
                         type="button"
                         onClick={handleCopyLink}
-                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs active:scale-98"
+                        className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl bg-foreground px-2.5 sm:px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs active:scale-98"
                       >
                         {copiedLink ? (
                           <>
-                            <Check className="size-4 text-tealdeep" />
-                            <span>Link Copied!</span>
+                            <Check className="size-3.5 sm:size-4 text-tealdeep shrink-0" />
+                            <span className="truncate">Copied!</span>
                           </>
                         ) : (
                           <>
-                            <Copy className="size-4" />
-                            <span>Copy Link</span>
+                            <Copy className="size-3.5 sm:size-4 shrink-0" />
+                            <span className="truncate">Link</span>
                           </>
                         )}
                       </button>
@@ -930,17 +946,17 @@ function Dashboard() {
                       <button
                         type="button"
                         onClick={handleCopyCode}
-                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-background px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all cursor-pointer shadow-xs active:scale-98"
+                        className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl bg-background px-2.5 sm:px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all cursor-pointer shadow-xs active:scale-98"
                       >
                         {copiedCode ? (
                           <>
-                            <Check className="size-4 text-tealdeep" />
-                            <span>Code Copied!</span>
+                            <Check className="size-3.5 sm:size-4 text-tealdeep shrink-0" />
+                            <span className="truncate">Copied!</span>
                           </>
                         ) : (
                           <>
-                            <Copy className="size-4 text-primary" />
-                            <span>Copy Code</span>
+                            <Copy className="size-3.5 sm:size-4 text-primary shrink-0" />
+                            <span className="truncate">Code</span>
                           </>
                         )}
                       </button>
@@ -949,18 +965,18 @@ function Dashboard() {
                         href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
                         target="_blank"
                         rel="noopener noreferrer"
-                        className="flex-1 sm:flex-initial inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-md active:scale-98"
+                        className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white px-2.5 sm:px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-md active:scale-98"
                       >
-                        <WhatsAppIcon className="size-4 shrink-0" />
-                        <span>WhatsApp</span>
+                        <WhatsAppIcon className="size-3.5 sm:size-4 shrink-0" />
+                        <span className="truncate">WhatsApp</span>
                       </a>
                     </div>
                   </div>
                 </div>
               ) : (
                 /* Locked state — trial or expired */
-                <div className="mt-6 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-6 text-center">
-                  <div className="inline-flex items-center justify-center size-12 rounded-full bg-primary/10 border border-primary/20 mb-3">
+                <div className="mt-5 sm:mt-6 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-5 sm:p-6 text-center">
+                  <div className="inline-flex items-center justify-center size-11 rounded-full bg-primary/10 border border-primary/20 mb-2.5">
                     <AlertCircle className="size-5 text-primary" />
                   </div>
                   <h3 className="text-sm font-bold text-foreground">
@@ -968,81 +984,345 @@ function Dashboard() {
                       ? "Referral Code Locked — Available on Paid Plans"
                       : "Referral Code Inactive — Renew to Reactivate"}
                   </h3>
-                  <p className="text-xs text-muted-foreground mt-1.5 max-w-sm mx-auto">
+                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
                     {isTrial && subActive
                       ? "Your referral code unlocks once you activate any paid subscription. Trial accounts cannot share referral links."
                       : "Your subscription has expired. Renew any paid plan to reactivate your referral code and start earning bonus days again."}
                   </p>
                   <Link
                     to="/creator/plans"
-                    className="inline-flex items-center gap-1.5 mt-4 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs"
+                    className="inline-flex items-center gap-1.5 mt-3.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs"
                   >
-                    <ArrowUpRight className="size-4" />
-                    {isTrial && subActive ? "Upgrade to Paid Plan" : "Renew Subscription"}
+                    <ArrowUpRight className="size-4 shrink-0" />
+                    <span>{isTrial && subActive ? "Upgrade to Paid Plan" : "Renew Subscription"}</span>
                   </Link>
                 </div>
               )}
 
-              {/* REFERRAL HISTORY */}
-              <div className="mt-8">
-                <div className="flex items-center gap-2 mb-3">
-                  <History className="size-4 text-muted-foreground" />
-                  <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
-                    Referral & Bonus Days History
-                  </h3>
+              {/* ── UNIFIED REFERRAL ACTIVITY & REWARDS ── */}
+              <div className="mt-7 sm:mt-8">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-3">
+                  <div className="flex items-center gap-2">
+                    <History className="size-4 text-primary shrink-0" />
+                    <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground">
+                      Referral Activity &amp; Bonus Days
+                    </h3>
+                    <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
+                      {referredCreators.length} invited
+                    </span>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    Track creator signups and earned +7 days bonus milestones
+                  </span>
                 </div>
 
-                {referralEvents.length > 0 ? (
-                  <div className="overflow-x-auto rounded-2xl border border-border/80 bg-background/60">
-                    <table className="w-full text-left text-xs table-fixed min-w-[520px]">
-                      <thead className="border-b border-border bg-secondary/50 font-semibold text-muted-foreground uppercase tracking-wider">
-                        <tr>
-                          <th className="w-28 px-4 py-3">Date</th>
-                          <th className="w-28 px-4 py-3">Event</th>
-                          <th className="w-28 px-4 py-3">Bonus Days</th>
-                          <th className="px-4 py-3">Details</th>
-                        </tr>
-                      </thead>
-                      <tbody className="divide-y divide-border/60">
-                        {referralEvents.map((ev) => (
-                          <tr key={ev.id} className="hover:bg-secondary/30 transition-colors">
-                            <td className="px-4 py-3 text-muted-foreground whitespace-nowrap truncate">
-                              {new Date(ev.createdAt).toLocaleDateString("en-IN", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </td>
-                            <td className="px-4 py-3 whitespace-nowrap">
-                              {ev.eventType === "earned" ? (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep">
-                                  + Earned
+                {referredCreators.length > 0 || referralEvents.length > 0 ? (
+                  <>
+                    {/* MOBILE CARD VIEW (block sm:hidden) — Scrollable after 4-5 cards */}
+                    <div className="space-y-2.5 block sm:hidden max-h-[340px] overflow-y-auto pr-1">
+                      {referredCreators.map((refCreator) => {
+                        const refSubs = subscriptions.filter((s) => s.creatorId === refCreator.id);
+                        const refEvent = referralEvents.find(
+                          (ev) =>
+                            ev.referredCreatorId === refCreator.id ||
+                            (refCreator.name && ev.note?.toLowerCase().includes(refCreator.name.toLowerCase())) ||
+                            ev.note?.toLowerCase().includes(refCreator.id.toLowerCase()),
+                        );
+                        const hasEarnedReward =
+                          Boolean(refEvent && refEvent.daysDelta > 0) ||
+                          refSubs.some((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
+                        const hasFreePass =
+                          !hasEarnedReward &&
+                          refSubs.some((s) => !s.isTrial && (s.price === 0 || s.price == null));
+
+                        const trialStartMs = refCreator.trialStartedAt
+                          ? new Date(refCreator.trialStartedAt).getTime()
+                          : refCreator.createdAt
+                          ? new Date(refCreator.createdAt).getTime()
+                          : 0;
+                        const trialExpMs = refCreator.subscriptionExpiresAt
+                          ? new Date(refCreator.subscriptionExpiresAt).getTime()
+                          : trialStartMs > 0
+                          ? trialStartMs + 3 * 24 * 60 * 60 * 1000
+                          : 0;
+                        const isTrialActive = trialExpMs > Date.now();
+                        const isTrialEnded = !isTrialActive;
+
+                        const canNudge = !hasEarnedReward && !hasFreePass && isTrialEnded && isReferralUnlocked;
+                        const phoneRaw = refCreator.contact?.whatsapp || refCreator.contact?.phone || "";
+                        const phoneClean = phoneRaw.replace(/[^0-9]/g, "");
+                        const waPhone = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
+                        const firstName = (refCreator.name || refCreator.displayName || "there").split(" ")[0];
+                        const nudgeMsg = encodeURIComponent(
+                          `Hey ${firstName}! Your free trial on Influencer Dhundo ended. Activate your creator pass so local brands and businesses can start finding and hiring you for collaborations: https://influencerdhundo.com/creator/plans`,
+                        );
+                        const waUrl = waPhone ? `https://wa.me/${waPhone}?text=${nudgeMsg}` : `https://wa.me/?text=${nudgeMsg}`;
+                        const dateStr = refCreator.createdAt || refCreator.trialStartedAt;
+
+                        return (
+                          <div
+                            key={refCreator.id}
+                            className="rounded-xl border border-border/80 bg-background/80 p-3.5 space-y-2.5 shadow-2xs"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <div className="flex items-center gap-2.5 min-w-0">
+                                {refCreator.photo ? (
+                                  <img
+                                    src={refCreator.photo}
+                                    alt={refCreator.name}
+                                    className="size-8 rounded-lg object-cover ring-1 ring-border shrink-0"
+                                  />
+                                ) : (
+                                  <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                    {(refCreator.name || refCreator.displayName || "C").slice(0, 2).toUpperCase()}
+                                  </div>
+                                )}
+                                <div className="min-w-0">
+                                  <p className="font-bold text-foreground text-xs truncate">
+                                    {refCreator.name || refCreator.displayName}
+                                  </p>
+                                  <p className="text-[10px] text-muted-foreground truncate">
+                                    {[refCreator.locality, refCreator.city].filter(Boolean).join(", ") || "Active Creator"}
+                                  </p>
+                                </div>
+                              </div>
+
+                              <span className="text-[10px] text-muted-foreground shrink-0 font-medium">
+                                {dateStr
+                                  ? new Date(dateStr).toLocaleDateString("en-IN", {
+                                      month: "short",
+                                      day: "numeric",
+                                    })
+                                  : "Recently"}
+                              </span>
+                            </div>
+
+                            <div className="flex items-center justify-end pt-2 border-t border-border/60">
+                              {hasEarnedReward ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 font-bold text-tealdeep border border-accent/40 text-[10px]">
+                                  <Check className="size-2.5 text-tealdeep stroke-[2.5]" />
+                                  <span>+7 Days Earned</span>
                                 </span>
+                              ) : hasFreePass ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 font-medium text-muted-foreground border border-border text-[10px]">
+                                  <span>No Reward (Free Pass)</span>
+                                </span>
+                              ) : isTrialActive ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2.5 py-0.5 font-semibold text-sky-700 dark:text-sky-300 border border-sky-500/25 text-[10px]">
+                                  <Clock className="size-2.5" />
+                                  <span>Active Trial</span>
+                                </span>
+                              ) : canNudge ? (
+                                <div className="flex items-center gap-1.5">
+                                  <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 font-medium text-muted-foreground border border-border text-[10px]">
+                                    Trial Ended
+                                  </span>
+                                  <a
+                                    href={waUrl}
+                                    target="_blank"
+                                    rel="noreferrer"
+                                    className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold transition-colors cursor-pointer"
+                                  >
+                                    <WhatsAppIcon className="size-2.5 fill-current" />
+                                    <span>Nudge (+7 Days)</span>
+                                  </a>
+                                </div>
                               ) : (
-                                <span className="inline-flex items-center gap-1 rounded-md bg-rose/15 px-2 py-0.5 font-bold text-rose">
-                                  - Reversed
+                                <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-0.5 font-medium text-muted-foreground border border-border text-[10px]">
+                                  Trial Ended
                                 </span>
                               )}
-                            </td>
-                            <td className="px-4 py-3 font-semibold text-foreground whitespace-nowrap">
-                              {ev.daysDelta > 0 ? `+${ev.daysDelta} Days` : `${ev.daysDelta} Days`}
-                            </td>
-                            <td className="px-4 py-3 text-muted-foreground truncate" title={ev.note}>
-                              {ev.note || "Referral conversion"}
-                            </td>
-                          </tr>
+                            </div>
+                          </div>
+                        );
+                      })}
+
+                      {/* Bonus events on mobile */}
+                      {referralEvents
+                        .filter((ev) => !referredCreators.some((rc) => ev.note?.includes(rc.name || rc.id)))
+                        .map((ev) => (
+                          <div
+                            key={ev.id}
+                            className="rounded-xl border border-border/80 bg-secondary/15 p-3 flex items-center justify-between gap-2 shadow-2xs"
+                          >
+                            <div className="flex items-center gap-2 min-w-0">
+                              <Gift className="size-3.5 text-saffrondeep shrink-0" />
+                              <span className="font-semibold text-xs text-foreground truncate">
+                                {ev.note || "Bonus Reward"}
+                              </span>
+                            </div>
+                            <span className="inline-flex items-center gap-1 font-bold text-saffrondeep text-xs shrink-0">
+                              +{ev.daysDelta} Days
+                            </span>
+                          </div>
                         ))}
-                      </tbody>
-                    </table>
-                  </div>
+                    </div>
+
+                    {/* DESKTOP TABLE VIEW (hidden sm:block) — Scrollable after 4-5 rows with sticky header */}
+                    <div className="hidden sm:block overflow-x-auto max-h-[300px] overflow-y-auto rounded-2xl border border-border/80 bg-background/60">
+                      <table className="w-full text-left text-xs table-fixed min-w-[560px]">
+                        <thead className="sticky top-0 z-10 border-b border-border bg-secondary/95 backdrop-blur-sm font-semibold text-muted-foreground uppercase tracking-wider shadow-2xs">
+                          <tr>
+                            <th className="w-60 px-4 py-3">Creator Invited</th>
+                            <th className="w-32 px-4 py-3">Joined Date</th>
+                            <th className="w-56 px-4 py-3 text-right">Referral Reward</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {referredCreators.map((refCreator) => {
+                            const refSubs = subscriptions.filter((s) => s.creatorId === refCreator.id);
+                            const refEvent = referralEvents.find(
+                              (ev) =>
+                                ev.referredCreatorId === refCreator.id ||
+                                (refCreator.name && ev.note?.toLowerCase().includes(refCreator.name.toLowerCase())) ||
+                                ev.note?.toLowerCase().includes(refCreator.id.toLowerCase()),
+                            );
+                            const hasEarnedReward =
+                              Boolean(refEvent && refEvent.daysDelta > 0) ||
+                              refSubs.some((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
+                            const hasFreePass =
+                              !hasEarnedReward &&
+                              refSubs.some((s) => !s.isTrial && (s.price === 0 || s.price == null));
+
+                            const trialStartMs = refCreator.trialStartedAt
+                              ? new Date(refCreator.trialStartedAt).getTime()
+                              : refCreator.createdAt
+                              ? new Date(refCreator.createdAt).getTime()
+                              : 0;
+                            const trialExpMs = refCreator.subscriptionExpiresAt
+                              ? new Date(refCreator.subscriptionExpiresAt).getTime()
+                              : trialStartMs > 0
+                              ? trialStartMs + 3 * 24 * 60 * 60 * 1000
+                              : 0;
+                            const isTrialActive = trialExpMs > Date.now();
+                            const isTrialEnded = !isTrialActive;
+
+                            const canNudge = !hasEarnedReward && !hasFreePass && isTrialEnded && isReferralUnlocked;
+                            const phoneRaw = refCreator.contact?.whatsapp || refCreator.contact?.phone || "";
+                            const phoneClean = phoneRaw.replace(/[^0-9]/g, "");
+                            const waPhone = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
+                            const firstName = (refCreator.name || refCreator.displayName || "there").split(" ")[0];
+                            const nudgeMsg = encodeURIComponent(
+                              `Hey ${firstName}! Your free trial on Influencer Dhundo ended. Activate your creator pass so local brands and businesses can start finding and hiring you for collaborations: https://influencerdhundo.com/creator/plans`,
+                            );
+                            const waUrl = waPhone ? `https://wa.me/${waPhone}?text=${nudgeMsg}` : `https://wa.me/?text=${nudgeMsg}`;
+                            const dateStr = refCreator.createdAt || refCreator.trialStartedAt;
+
+                            return (
+                              <tr key={refCreator.id} className="hover:bg-secondary/30 transition-colors">
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2.5 min-w-0">
+                                    {refCreator.photo ? (
+                                      <img
+                                        src={refCreator.photo}
+                                        alt={refCreator.name}
+                                        className="size-8 rounded-lg object-cover ring-1 ring-border shrink-0"
+                                      />
+                                    ) : (
+                                      <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                        {(refCreator.name || refCreator.displayName || "C").slice(0, 2).toUpperCase()}
+                                      </div>
+                                    )}
+                                    <div className="min-w-0 truncate">
+                                      <p className="font-bold text-foreground truncate">
+                                        {refCreator.name || refCreator.displayName}
+                                      </p>
+                                      <p className="text-[11px] text-muted-foreground truncate">
+                                        {[refCreator.locality, refCreator.city].filter(Boolean).join(", ") || "Active Creator"}
+                                      </p>
+                                    </div>
+                                  </div>
+                                </td>
+
+                                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                                  {dateStr
+                                    ? new Date(dateStr).toLocaleDateString("en-IN", {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                      })
+                                    : "Recently"}
+                                </td>
+
+                                <td className="px-4 py-3 text-right whitespace-nowrap">
+                                  {hasEarnedReward ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-3 py-1 font-bold text-tealdeep border border-accent/40 text-[11px] shadow-2xs">
+                                      <Check className="size-3 text-tealdeep stroke-[2.5]" />
+                                      +7 Days Earned
+                                    </span>
+                                  ) : hasFreePass ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-medium text-muted-foreground border border-border text-[11px]">
+                                      No Reward (Free Pass)
+                                    </span>
+                                  ) : isTrialActive ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-sky-500/15 px-2.5 py-1 font-semibold text-sky-700 dark:text-sky-300 border border-sky-500/25 text-[11px]">
+                                      <Clock className="size-3" />
+                                      Active Trial
+                                    </span>
+                                  ) : canNudge ? (
+                                    <div className="flex items-center gap-2 justify-end">
+                                      <span className="inline-flex items-center rounded-full bg-secondary px-2 py-0.5 font-medium text-muted-foreground border border-border text-[11px]">
+                                        Trial Ended
+                                      </span>
+                                      <a
+                                        href={waUrl}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-bold transition-colors shadow-2xs cursor-pointer"
+                                        title="Nudge on WhatsApp to upgrade and earn +7 days"
+                                      >
+                                        <WhatsAppIcon className="size-3 fill-current" />
+                                        <span>Nudge on WhatsApp</span>
+                                      </a>
+                                    </div>
+                                  ) : (
+                                    <span className="inline-flex items-center rounded-full bg-secondary px-2.5 py-1 font-medium text-muted-foreground border border-border text-[11px]">
+                                      Trial Ended
+                                    </span>
+                                  )}
+                                </td>
+                              </tr>
+                            );
+                          })}
+
+                          {/* ADDITIONAL SYSTEM / BONUS REWARD EVENTS */}
+                          {referralEvents
+                            .filter((ev) => !referredCreators.some((rc) => ev.note?.includes(rc.name || rc.id)))
+                            .map((ev) => (
+                              <tr key={ev.id} className="hover:bg-secondary/30 transition-colors bg-secondary/10">
+                                <td className="px-4 py-3">
+                                  <div className="flex items-center gap-2">
+                                    <Gift className="size-4 text-saffrondeep shrink-0" />
+                                    <span className="font-semibold text-foreground">
+                                      {ev.note || "Bonus Reward Event"}
+                                    </span>
+                                  </div>
+                                </td>
+                                <td className="px-4 py-3 text-muted-foreground whitespace-nowrap">
+                                  {new Date(ev.createdAt).toLocaleDateString("en-IN", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
+                                </td>
+                                <td className="px-4 py-3 text-right whitespace-nowrap">
+                                  <span className="inline-flex items-center gap-1 font-bold text-saffrondeep">
+                                    +{ev.daysDelta} Days
+                                  </span>
+                                </td>
+                              </tr>
+                            ))}
+                        </tbody>
+                      </table>
+                    </div>
+                  </>
                 ) : (
-                  <div className="rounded-2xl border border-dashed border-border/80 p-6 text-center">
+                  <div className="rounded-2xl border border-dashed border-border/80 p-5 sm:p-6 text-center">
                     <p className="text-sm font-medium text-muted-foreground">
-                      No referral events yet.
+                      No referral activity yet.
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Share your link with fellow creators. When they upgrade to a paid subscription,
-                      your history and +7 day rewards will appear here!
+                      Share your personal invite link above. When creators sign up and activate passes, they will appear here with +7 day rewards!
                     </p>
                   </div>
                 )}
@@ -1051,129 +1331,252 @@ function Dashboard() {
           </div>
 
           {/* ── BILLING & PAYMENT RECEIPTS HISTORY ─────────────────────────────────── */}
-          <div className="mt-10">
-            <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative">
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 pb-6 border-b border-border/60">
+          <div className="mt-8 sm:mt-10">
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-4.5 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative">
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 sm:gap-4 pb-5 sm:pb-6 border-b border-border/60">
                 <div>
                   <div className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1 text-xs font-bold text-saffrondeep border border-primary/25 mb-2">
-                    <ReceiptText className="size-3.5 text-primary" />
-                    Billing &amp; Payment Receipts
+                    <ReceiptText className="size-3.5 text-primary shrink-0" />
+                    <span>Billing &amp; Payment Receipts</span>
                   </div>
-                  <h2 className="text-2xl font-display font-semibold tracking-tight">
+                  <h2 className="text-xl sm:text-2xl font-display font-semibold tracking-tight text-foreground">
                     Payment History &amp; Receipts
                   </h2>
-                  <p className="mt-1 text-sm text-muted-foreground">
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
                     All your one-time subscription pass payments processed securely via Razorpay.
                   </p>
                 </div>
 
                 <div className="shrink-0 flex items-center gap-2">
                   <span className="inline-flex items-center gap-1.5 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground border border-border">
-                    <ShieldCheck className="size-3.5 text-tealdeep" />
-                    100% Secure via Razorpay
+                    <ShieldCheck className="size-3.5 text-tealdeep shrink-0" />
+                    <span>100% Secure via Razorpay</span>
                   </span>
                 </div>
               </div>
 
               {loadingPayments ? (
                 <div className="py-12 text-center text-sm text-muted-foreground flex items-center justify-center gap-2">
-                  <Loader2 className="size-4 animate-spin text-primary" />
-                  Loading payment history...
+                  <Loader2 className="size-4 animate-spin text-primary shrink-0" />
+                  <span>Loading payment history...</span>
                 </div>
               ) : payments.length > 0 ? (
-                <div className="mt-6 overflow-x-auto rounded-2xl border border-border/80 bg-background/60">
-                  <table className="w-full text-left text-xs table-fixed min-w-[700px]">
-                    <thead className="border-b border-border bg-secondary/50 font-semibold text-muted-foreground uppercase tracking-wider">
-                      <tr>
-                        <th className="w-32 px-4 py-3">Date</th>
-                        <th className="w-40 px-4 py-3">Plan</th>
-                        <th className="w-28 px-4 py-3">Amount</th>
-                        <th className="w-48 px-4 py-3">Payment Ref ID</th>
-                        <th className="w-24 px-4 py-3">Status</th>
-                        <th className="w-28 px-4 py-3 text-right">Invoice</th>
-                      </tr>
-                    </thead>
-                    <tbody className="divide-y divide-border/60">
-                      {payments.map((p) => {
-                        const planLabel =
-                          p.planId === "1m"
-                            ? "1 Month Pass"
-                            : p.planId === "3m"
-                              ? "3 Months (Launch Offer)"
-                              : p.planId === "6m"
-                                ? "6 Months Pass"
-                                : p.planId === "1y"
-                                  ? "1 Year Pass"
-                                  : p.planId;
+                <>
+                  {/* MOBILE VIEW FOR PAYMENTS (block sm:hidden) — Scrollable after 4-5 cards */}
+                  <div className="mt-5 space-y-3 block sm:hidden max-h-[340px] overflow-y-auto pr-1">
+                    {payments.map((p) => {
+                      const planLabel =
+                        p.planId === "1m"
+                          ? "1 Month Pass"
+                          : p.planId === "3m"
+                            ? "3 Months Pass"
+                            : p.planId === "6m"
+                              ? "6 Months Pass"
+                              : p.planId === "1y"
+                                ? "1 Year Pass"
+                                : p.planId;
 
-                        const displayRef = p.razorpayPaymentId || p.razorpayOrderId;
-                        const isCopied = copiedPaymentId === displayRef;
+                      const promoCode =
+                        p.promoCodeUsed ||
+                        p.referralCodeUsed ||
+                        userSubs.find(
+                          (s) =>
+                            s.planId === p.planId &&
+                            (s.referralCodeUsed || (s.razorpayPaymentId && s.razorpayPaymentId === p.razorpayPaymentId)),
+                        )?.referralCodeUsed;
 
-                        return (
-                          <tr key={p.id} className="hover:bg-secondary/30 transition-colors">
-                            <td className="px-4 py-3.5 text-muted-foreground whitespace-nowrap">
-                              {new Date(p.createdAt).toLocaleDateString("en-IN", {
-                                month: "short",
-                                day: "numeric",
-                                year: "numeric",
-                              })}
-                            </td>
-                            <td className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
-                              {planLabel}
-                            </td>
-                            <td className="px-4 py-3.5 font-bold text-saffrondeep whitespace-nowrap">
-                              {formatPrice(p.amount)}
-                            </td>
-                            <td className="px-4 py-3.5">
-                              <div className="flex items-center gap-1.5">
-                                <span className="font-mono text-[11px] text-muted-foreground truncate max-w-[140px]">
-                                  {displayRef}
+                      const displayRef = p.razorpayPaymentId || p.razorpayOrderId;
+                      const isCopied = copiedPaymentId === displayRef;
+
+                      return (
+                        <div
+                          key={p.id}
+                          className="rounded-xl border border-border/80 bg-background/80 p-3.5 space-y-3 shadow-2xs"
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <div>
+                              <p className="font-bold text-foreground text-sm">{planLabel}</p>
+                              <div className="flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className="text-[11px] text-muted-foreground">
+                                  {new Date(p.createdAt).toLocaleDateString("en-IN", {
+                                    month: "short",
+                                    day: "numeric",
+                                    year: "numeric",
+                                  })}
                                 </span>
-                                {displayRef && (
-                                  <button
-                                    type="button"
-                                    onClick={() => {
-                                      navigator.clipboard.writeText(displayRef);
-                                      setCopiedPaymentId(displayRef);
-                                      setTimeout(() => setCopiedPaymentId(null), 2000);
-                                    }}
-                                    title="Copy transaction ID"
-                                    className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
-                                  >
-                                    {isCopied ? (
-                                      <CheckCheck className="size-3 text-tealdeep" />
-                                    ) : (
-                                      <Copy className="size-3" />
-                                    )}
-                                  </button>
+                                {promoCode ? (
+                                  <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 px-1.5 py-0.5 rounded border border-emerald-500/20 text-[10px]">
+                                    <Tag className="size-2.5 text-emerald-600 shrink-0" />
+                                    <span>{promoCode}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-[10px] text-muted-foreground">• Standard</span>
                                 )}
                               </div>
-                            </td>
-                            <td className="px-4 py-3.5 whitespace-nowrap">
-                              <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep text-[11px]">
-                                <Check className="size-3" />
+                            </div>
+                            <div className="text-right">
+                              <p className="text-base font-bold text-saffrondeep">{formatPrice(p.amount)}</p>
+                              <span className="inline-flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-tealdeep">
+                                <Check className="size-2.5" />
                                 Paid
                               </span>
-                            </td>
-                            <td className="px-4 py-3.5 text-right whitespace-nowrap">
-                              <button
-                                type="button"
-                                title="View / Print Receipt"
-                                onClick={() => setSelectedReceipt(p)}
-                                className="inline-flex items-center gap-1.5 rounded-lg bg-black hover:bg-black/80 text-white px-2.5 py-1.5 transition-all cursor-pointer active:scale-95"
-                              >
-                                <Eye className="size-3.5" />
-                                <Printer className="size-3.5" />
-                              </button>
-                            </td>
-                          </tr>
-                        );
-                      })}
-                    </tbody>
-                  </table>
-                </div>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center justify-between gap-2 pt-2.5 border-t border-border/60">
+                            <div className="flex items-center gap-1.5 min-w-0">
+                              <span className="font-mono text-[10px] text-muted-foreground truncate max-w-[120px]">
+                                {displayRef}
+                              </span>
+                              {displayRef && (
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    navigator.clipboard.writeText(displayRef);
+                                    setCopiedPaymentId(displayRef);
+                                    setTimeout(() => setCopiedPaymentId(null), 2000);
+                                  }}
+                                  title="Copy transaction ID"
+                                  className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer shrink-0"
+                                >
+                                  {isCopied ? (
+                                    <CheckCheck className="size-3 text-tealdeep" />
+                                  ) : (
+                                    <Copy className="size-3" />
+                                  )}
+                                </button>
+                              )}
+                            </div>
+
+                            <button
+                              type="button"
+                              onClick={() => setSelectedReceipt(p)}
+                              className="inline-flex items-center gap-1.5 rounded-lg bg-foreground text-background px-3 py-1.5 text-xs font-semibold hover:bg-foreground/90 transition-all cursor-pointer active:scale-95 shrink-0"
+                            >
+                              <Eye className="size-3.5 shrink-0" />
+                              <span>Receipt</span>
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+
+                  {/* DESKTOP VIEW FOR PAYMENTS (hidden sm:block) — Scrollable after 4-5 rows with sticky header */}
+                  <div className="hidden sm:block mt-6 overflow-x-auto max-h-[300px] overflow-y-auto rounded-2xl border border-border/80 bg-background/60">
+                    <table className="w-full text-left text-xs table-fixed min-w-[760px]">
+                      <thead className="sticky top-0 z-10 border-b border-border bg-secondary/95 backdrop-blur-sm font-semibold text-muted-foreground uppercase tracking-wider shadow-2xs">
+                        <tr>
+                          <th className="w-28 px-4 py-3">Date</th>
+                          <th className="w-36 px-4 py-3">Plan</th>
+                          <th className="w-36 px-4 py-3">Promo Applied</th>
+                          <th className="w-24 px-4 py-3">Amount</th>
+                          <th className="w-44 px-4 py-3">Payment Ref ID</th>
+                          <th className="w-20 px-4 py-3">Status</th>
+                          <th className="w-24 px-4 py-3 text-right">Invoice</th>
+                        </tr>
+                      </thead>
+                      <tbody className="divide-y divide-border/60">
+                        {payments.map((p) => {
+                          const planLabel =
+                            p.planId === "1m"
+                              ? "1 Month Pass"
+                              : p.planId === "3m"
+                                ? "3 Months (Launch Offer)"
+                                : p.planId === "6m"
+                                  ? "6 Months Pass"
+                                  : p.planId === "1y"
+                                    ? "1 Year Pass"
+                                    : p.planId;
+
+                          const promoCode =
+                            p.promoCodeUsed ||
+                            p.referralCodeUsed ||
+                            userSubs.find(
+                              (s) =>
+                                s.planId === p.planId &&
+                                (s.referralCodeUsed || (s.razorpayPaymentId && s.razorpayPaymentId === p.razorpayPaymentId)),
+                            )?.referralCodeUsed;
+
+                          const displayRef = p.razorpayPaymentId || p.razorpayOrderId;
+                          const isCopied = copiedPaymentId === displayRef;
+
+                          return (
+                            <tr key={p.id} className="hover:bg-secondary/30 transition-colors">
+                              <td className="px-4 py-3.5 text-muted-foreground whitespace-nowrap">
+                                {new Date(p.createdAt).toLocaleDateString("en-IN", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                })}
+                              </td>
+                              <td className="px-4 py-3.5 font-semibold text-foreground whitespace-nowrap">
+                                {planLabel}
+                              </td>
+                              <td className="px-4 py-3.5">
+                                {promoCode ? (
+                                  <span className="inline-flex items-center gap-1 font-mono font-bold text-emerald-800 dark:text-emerald-300 bg-emerald-500/10 px-2 py-0.5 rounded border border-emerald-500/20 text-[11px]">
+                                    <Tag className="size-3 text-emerald-600 shrink-0" />
+                                    <span>{promoCode}</span>
+                                  </span>
+                                ) : (
+                                  <span className="text-muted-foreground text-[11px]">Standard</span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3.5 font-bold text-saffrondeep whitespace-nowrap">
+                                {formatPrice(p.amount)}
+                              </td>
+                              <td className="px-4 py-3.5">
+                                <div className="flex items-center gap-1.5">
+                                  <span className="font-mono text-[11px] text-muted-foreground truncate max-w-[130px]">
+                                    {displayRef}
+                                  </span>
+                                  {displayRef && (
+                                    <button
+                                      type="button"
+                                      onClick={() => {
+                                        navigator.clipboard.writeText(displayRef);
+                                        setCopiedPaymentId(displayRef);
+                                        setTimeout(() => setCopiedPaymentId(null), 2000);
+                                      }}
+                                      title="Copy transaction ID"
+                                      className="inline-flex size-5 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-all cursor-pointer"
+                                    >
+                                      {isCopied ? (
+                                        <CheckCheck className="size-3 text-tealdeep" />
+                                      ) : (
+                                        <Copy className="size-3" />
+                                      )}
+                                    </button>
+                                  )}
+                                </div>
+                              </td>
+                              <td className="px-4 py-3.5 whitespace-nowrap">
+                                <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep text-[11px]">
+                                  <Check className="size-3" />
+                                  Paid
+                                </span>
+                              </td>
+                              <td className="px-4 py-3.5 text-right whitespace-nowrap">
+                                <button
+                                  type="button"
+                                  title="View / Print Receipt"
+                                  onClick={() => setSelectedReceipt(p)}
+                                  className="inline-flex items-center gap-1.5 rounded-lg bg-black hover:bg-black/80 text-white px-2.5 py-1.5 transition-all cursor-pointer active:scale-95"
+                                >
+                                  <Eye className="size-3.5" />
+                                  <Printer className="size-3.5" />
+                                </button>
+                              </td>
+                            </tr>
+                          );
+                        })}
+                      </tbody>
+                    </table>
+                  </div>
+                </>
               ) : (
-                <div className="mt-6 rounded-2xl border border-dashed border-border/80 p-8 text-center bg-background/40">
+                <div className="mt-5 sm:mt-6 rounded-2xl border border-dashed border-border/80 p-6 sm:p-8 text-center bg-background/40">
                   <div className="inline-flex items-center justify-center size-10 rounded-full bg-secondary text-muted-foreground mb-2">
                     <ReceiptText className="size-5" />
                   </div>
@@ -1502,6 +1905,7 @@ function PaymentReceiptModal({
   const matchedPlan = PLANS.find((p) => p.id === receipt.planId);
   const basePrice = matchedPlan?.price ?? receipt.amount;
   const discountAmount = Math.max(0, basePrice - receipt.amount);
+  const promoCode = receipt.promoCodeUsed || receipt.referralCodeUsed;
 
   const planName =
     receipt.planId === "1m"
@@ -1565,10 +1969,10 @@ function PaymentReceiptModal({
         ? `
         <tr style="background: #f0fdf4;">
           <td style="padding: 10px 14px; font-weight: 600; color: #166534; border-bottom: 1px solid #e2e8f0;">
-            Discount / Promotional Savings
+            Discount / Promotional Savings ${promoCode ? `(Code: ${promoCode})` : ""}
           </td>
           <td style="padding: 10px 14px; text-align: center; color: #166534; font-weight: 600; border-bottom: 1px solid #e2e8f0;">
-            Promo Applied
+            ${promoCode ? `Promo (${promoCode})` : "Promo Applied"}
           </td>
           <td style="padding: 10px 14px; text-align: right; color: #166534; font-weight: 700; border-bottom: 1px solid #e2e8f0;">
             -${formatPrice(discountAmount)}
@@ -2193,6 +2597,18 @@ function PaymentReceiptModal({
                   </span>
                 </div>
               )}
+
+              {promoCode && (
+                <div className="flex items-center justify-between text-[11px] pt-1.5 border-t border-accent/20">
+                  <span className="text-muted-foreground flex items-center gap-1">
+                    <Tag className="size-3 text-emerald-600" />
+                    Promo Code Applied:
+                  </span>
+                  <span className="font-mono text-emerald-800 dark:text-emerald-300 font-bold bg-emerald-500/15 px-2 py-0.5 rounded border border-emerald-500/30 text-xs">
+                    {promoCode}
+                  </span>
+                </div>
+              )}
             </div>
 
             {/* ITEMIZED SERVICES TABLE */}
@@ -2229,11 +2645,11 @@ function PaymentReceiptModal({
                       <tr className="bg-accent/5">
                         <td className="px-4 py-2">
                           <span className="font-semibold text-tealdeep">
-                            Discount / Promotional Savings
+                            Discount / Promotional Savings {promoCode ? `(${promoCode})` : ""}
                           </span>
                         </td>
                         <td className="px-4 py-2 text-center text-tealdeep font-medium">
-                          Promo Applied
+                          {promoCode ? `Code: ${promoCode}` : "Promo Applied"}
                         </td>
                         <td className="px-4 py-2 text-right font-semibold text-tealdeep">
                           -{formatPrice(discountAmount)}

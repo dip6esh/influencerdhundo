@@ -53,6 +53,29 @@ export const Route = createFileRoute("/creator/register")({
 
 const STEPS = ["Account", "Basics", "Social", "Content", "Collaboration", "Preview"] as const;
 const DRAFT_STORAGE_KEY = "influencer-dhundo-creator-draft-v2";
+const DRAFT_ID_KEY = "influencer-dhundo-creator-draft-id-v2";
+
+function getOrCreateDraftId(name: string, email: string, mobile: string): string {
+  if (typeof window === "undefined") return "draft-lead";
+  try {
+    const existingId = localStorage.getItem(DRAFT_ID_KEY);
+    if (existingId) return existingId;
+  } catch {
+    // ignore
+  }
+  const clean = (name || email.split("@")[0] || mobile || "lead")
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, "-")
+    .replace(/^-|-$/g, "");
+  const randomSuffix = Math.random().toString(36).substring(2, 7);
+  const newId = `draft-${clean || "creator"}-${randomSuffix}`;
+  try {
+    localStorage.setItem(DRAFT_ID_KEY, newId);
+  } catch {
+    // ignore
+  }
+  return newId;
+}
 
 type Form = {
   // ── Account step ──────────────────────────
@@ -247,16 +270,71 @@ function Register() {
     return initialForm;
   });
 
-  // Save form draft to localStorage
+  // Save form draft to localStorage and auto-sync in-progress lead to Supabase so Admin can track abandoned registrations
   useEffect(() => {
-    if (!existing && (form.name || form.email || form.instagram || form.city)) {
+    if (existing) return;
+
+    if (form.name || form.email || form.instagram || form.city || form.mobile) {
       try {
         localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form));
       } catch {
         // ignore
       }
     }
-  }, [form, existing]);
+
+    const hasEnoughData = Boolean(
+      (form.name && form.name.trim().length >= 2) ||
+      (form.email && form.email.includes("@")) ||
+      (form.mobile && form.mobile.trim().length >= 5) ||
+      (form.instagram && form.instagram.trim().length >= 2),
+    );
+    if (!hasEnoughData) return;
+
+    const timer = setTimeout(async () => {
+      try {
+        const draftId = getOrCreateDraftId(form.name, form.email, form.mobile);
+        const currentStepName = STEPS[step] || "Account";
+        const draftLead: Creator = {
+          id: draftId,
+          name: form.name.trim() || form.displayName.trim() || form.instagram.trim() || form.email || "Incomplete Profile",
+          displayName: form.displayName.trim() || form.name.trim() || form.instagram.trim() || "Incomplete Profile",
+          photo: form.photo || "",
+          city: form.city || "Unassigned",
+          locality: form.locality || "",
+          state: form.state || "",
+          pincode: form.pincode || "",
+          followers: Number(form.followers) || 0,
+          instagram: form.instagram || "",
+          otherSocials: [],
+          categories: form.categories || [],
+          contentTypes: form.contentTypes || [],
+          languages: form.languages || [],
+          about: form.about || `In-progress registration started on ${new Date().toLocaleDateString("en-IN")}.`,
+          collabType: (form.collabType as any) || "Paid",
+          startingPrice: Number(form.startingPrice) || 0,
+          travels: form.travels === "Yes",
+          travelRange: form.travelRange || "",
+          acceptsProducts: (form.acceptsProducts as any) || "Depends",
+          acceptsProductsDetails: `[Abandoned Lead - Dropped at Step ${step + 1}: ${currentStepName}]`,
+          turnaround: form.turnaround || "3–5 days",
+          status: "Draft",
+          contact: {
+            phone: form.mobile || "",
+            whatsapp: form.mobile || "",
+            email: form.email || "",
+          },
+          birthDate: form.birthDate || undefined,
+          gender: form.gender || undefined,
+          referredBy: referralCode || undefined,
+        };
+        await supabaseDb.upsertCreator(draftLead);
+      } catch (err) {
+        console.debug("Draft sync error:", err);
+      }
+    }, 1500);
+
+    return () => clearTimeout(timer);
+  }, [form, step, existing, referralCode]);
 
   // Check for existing session & listen for cross-tab auth state changes (e.g. email confirmation in another tab)
   useEffect(() => {
@@ -347,34 +425,40 @@ function Register() {
     }));
 
   const draft: Creator = useMemo(
-    () => ({
-      id:
-        existing?.id ??
-        (form.name || "my-profile").toLowerCase().replace(/[^a-z0-9]+/g, "-"),
-      name: form.name || "Your name",
-      displayName: form.name || form.displayName || "Your name",
-      photo: form.photo || "",
-      city: form.city || "Your city",
-      locality: form.locality || "Your area",
-      state: form.state || "",
-      pincode: form.pincode,
-      followers: Number(form.followers) || 0,
-      instagram: normalizeInstagramHandle(form.instagram)
-        ? `@${normalizeInstagramHandle(form.instagram)}`
-        : form.instagram.startsWith("@")
-          ? form.instagram
-          : form.instagram
-            ? `@${form.instagram}`
-            : "@yourhandle",
-      otherSocials: [
-        form.facebook ? { platform: "Facebook", handle: form.facebook } : null,
-        form.youtube ? { platform: "YouTube", handle: form.youtube } : null,
-        form.otherPlatform ? { platform: "Other", handle: form.otherPlatform } : null,
-      ].filter(Boolean) as Creator["otherSocials"],
-      categories: form.categories,
-      contentTypes: form.contentTypes,
-      languages: form.languages,
-      about: form.about,
+    () => {
+      const cleanName = (form.name || "").trim();
+      const cleanDisplay = (form.displayName || form.name || "").trim();
+      const generatedId = (cleanName || cleanDisplay || "my-profile")
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+
+      return {
+        id: existing?.id ?? (generatedId || "my-profile"),
+        name: cleanName || "Your name",
+        displayName: cleanDisplay || cleanName || "Your name",
+        photo: (form.photo || "").trim(),
+        city: (form.city || "").trim() || "Your city",
+        locality: (form.locality || "").trim() || "Your area",
+        state: (form.state || "").trim(),
+        pincode: (form.pincode || "").trim(),
+        followers: Number(form.followers) || 0,
+        instagram: normalizeInstagramHandle(form.instagram)
+          ? `@${normalizeInstagramHandle(form.instagram)}`
+          : form.instagram.startsWith("@")
+            ? form.instagram.trim()
+            : form.instagram
+              ? `@${form.instagram.trim()}`
+              : "@yourhandle",
+        otherSocials: [
+          form.facebook ? { platform: "Facebook", handle: form.facebook.trim() } : null,
+          form.youtube ? { platform: "YouTube", handle: form.youtube.trim() } : null,
+          form.otherPlatform ? { platform: "Other", handle: form.otherPlatform.trim() } : null,
+        ].filter(Boolean) as Creator["otherSocials"],
+        categories: form.categories,
+        contentTypes: form.contentTypes,
+        languages: form.languages,
+        about: (form.about || "").trim(),
       collabType: (form.collabType || "Paid") as Creator["collabType"],
       startingPrice: Number(form.startingPrice) || 0,
       travels: form.travels === "Yes",
@@ -391,13 +475,12 @@ function Register() {
       referralCode: existing?.referralCode,
       referredBy: referrerInfo?.id ?? existing?.referredBy,
       contact: {
-        phone: form.mobile,
-        whatsapp: form.mobile,
-        email: form.email,
+        phone: (form.mobile || "").trim(),
+        whatsapp: (form.mobile || "").trim(),
+        email: (form.email || "").trim(),
       },
-    }),
-    [form, existing, referrerInfo],
-  );
+    };
+  }, [form, existing, referrerInfo]);
 
   const validateStep = () => {
     if (step === 0) {
@@ -567,10 +650,13 @@ function Register() {
     setSaveError("");
 
     try {
-      let finalReferredBy = draft.referredBy;
-      if (!finalReferredBy && referralCode && referralCode.trim().length >= 4) {
-        const cleaned = referralCode.trim().toUpperCase();
-        const local = creators.find((c) => c.referralCode && c.referralCode.toUpperCase() === cleaned);
+      let candidateRef = referrerInfo?.id || draft.referredBy || referralCode;
+      let finalReferredBy = candidateRef;
+      if (candidateRef && candidateRef.trim().length >= 4) {
+        const cleaned = candidateRef.trim().toUpperCase();
+        const local = creators.find(
+          (c) => c.id === candidateRef || (c.referralCode && c.referralCode.toUpperCase() === cleaned),
+        );
         if (local) {
           finalReferredBy = local.id;
         } else {
@@ -602,9 +688,15 @@ function Register() {
         await startFreeTrial(finalDraft.id);
       }
 
-      // Success! Clear local draft cache & referral cache
+      // Success! Clear local draft cache & temporary draft ID
       try {
+        const tempDraftId = localStorage.getItem(DRAFT_ID_KEY);
+        if (tempDraftId && tempDraftId !== finalDraft.id) {
+          // Clean up the temporary lead record from Supabase since final active profile is now saved
+          supabaseDb.deleteCreator(tempDraftId).catch(() => {});
+        }
         localStorage.removeItem(DRAFT_STORAGE_KEY);
+        localStorage.removeItem(DRAFT_ID_KEY);
         localStorage.removeItem("influencer_referral_code");
       } catch {
         // ignore

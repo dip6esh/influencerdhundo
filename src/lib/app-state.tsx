@@ -42,6 +42,8 @@ export type Subscription = {
   referralCodeUsed?: string | undefined;
   isQueued?: boolean | undefined;
   status?: "active" | "queued" | "expired" | undefined;
+  razorpayOrderId?: string | undefined;
+  razorpayPaymentId?: string | undefined;
 };
 
 type AppState = {
@@ -143,9 +145,15 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     async function loadFromSupabase() {
-      const remoteCreators = await supabaseDb.fetchCreators();
+      const [remoteCreators, remoteSubs] = await Promise.all([
+        supabaseDb.fetchCreators(),
+        supabaseDb.fetchAllSubscriptions(),
+      ]);
       if (isMounted && remoteCreators && remoteCreators.length > 0) {
         setCreators(remoteCreators);
+      }
+      if (isMounted && remoteSubs && remoteSubs.length > 0) {
+        setSubscriptions(remoteSubs);
       }
 
       // If user has active Supabase session, look up their creator or business profile
@@ -157,23 +165,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             prev.some((x) => x.id === creatorProfile.id) ? prev : [creatorProfile, ...prev],
           );
           setMyCreatorId(creatorProfile.id);
-
-          // Fetch this creator's subscriptions from Supabase and merge into state
-          const remoteSubs = await supabaseDb.fetchSubscriptionsForCreator(creatorProfile.id);
-          if (remoteSubs.length > 0 && isMounted) {
-            setSubscriptions((prev) => {
-              // Remote is source of truth — drop local dupes and sort newest first
-              const localOnly = prev.filter(
-                (s) =>
-                  s.creatorId === creatorProfile.id
-                    ? false // replace all local subs for this creator with remote
-                    : true, // keep subs for other creators (e.g. in dev/admin scenarios)
-              );
-              return [...remoteSubs, ...localOnly].sort(
-                (a, b) => new Date(b.startedAt).getTime() - new Date(a.startedAt).getTime(),
-              );
-            });
-          }
 
           // Fetch referral events
           const events = await supabaseDb.fetchReferralEvents(creatorProfile.id);
@@ -198,7 +189,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     const checkAndActivate = async () => {
       const now = Date.now();
       let hasUpdates = false;
-
+      // 1. Auto-activate queued subscriptions
       const nextSubs = await Promise.all(
         subscriptions.map(async (sub) => {
           const startTime = new Date(sub.startedAt).getTime();
@@ -223,12 +214,43 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (hasUpdates) {
         setSubscriptions(nextSubs);
       }
+
+      // 2. Automated Expiration Sweep for Creators whose passes ended
+      let creatorsUpdated = false;
+      const nextCreators = creators.map((c) => {
+        if (c.status === "Draft" || c.id.startsWith("draft-")) return c;
+        const creatorExplicitExpTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+        let latestSubExpTime = 0;
+        let hasActiveOrQueuedSub = false;
+
+        for (const s of subscriptions) {
+          if (s.creatorId !== c.id) continue;
+          const sExp = s.expiresAt ? new Date(s.expiresAt).getTime() : 0;
+          if (sExp > latestSubExpTime) latestSubExpTime = sExp;
+          if (s.isQueued || s.status === "queued" || sExp > now) {
+            hasActiveOrQueuedSub = true;
+          }
+        }
+
+        const expTime = Math.max(creatorExplicitExpTime, latestSubExpTime);
+
+        if (expTime > 0 && expTime <= now && !hasActiveOrQueuedSub && c.status === "Active") {
+          creatorsUpdated = true;
+          supabaseDb.updateCreatorStatus(c.id, "Expired");
+          return { ...c, status: "Expired" as CreatorStatus };
+        }
+        return c;
+      });
+
+      if (creatorsUpdated) {
+        setCreators(nextCreators);
+      }
     };
 
     checkAndActivate();
     const interval = setInterval(checkAndActivate, 10000); // Poll every 10s
     return () => clearInterval(interval);
-  }, [hydrated, subscriptions]);
+  }, [hydrated, subscriptions, creators]);
 
   // 4. Persist to localStorage whenever state changes
   useEffect(() => {
@@ -482,7 +504,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           );
         }
 
-        // If paid plan: generate referral code and fire referral reward
+        // If paid/active plan: generate referral code
         if (!isTrialPlan) {
           if (creator && !creator.referralCode) {
             const code = generateReferralCode(creator.name || creator.displayName);
@@ -492,18 +514,25 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
             );
           }
 
-          // Reward referrer if this creator was referred
+          // Reward referrer ONLY if this creator was referred AND paid real money for the plan (price > 0)
+          const isRealMoneyPaid = (s.price ?? 0) > 0;
           const thisCreator = creators.find((c) => c.id === s.creatorId);
-          const effectiveReferrerId = thisCreator?.referredBy;
-          if (effectiveReferrerId) {
-            const referrer = creators.find((c) => c.id === effectiveReferrerId);
+          const effectiveReferrerId = thisCreator?.referredBy?.trim();
+
+          if (isRealMoneyPaid && effectiveReferrerId) {
+            const cleanRef = effectiveReferrerId.toUpperCase();
+            const referrer = creators.find(
+              (c) =>
+                c.id === effectiveReferrerId ||
+                (c.referralCode && c.referralCode.toUpperCase() === cleanRef),
+            );
             if (referrer) {
               const referrerExpiry = referrer.subscriptionExpiresAt
                 ? new Date(referrer.subscriptionExpiresAt)
                 : null;
               const referrerActive = referrerExpiry ? referrerExpiry > now : false;
               const referrerSub = subscriptions.find(
-                (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d",
+                (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d" && !sub.isTrial,
               );
               if (referrerActive || referrerSub) {
                 const baseExpiry = referrer.subscriptionExpiresAt
@@ -518,7 +547,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   referredSubId: item.id,
                   daysDelta: 7,
                   eventType: "earned",
-                  note: `${thisCreator?.name || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
+                  note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
                 });
                 setCreators((prev) =>
                   prev.map((c) =>
