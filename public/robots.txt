@@ -8,9 +8,9 @@ Allow: /about
 Allow: /privacy
 Allow: /terms
 Allow: /refund-policy
+Allow: /creators/
 
-# Block all auth, private, and creator profile pages
-Disallow: /creators/
+# Block all auth, private, and admin management routes
 Disallow: /creator/dashboard
 Disallow: /creator/plans
 Disallow: /creator/register
@@ -21,3 +21,4 @@ Disallow: /login
 Disallow: /admin
 
 Sitemap: https://www.influencerdhundo.com/sitemap.xml
+

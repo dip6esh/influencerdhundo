@@ -93,21 +93,43 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
     meta: [
       { charSet: "utf-8" },
       { name: "viewport", content: "width=device-width, initial-scale=1" },
-      { title: "Influencer Dhundo — Local creator directory" },
+      { title: "Influencer Dhundo — Where Businesses Find Relevant Creators with 0% Commission" },
       {
         name: "description",
         content:
-          "Discover local creators near your business by location, content, audience size and budget.",
+          "Discover and connect directly with verified local Instagram creators and influencers across India. Filter by city, category, followers, and budget. 0% commission.",
       },
-      { property: "og:title", content: "influencer Dhundo" },
+      {
+        name: "keywords",
+        content:
+          "influencer marketing India, local influencers, instagram creators Surat, hire influencers Ahmedabad, micro creators Mumbai, nano influencers, direct brand collaboration",
+      },
+      { name: "author", content: "Influencer Dhundo" },
+      { name: "robots", content: "index, follow, max-image-preview:large, max-snippet:-1, max-video-preview:-1" },
+
+      // Open Graph
+      { property: "og:site_name", content: "Influencer Dhundo" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Influencer Dhundo — Local Influencer Discovery Platform" },
       {
         property: "og:description",
-        content: "A directory that helps local businesses discover local creators.",
+        content: "Where businesses find relevant influencers to collaborate. Connect directly with local creators with 0% commission.",
       },
-      { property: "og:type", content: "website" },
+      { property: "og:image", content: "https://www.influencerdhundo.com/logo.png" },
+      { property: "og:image:alt", content: "Influencer Dhundo Logo & Directory" },
+      { property: "og:url", content: "https://www.influencerdhundo.com/" },
+
+      // Twitter Cards
       { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Influencer Dhundo — Local Influencer Discovery Platform" },
+      {
+        name: "twitter:description",
+        content: "Where businesses find relevant influencers to collaborate. Connect directly with verified local creators with 0% commission.",
+      },
+      { name: "twitter:image", content: "https://www.influencerdhundo.com/logo.png" },
     ],
     links: [
+      { rel: "canonical", href: "https://www.influencerdhundo.com/" },
       { rel: "stylesheet", href: appCss },
       { rel: "preconnect", href: "https://fonts.googleapis.com" },
       { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
@@ -125,10 +147,48 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
 });
 
 function RootShell({ children }: { children: ReactNode }) {
+  const globalSchema = {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "Organization",
+        "@id": "https://www.influencerdhundo.com/#organization",
+        "name": "Influencer Dhundo",
+        "url": "https://www.influencerdhundo.com",
+        "logo": {
+          "@type": "ImageObject",
+          "@id": "https://www.influencerdhundo.com/#logo",
+          "url": "https://www.influencerdhundo.com/logo.png",
+          "caption": "Influencer Dhundo",
+        },
+        "description":
+          "India's direct discovery platform connecting local businesses with verified Instagram creators and influencers with 0% commission.",
+      },
+      {
+        "@type": "WebSite",
+        "@id": "https://www.influencerdhundo.com/#website",
+        "url": "https://www.influencerdhundo.com",
+        "name": "Influencer Dhundo",
+        "publisher": {
+          "@id": "https://www.influencerdhundo.com/#organization",
+        },
+        "potentialAction": {
+          "@type": "SearchAction",
+          "target": "https://www.influencerdhundo.com/discover?search={search_term_string}",
+          "query-input": "required name=search_term_string",
+        },
+      },
+    ],
+  };
+
   return (
     <html lang="en">
       <head>
         <HeadContent />
+        <script
+          type="application/ld+json"
+          dangerouslySetInnerHTML={{ __html: JSON.stringify(globalSchema) }}
+        />
       </head>
       <body>
         {children}

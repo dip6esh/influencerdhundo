@@ -31,15 +31,23 @@ import {
 } from "lucide-react";
 
 export const Route = createFileRoute("/creators/$creatorId")({
-  head: () => ({
+  head: ({ params }) => ({
     meta: [
-      { title: "Creator profile — Influencer Dhundo" },
+      { title: "Creator Profile — Influencer Dhundo" },
       {
         name: "description",
         content:
-          "See a local creator's location, audience, content formats, collaboration preferences and starting price.",
+          "See a local creator's verified audience, content categories, starting pricing, turnaround time, and direct collaboration preferences on Influencer Dhundo.",
       },
-      { name: "robots", content: "noindex, nofollow" },
+      { name: "robots", content: "index, follow, max-image-preview:large" },
+      { property: "og:type", content: "profile" },
+      { property: "og:image", content: "https://www.influencerdhundo.com/logo.png" },
+      { property: "og:url", content: `https://www.influencerdhundo.com/creators/${params.creatorId}` },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:image", content: "https://www.influencerdhundo.com/logo.png" },
+    ],
+    links: [
+      { rel: "canonical", href: `https://www.influencerdhundo.com/creators/${params.creatorId}` },
     ],
   }),
   validateSearch: (
@@ -93,12 +101,17 @@ function CreatorProfile() {
 
   useEffect(() => {
     if (creator && typeof window !== "undefined") {
+      const creatorName = creator.displayName || creator.name;
+      const categoriesText = (creator.categories || []).slice(0, 2).join(" & ");
+      const cityText = creator.city ? ` in ${creator.city}` : "";
+      document.title = `${creatorName}${categoriesText ? ` — ${categoriesText} Creator` : ""}${cityText} | Influencer Dhundo`;
+
       trackPageView(window.location.pathname + window.location.search, {
         creatorId: creator.id,
-        creatorName: creator.displayName || creator.name,
+        creatorName: creatorName,
       });
     }
-  }, [creator?.id]);
+  }, [creator?.id, creator?.displayName, creator?.name, creator?.city]);
 
   if (!creator) {
     return (
@@ -145,8 +158,31 @@ function CreatorProfile() {
 
   const age = calculateAge(creator.birthDate);
 
+  const profileSchema = {
+    "@context": "https://schema.org",
+    "@type": "ProfilePage",
+    "mainEntity": {
+      "@type": "Person",
+      "name": creator.displayName || creator.name,
+      "description": creator.about || `Verified Instagram creator and influencer based in ${creator.city}`,
+      "image": creator.photo || "https://www.influencerdhundo.com/logo.png",
+      "jobTitle": "Content Creator & Influencer",
+      "homeLocation": {
+        "@type": "Place",
+        "name": [creator.locality, creator.city, creator.state].filter(Boolean).join(", "),
+      },
+      "sameAs": creator.instagram
+        ? [getInstagramUrl(creator.instagram)]
+        : [],
+    },
+  };
+
   return (
     <div className="min-h-screen bg-secondary/50 pb-28">
+      <script
+        type="application/ld+json"
+        dangerouslySetInnerHTML={{ __html: JSON.stringify(profileSchema) }}
+      />
       <div className="mx-auto max-w-5xl px-5 py-8">
 
         {/* PREVIEW MODE BANNER */}

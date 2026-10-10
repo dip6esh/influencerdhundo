@@ -18,18 +18,29 @@ import {
 export const Route = createFileRoute("/")({
   head: () => ({
     meta: [
-      { title: "Influencer Dhundo — Where businesses find relevant Influencers to collaborate" },
+      { title: "Influencer Dhundo — Where Businesses Find Relevant Creators with 0% Commission" },
       {
         name: "description",
         content:
-          "Influencer Dhundo helps creators and businesses find each other. No agency, no commission, no middleman. Just collaborate and make it happen.",
+          "Influencer Dhundo connects local businesses directly with verified Instagram creators. 0% commission, direct WhatsApp contact. Find the best creators for your business today.",
       },
-      { property: "og:title", content: "Influencer Dhundo — A Business + Relevant Influencers = Big Possibilities." },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Influencer Dhundo — Where Businesses Find Relevant Creators" },
       {
         property: "og:description",
         content:
-          "Where businesses find relevant Influencers to collaborate. Discover creators around your business. Connect directly. Start collaborating.",
+          "Discover creators around your business. Connect directly with 0% commission. No agency, no middlemen.",
       },
+      { property: "og:image", content: "https://www.influencerdhundo.com/logo.png" },
+      { property: "og:url", content: "https://www.influencerdhundo.com/" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Influencer Dhundo — Where Businesses Find Relevant Creators" },
+      {
+        name: "twitter:description",
+        content:
+          "Discover creators around your business. Connect directly with 0% commission. No agency, no middlemen.",
+      },
+      { name: "twitter:image", content: "https://www.influencerdhundo.com/logo.png" },
     ],
     links: [
       { rel: "canonical", href: "https://www.influencerdhundo.com/" },

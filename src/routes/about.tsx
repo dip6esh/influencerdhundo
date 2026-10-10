@@ -17,18 +17,29 @@ import {
 export const Route = createFileRoute("/about")({
   head: () => ({
     meta: [
-      { title: "About Us | Influencer Dhundo" },
+      { title: "About Us — Influencer Dhundo | India's Direct Creator Discovery Platform" },
       {
         name: "description",
         content:
           "Learn about Influencer Dhundo - India's direct discovery platform connecting local businesses with regional creators with 0% commission.",
       },
-      { property: "og:title", content: "About Us | Influencer Dhundo" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "About Us — Influencer Dhundo" },
       {
         property: "og:description",
         content:
-          "Empowering local businesses and creators with seamless discovery and 100% direct collaborations.",
+          "Empowering local businesses and creators with seamless discovery and 100% direct collaborations with 0% commission.",
       },
+      { property: "og:image", content: "https://www.influencerdhundo.com/logo.png" },
+      { property: "og:url", content: "https://www.influencerdhundo.com/about" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "About Us — Influencer Dhundo" },
+      {
+        name: "twitter:description",
+        content:
+          "Empowering local businesses and creators with seamless discovery and 100% direct collaborations with 0% commission.",
+      },
+      { name: "twitter:image", content: "https://www.influencerdhundo.com/logo.png" },
     ],
     links: [
       { rel: "canonical", href: "https://www.influencerdhundo.com/about" },

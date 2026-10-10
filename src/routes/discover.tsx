@@ -29,17 +29,27 @@ import {
 export const Route = createFileRoute("/discover")({
   head: () => ({
     meta: [
-      { title: "Find Relevant Influencers / Creators — Influencer Dhundo" },
+      { title: "Find Relevant Influencers & Content Creators — Influencer Dhundo" },
       {
         name: "description",
         content:
-          "Discover and connect directly with verified creators and influencers filtered by location, niche category, follower count, and budget.",
+          "Discover and connect directly with verified local Instagram creators and influencers across India. Filter by city, category, follower count, and budget.",
       },
-      { property: "og:title", content: "Find Relevant Influencers / Creators — Influencer Dhundo" },
+      { property: "og:type", content: "website" },
+      { property: "og:title", content: "Find Relevant Influencers & Content Creators — Influencer Dhundo" },
       {
         property: "og:description",
-        content: "Filter and connect directly with verified creators by location, niche, audience size, and budget.",
+        content: "Filter and connect directly with verified creators by location, niche, audience size, and budget with 0% commission.",
       },
+      { property: "og:image", content: "https://www.influencerdhundo.com/logo.png" },
+      { property: "og:url", content: "https://www.influencerdhundo.com/discover" },
+      { name: "twitter:card", content: "summary_large_image" },
+      { name: "twitter:title", content: "Find Relevant Influencers & Content Creators — Influencer Dhundo" },
+      {
+        name: "twitter:description",
+        content: "Filter and connect directly with verified creators by location, niche, audience size, and budget with 0% commission.",
+      },
+      { name: "twitter:image", content: "https://www.influencerdhundo.com/logo.png" },
     ],
     links: [
       { rel: "canonical", href: "https://www.influencerdhundo.com/discover" },
