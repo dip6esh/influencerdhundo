@@ -472,12 +472,42 @@ export const supabaseDb = {
         businessName: row.business_name,
         mobile: row.mobile,
         email: row.email,
+        createdAt: row.created_at ?? undefined,
+        updatedAt: row.updated_at ?? undefined,
       };
     } catch (e) {
       console.warn("Supabase findBusinessAccount error:", e);
       return null;
     }
   },
+
+  async fetchAllBusinesses(): Promise<BusinessAccount[]> {
+    try {
+      const { data, error } = await supabase
+        .from("business_accounts")
+        .select("*")
+        .order("created_at", { ascending: false });
+
+      if (error || !data) {
+        console.warn("Supabase fetchAllBusinesses error:", error?.message);
+        return [];
+      }
+      return data.map((row) => ({
+        id: row.id,
+        authUserId: row.auth_user_id ?? undefined,
+        name: row.name,
+        businessName: row.business_name,
+        mobile: row.mobile,
+        email: row.email,
+        createdAt: row.created_at ?? undefined,
+        updatedAt: row.updated_at ?? undefined,
+      }));
+    } catch (e) {
+      console.warn("Supabase fetchAllBusinesses error:", e);
+      return [];
+    }
+  },
+
 
   // ── Business Auth ─────────────────────────────────────────────────────────
 

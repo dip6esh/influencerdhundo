@@ -20,6 +20,8 @@ export type BusinessAccount = {
   businessName: string;
   mobile: string;
   email: string;
+  createdAt?: string;
+  updatedAt?: string;
 };
 
 export type Report = {

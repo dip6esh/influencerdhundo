@@ -1,7 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Chip, DatePicker, Field, SectionEyebrow, StatusPill, TextArea, TextInput } from "@/components/ui-kit";
-import { useAppState } from "@/lib/app-state";
+import { useAppState, type BusinessAccount } from "@/lib/app-state";
 import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
 import { supabaseDb, type DiscountCode, type WebsiteVisit } from "@/lib/supabase";
 import {
@@ -69,6 +69,7 @@ import {
   Award,
   AlertTriangle,
   TrendingUp,
+  Building2,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -1480,6 +1481,53 @@ function AdminDashboard() {
   const [subSearch, setSubSearch] = useState("");
   const [subFilter, setSubFilter] = useState<"all" | "paid" | "promo100" | "trial" | "active" | "queued" | "expired">("all");
 
+  // Businesses tab state
+  const [businessAccounts, setBusinessAccounts] = useState<BusinessAccount[]>([]);
+  const [loadingBusinesses, setLoadingBusinesses] = useState(false);
+  const [businessSearch, setBusinessSearch] = useState("");
+  const [copiedContact, setCopiedContact] = useState<string | null>(null);
+
+  const loadBusinesses = async () => {
+    setLoadingBusinesses(true);
+    try {
+      const data = await supabaseDb.fetchAllBusinesses();
+      setBusinessAccounts(data);
+    } catch {
+      // ignore
+    } finally {
+      setLoadingBusinesses(false);
+    }
+  };
+
+  useEffect(() => {
+    loadBusinesses();
+  }, []);
+
+  useEffect(() => {
+    if (tab === "Businesses") {
+      loadBusinesses();
+    }
+  }, [tab]);
+
+  const handleCopyBusinessInfo = (text: string, label: string) => {
+    navigator.clipboard.writeText(text);
+    setCopiedContact(`${label}-${text}`);
+    setTimeout(() => setCopiedContact(null), 2000);
+  };
+
+  const filteredBusinesses = useMemo(() => {
+    if (!businessSearch.trim()) return businessAccounts;
+    const q = businessSearch.toLowerCase().trim();
+    return businessAccounts.filter((b) => {
+      return (
+        b.name?.toLowerCase().includes(q) ||
+        b.businessName?.toLowerCase().includes(q) ||
+        b.mobile?.toLowerCase().includes(q) ||
+        b.email?.toLowerCase().includes(q)
+      );
+    });
+  }, [businessAccounts, businessSearch]);
+
   const clearActionFeedback = () => {
     setTimeout(() => setActionFeedback(null), 3500);
   };
@@ -1879,7 +1927,13 @@ function AdminDashboard() {
                 : "rounded-full px-4 py-2 text-xs font-medium text-muted-foreground ring-1 ring-border hover:text-foreground"
             }
           >
-            {t === "Analytics" ? "📊 Traffic & Footprints" : t === "Discount Codes" ? "🏷️ Discount & Referral Codes" : t}
+            {t === "Analytics"
+              ? "📊 Traffic & Footprints"
+              : t === "Discount Codes"
+              ? "🏷️ Discount & Referral Codes"
+              : t === "Businesses"
+              ? `🏢 Businesses (${businessAccounts.length})`
+              : t}
           </button>
         ))}
       </div>
@@ -4508,20 +4562,229 @@ function AdminDashboard() {
 
       {/* ── TAB 4: BUSINESSES ───────────────────────────────────────────── */}
       {tab === "Businesses" ? (
-        <Card className="mt-5">
-          {business ? (
-            <div className="text-sm">
-              <p className="font-semibold">{business.businessName}</p>
-              <p className="text-muted-foreground">
-                {business.name} · {business.mobile} · {business.email}
-              </p>
+        <div className="mt-5 space-y-5">
+          {/* Header Stats & Refresh Bar */}
+          <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 bg-secondary/30 p-4 rounded-2xl border border-border/80">
+            <div className="flex items-center gap-3">
+              <div className="size-10 rounded-xl bg-primary/10 text-primary flex items-center justify-center font-bold shrink-0">
+                <Building2 className="size-5" />
+              </div>
+              <div>
+                <h3 className="font-semibold text-base leading-tight">
+                  Registered Business Accounts
+                </h3>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  Brands, agencies, and marketers registered on Influencer Dhundo ({businessAccounts.length} total)
+                </p>
+              </div>
             </div>
+
+            <div className="flex items-center gap-2">
+              <Button
+                variant="ghost"
+                className="px-3 py-2 text-xs flex items-center gap-1.5 ring-1 ring-border bg-background hover:bg-secondary cursor-pointer"
+                onClick={loadBusinesses}
+                disabled={loadingBusinesses}
+              >
+                <RefreshCw className={`size-3.5 ${loadingBusinesses ? "animate-spin" : ""}`} />
+                <span>Refresh</span>
+              </Button>
+            </div>
+          </div>
+
+          {/* Search Bar */}
+          <div className="relative">
+            <Search className="size-4 absolute left-3.5 top-1/2 -translate-y-1/2 text-muted-foreground pointer-events-none" />
+            <TextInput
+              value={businessSearch}
+              onChange={(e) => setBusinessSearch(e.target.value)}
+              placeholder="Search by company name, contact person, mobile, or email..."
+              className="pl-10 pr-10 py-2 text-sm bg-background"
+            />
+            {businessSearch ? (
+              <button
+                type="button"
+                onClick={() => setBusinessSearch("")}
+                className="absolute right-3.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground cursor-pointer text-xs"
+              >
+                <X className="size-4" />
+              </button>
+            ) : null}
+          </div>
+
+          {/* Businesses List */}
+          {loadingBusinesses && businessAccounts.length === 0 ? (
+            <Card className="py-12 flex flex-col items-center justify-center text-center">
+              <Loader2 className="size-6 animate-spin text-primary mb-2" />
+              <p className="text-sm text-muted-foreground">Loading registered businesses...</p>
+            </Card>
+          ) : filteredBusinesses.length === 0 ? (
+            <Card className="py-12 flex flex-col items-center justify-center text-center">
+              <Building2 className="size-10 text-muted-foreground/40 mb-3" />
+              <h4 className="font-semibold text-base text-foreground">
+                {businessSearch ? "No matching businesses found" : "No business accounts registered yet"}
+              </h4>
+              <p className="text-xs text-muted-foreground mt-1 max-w-sm">
+                {businessSearch
+                  ? `No businesses match "${businessSearch}". Try clearing your search query.`
+                  : "When brands and agencies sign up on Influencer Dhundo, their accounts and contact information will appear here."}
+              </p>
+              {businessSearch && (
+                <Button
+                  variant="ghost"
+                  className="mt-4 px-3 py-1.5 text-xs ring-1 ring-border cursor-pointer"
+                  onClick={() => setBusinessSearch("")}
+                >
+                  Clear search
+                </Button>
+              )}
+            </Card>
           ) : (
-            <p className="text-sm text-muted-foreground">
-              No business accounts registered yet.
-            </p>
+            <div className="grid grid-cols-1 gap-4">
+              {filteredBusinesses.map((b) => {
+                const cleanPhone = b.mobile ? b.mobile.replace(/\D/g, "") : "";
+                const isPhoneCopied = copiedContact === `phone-${b.mobile}`;
+                const isEmailCopied = copiedContact === `email-${b.email}`;
+
+                return (
+                  <Card
+                    key={b.id || `${b.mobile}-${b.email}`}
+                    className="p-4 sm:p-5 transition-all hover:border-foreground/30 hover:shadow-sm"
+                  >
+                    <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                      {/* Business & Contact Name */}
+                      <div className="flex items-start gap-3.5 min-w-0 flex-1">
+                        <div className="size-11 rounded-2xl bg-gradient-to-br from-primary/20 via-primary/10 to-transparent border border-primary/20 text-primary flex items-center justify-center font-bold text-base shrink-0 select-none uppercase">
+                          {b.businessName?.charAt(0) || b.name?.charAt(0) || "B"}
+                        </div>
+
+                        <div className="min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <h4 className="font-bold text-base text-foreground truncate">
+                              {b.businessName || "Unnamed Business"}
+                            </h4>
+                            {b.authUserId ? (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2 py-0.5 text-[10px] font-semibold ring-1 ring-emerald-500/20">
+                                <CheckCircle2 className="size-3 shrink-0" />
+                                Registered User
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-secondary text-muted-foreground px-2 py-0.5 text-[10px] font-medium ring-1 ring-border">
+                                Business Account
+                              </span>
+                            )}
+                          </div>
+
+                          <p className="text-xs text-muted-foreground mt-0.5 flex items-center gap-1.5">
+                            <User className="size-3 text-muted-foreground shrink-0" />
+                            <span className="font-medium text-foreground">{b.name}</span>
+                            <span>· Contact Person</span>
+                          </p>
+
+                          {/* Contact Details Badges */}
+                          <div className="mt-3 flex flex-wrap items-center gap-2 text-xs">
+                            {/* Mobile / Phone */}
+                            {b.mobile ? (
+                              <div className="inline-flex items-center gap-1.5 rounded-lg bg-secondary/60 px-2.5 py-1 text-foreground font-mono text-xs ring-1 ring-border">
+                                <Phone className="size-3 text-primary shrink-0" />
+                                <span>{b.mobile}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyBusinessInfo(b.mobile, "phone")}
+                                  className="ml-1 text-muted-foreground hover:text-foreground cursor-pointer"
+                                  title="Copy phone number"
+                                >
+                                  {isPhoneCopied ? (
+                                    <Check className="size-3 text-emerald-500" />
+                                  ) : (
+                                    <Copy className="size-3" />
+                                  )}
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {/* Email */}
+                            {b.email ? (
+                              <div className="inline-flex items-center gap-1.5 rounded-lg bg-secondary/60 px-2.5 py-1 text-foreground font-mono text-xs ring-1 ring-border max-w-full truncate">
+                                <Mail className="size-3 text-sky-500 shrink-0" />
+                                <span className="truncate">{b.email}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => handleCopyBusinessInfo(b.email, "email")}
+                                  className="ml-1 text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
+                                  title="Copy email"
+                                >
+                                  {isEmailCopied ? (
+                                    <Check className="size-3 text-emerald-500" />
+                                  ) : (
+                                    <Copy className="size-3" />
+                                  )}
+                                </button>
+                              </div>
+                            ) : null}
+
+                            {/* Created Date */}
+                            {b.createdAt ? (
+                              <div className="inline-flex items-center gap-1 rounded-lg bg-background px-2.5 py-1 text-[11px] text-muted-foreground ring-1 ring-border">
+                                <Calendar className="size-3 shrink-0" />
+                                <span>
+                                  Joined{" "}
+                                  {new Date(b.createdAt).toLocaleDateString("en-IN", {
+                                    day: "numeric",
+                                    month: "short",
+                                    year: "numeric",
+                                  })}
+                                </span>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      </div>
+
+                      {/* Quick Contact Actions */}
+                      <div className="flex flex-wrap items-center gap-2 shrink-0 pt-2 md:pt-0 border-t md:border-t-0 border-border/60">
+                        {b.mobile && cleanPhone ? (
+                          <>
+                            <a
+                              href={`https://wa.me/91${cleanPhone.slice(-10)}`}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 hover:bg-emerald-500/20 px-3 py-2 text-xs font-semibold ring-1 ring-emerald-500/30 transition-colors"
+                              title="Chat on WhatsApp"
+                            >
+                              <MessageSquare className="size-3.5" />
+                              <span>WhatsApp</span>
+                            </a>
+
+                            <a
+                              href={`tel:${b.mobile}`}
+                              className="inline-flex items-center gap-1.5 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 px-3 py-2 text-xs font-semibold ring-1 ring-border transition-colors"
+                              title="Call phone"
+                            >
+                              <PhoneCall className="size-3.5 text-primary" />
+                              <span>Call</span>
+                            </a>
+                          </>
+                        ) : null}
+
+                        {b.email ? (
+                          <a
+                            href={`mailto:${b.email}?subject=Hello%20from%20Influencer%20Dhundo`}
+                            className="inline-flex items-center gap-1.5 rounded-xl bg-secondary text-foreground hover:bg-secondary/80 px-3 py-2 text-xs font-semibold ring-1 ring-border transition-colors"
+                            title="Send Email"
+                          >
+                            <Mail className="size-3.5 text-sky-500" />
+                            <span>Email</span>
+                          </a>
+                        ) : null}
+                      </div>
+                    </div>
+                  </Card>
+                );
+              })}
+            </div>
           )}
-        </Card>
+        </div>
       ) : null}
 
       {/* ── TAB 5: REPORTS ──────────────────────────────────────────────── */}
