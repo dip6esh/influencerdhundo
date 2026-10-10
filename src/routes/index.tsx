@@ -842,7 +842,7 @@ function RegionalHubSection() {
         <div className="text-center max-w-2xl mx-auto">
           <SectionEyebrow>Local Discovery</SectionEyebrow>
           <h2 className="mt-2 text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
-            Discover Creators by City &amp; Category
+            Discover Influencers by City &amp; Category
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
             Explore verified local influencers across top Indian cities and high-growth niches.
@@ -862,7 +862,7 @@ function RegionalHubSection() {
                 to="/discover"
                 className="rounded-xl bg-secondary/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background transition-all shadow-2xs"
               >
-                {city} Creators
+                {city} Influencers
               </Link>
             ))}
           </div>
