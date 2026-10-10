@@ -658,26 +658,28 @@ function CreatorProfile() {
       </div>
 
       {/* STICKY BAR */}
-      <div className="fixed inset-x-0 bottom-0 z-20">
-        <div className="mx-auto max-w-5xl px-5 pb-4">
-          <div className="glass-card flex items-center gap-3 rounded-2xl p-3 shadow-2xl border border-border/80">
-            <div className="min-w-0 flex-1">
-              <p className="label-caps">Starting from</p>
-              <p className="font-display text-lg font-semibold leading-none text-saffrondeep">
+      <div className="fixed inset-x-0 bottom-0 z-20 pointer-events-none">
+        <div className="mx-auto max-w-5xl px-5 pb-4 pointer-events-auto">
+          <div className="flex items-center justify-between gap-4 rounded-2xl p-3.5 sm:p-4 bg-primary shadow-2xl ring-1 ring-saffrondeep/30">
+            <div className="min-w-0 flex-1 pl-1">
+              <p className="text-[10px] sm:text-[11px] font-bold uppercase tracking-wider text-primary-foreground/80">
+                Starting from
+              </p>
+              <p className="font-display text-xl sm:text-2xl font-extrabold leading-tight text-primary-foreground">
                 {formatPrice(creator.startingPrice)}
               </p>
             </div>
             {preview ? (
               <Link
                 to="/creator/register"
-                className="rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
+                className="rounded-xl bg-foreground px-6 py-3 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98 shrink-0"
               >
                 Edit profile
               </Link>
             ) : business ? (
               <a
                 href={`tel:${creator.contact.phone.replace(/\s/g, "")}`}
-                className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="rounded-xl bg-foreground px-6 py-3 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98 shrink-0"
               >
                 Call Creator
               </a>
@@ -685,7 +687,7 @@ function CreatorProfile() {
               <Link
                 to="/business/signup"
                 search={{ redirect: `/creators/${creator.id}` }}
-                className="rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-colors"
+                className="rounded-xl bg-foreground px-6 py-3 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98 shrink-0"
               >
                 Contact Creator
               </Link>
