@@ -1345,29 +1345,54 @@ function AnalyticsTabContent({
                 return (
                   <div
                     key={v.id}
-                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/60 transition-all text-xs"
+                    className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 p-3 rounded-xl bg-secondary/30 border border-border/50 hover:bg-secondary/60 transition-all text-xs overflow-hidden"
                   >
-                    <div className="flex items-start sm:items-center gap-2.5 min-w-0">
+                    <div className="flex items-start sm:items-center gap-2.5 min-w-0 flex-1">
                       <span className="font-mono text-[11px] text-muted-foreground font-semibold shrink-0 min-w-[55px]">
                         {formatTimeAgo(v.createdAt)}
                       </span>
-                      <div className="min-w-0">
-                        <p className="text-foreground">
+                      <div className="min-w-0 flex-1">
+                        <p className="text-foreground break-words [overflow-wrap:anywhere] leading-relaxed">
                           Visitor from <strong className="text-foreground font-bold">{v.city || "Unknown City"}</strong>
                           {v.region && <span className="text-muted-foreground">, {v.region}</span>}{" "}
-                          <span className="text-foreground">{actionText}</span>
+                          {isCreator ? (
+                            <span className="text-foreground">
+                              viewed {v.creatorName ? <strong className="font-semibold text-foreground">{v.creatorName}'s profile</strong> : "a creator profile"}
+                            </span>
+                          ) : isDiscover ? (
+                            <span className="text-foreground">searched the discovery directory</span>
+                          ) : isPlans ? (
+                            <span className="text-foreground">opened subscription pricing &amp; plans</span>
+                          ) : isReg ? (
+                            <span className="text-foreground">opened creator registration form</span>
+                          ) : isBiz ? (
+                            <span className="text-foreground">opened business signup form</span>
+                          ) : isHome ? (
+                            <span className="text-foreground">landed on homepage</span>
+                          ) : (
+                            <span className="text-foreground inline-flex flex-wrap items-center gap-1">
+                              visited{" "}
+                              <code
+                                className="rounded bg-background/80 px-1.5 py-0.5 font-mono text-[11px] text-foreground font-medium ring-1 ring-border/50 break-all max-w-full"
+                                title={v.path}
+                              >
+                                {v.path && v.path.length > 60 ? `${v.path.slice(0, 60)}…` : v.path}
+                              </code>
+                            </span>
+                          )}
                         </p>
                       </div>
                     </div>
 
                     <div className="flex flex-wrap items-center gap-2 shrink-0 sm:self-center pl-16 sm:pl-0">
                       <span
-                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${srcStyle.bg}`}
+                        className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border ${srcStyle.bg} max-w-[160px] truncate`}
+                        title={v.referrerSource}
                       >
-                        <span className={`size-1.5 rounded-full ${srcStyle.dot}`} />
-                        {v.referrerSource}
+                        <span className={`size-1.5 rounded-full ${srcStyle.dot} shrink-0`} />
+                        <span className="truncate">{v.referrerSource}</span>
                       </span>
-                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-border">
+                      <span className="rounded-md bg-background px-2 py-0.5 text-[10px] font-medium text-muted-foreground ring-1 ring-border shrink-0">
                         {v.deviceType} · {v.os} · {v.browser}
                       </span>
                     </div>
