@@ -932,7 +932,13 @@ function FaqSection() {
             return (
               <div
                 key={index}
-                className="glass-card rounded-2xl border border-border/80 overflow-hidden transition-all"
+                className="glass-card rounded-2xl border border-border/80 overflow-hidden"
+                style={{
+                  transition: "box-shadow 0.4s cubic-bezier(0.4,0,0.2,1)",
+                  boxShadow: isOpen
+                    ? "0 4px 32px 0 rgba(0,0,0,0.10)"
+                    : "none",
+                }}
               >
                 <button
                   type="button"
@@ -945,16 +951,35 @@ function FaqSection() {
                     <span>{item.q}</span>
                   </span>
                   <ChevronDown
-                    className={`size-5 text-muted-foreground shrink-0 transition-transform duration-200 ${
-                      isOpen ? "rotate-180 text-primary" : ""
-                    }`}
+                    style={{
+                      transition: "transform 0.45s cubic-bezier(0.4,0,0.2,1), color 0.3s ease",
+                      transform: isOpen ? "rotate(180deg)" : "rotate(0deg)",
+                      color: isOpen ? "hsl(var(--primary))" : "hsl(var(--muted-foreground))",
+                    }}
+                    className="size-5 shrink-0"
                   />
                 </button>
-                {isOpen && (
-                  <div className="px-5 pb-6 sm:px-6 sm:pb-6 text-sm sm:text-base text-muted-foreground leading-relaxed pl-12 sm:pl-14 border-t border-border/40 pt-3">
+                {/* Outer wrapper: drives the max-height clip */}
+                <div
+                  style={{
+                    maxHeight: isOpen ? "600px" : "0px",
+                    overflow: "hidden",
+                    transition: "max-height 0.5s cubic-bezier(0.4,0,0.2,1)",
+                  }}
+                >
+                  {/* Inner wrapper: slides + fades the content */}
+                  <div
+                    style={{
+                      opacity: isOpen ? 1 : 0,
+                      transform: isOpen ? "translateY(0)" : "translateY(-8px)",
+                      transition:
+                        "opacity 0.4s cubic-bezier(0.4,0,0.2,1) 0.05s, transform 0.45s cubic-bezier(0.4,0,0.2,1) 0.05s",
+                    }}
+                    className="px-5 pb-6 sm:px-6 sm:pb-6 text-sm sm:text-base text-muted-foreground leading-relaxed pl-12 sm:pl-14 border-t border-border/40 pt-3"
+                  >
                     {item.a}
                   </div>
-                )}
+                </div>
               </div>
             );
           })}
