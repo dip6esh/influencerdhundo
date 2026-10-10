@@ -837,53 +837,72 @@ const POPULAR_CATEGORIES = [
 
 function RegionalHubSection() {
   return (
-    <section className="border-t border-border bg-secondary/30 py-12 md:py-16">
+    <section className="border-t border-border bg-secondary/50 py-16 md:py-24">
       <div className="mx-auto max-w-5xl px-5">
-        <div className="text-center max-w-2xl mx-auto">
+        <div className="max-w-3xl">
           <SectionEyebrow>Local Discovery</SectionEyebrow>
-          <h2 className="mt-2 text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
-            Discover Influencers by City &amp; Category
+          <h2 className="mt-3 text-3xl font-display font-semibold leading-tight text-balance md:text-5xl">
+            Discover Influencers by City &amp; Category.
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Explore local influencers across top Indian cities and high-growth niches.
+          <p className="mt-4 text-base text-pretty text-muted-foreground md:text-lg">
+            Explore local influencers across top Indian cities and high-growth niches. Find the right creator right around your business.
           </p>
         </div>
 
-        {/* Cities Hub */}
-        <div className="mt-8 rounded-2xl bg-card p-5 sm:p-6 border border-border/80 shadow-xs">
-          <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            <MapPin className="size-4 text-primary shrink-0" />
-            <span>Popular Cities in India</span>
+        {/* Two key hubs as side-by-side cards */}
+        <div className="mt-10 grid gap-6 md:grid-cols-2">
+          {/* Cities Hub */}
+          <div className="glass-card flex flex-col rounded-2xl sm:rounded-3xl p-6 sm:p-8">
+            <div className="flex items-center gap-2">
+              <MapPin className="size-4 text-primary shrink-0" />
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
+                Popular Cities in India
+              </p>
+            </div>
+            <h3 className="mt-3 text-xl font-display font-semibold leading-snug">
+              Find creators around your city
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              Filter creators based in specific metropolitan and regional commercial hubs.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2 pt-2">
+              {POPULAR_CITIES.map((city) => (
+                <Link
+                  key={city}
+                  to="/discover"
+                  className="rounded-xl bg-background/80 px-3.5 py-2 text-xs font-semibold text-foreground ring-1 ring-border/80 hover:bg-foreground hover:text-background transition-all shadow-2xs active:scale-98"
+                >
+                  {city} Influencers
+                </Link>
+              ))}
+            </div>
           </div>
-          <div className="flex flex-wrap gap-2">
-            {POPULAR_CITIES.map((city) => (
-              <Link
-                key={city}
-                to="/discover"
-                className="rounded-xl bg-secondary/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background transition-all shadow-2xs"
-              >
-                {city} Influencers
-              </Link>
-            ))}
-          </div>
-        </div>
 
-        {/* Categories Hub */}
-        <div className="mt-4 rounded-2xl bg-card p-5 sm:p-6 border border-border/80 shadow-xs">
-          <div className="flex items-center gap-2 mb-3 text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            <Sparkles className="size-4 text-primary shrink-0" />
-            <span>Trending Niche Categories</span>
-          </div>
-          <div className="flex flex-wrap gap-2">
-            {POPULAR_CATEGORIES.map((cat) => (
-              <Link
-                key={cat}
-                to="/discover"
-                className="rounded-xl bg-secondary/80 px-3.5 py-1.5 text-xs font-semibold text-foreground hover:bg-foreground hover:text-background transition-all shadow-2xs"
-              >
-                {cat} Influencers
-              </Link>
-            ))}
+          {/* Categories Hub */}
+          <div className="glass-card flex flex-col rounded-2xl sm:rounded-3xl p-6 sm:p-8">
+            <div className="flex items-center gap-2">
+              <Sparkles className="size-4 text-primary shrink-0" />
+              <p className="text-xs font-semibold uppercase tracking-[0.14em] text-foreground">
+                Trending Niche Categories
+              </p>
+            </div>
+            <h3 className="mt-3 text-xl font-display font-semibold leading-snug">
+              Creators in every industry
+            </h3>
+            <p className="mt-2 text-sm text-muted-foreground leading-relaxed">
+              From food and cafes to fashion, tech, and fitness, find creators that fit your niche.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-2 pt-2">
+              {POPULAR_CATEGORIES.map((cat) => (
+                <Link
+                  key={cat}
+                  to="/discover"
+                  className="rounded-xl bg-background/80 px-3.5 py-2 text-xs font-semibold text-foreground ring-1 ring-border/80 hover:bg-foreground hover:text-background transition-all shadow-2xs active:scale-98"
+                >
+                  {cat} Influencers
+                </Link>
+              ))}
+            </div>
           </div>
         </div>
       </div>
@@ -895,30 +914,30 @@ function FaqSection() {
   const [openIndex, setOpenIndex] = useState<number | null>(0);
 
   return (
-    <section className="border-t border-border bg-background py-14 md:py-20">
-      <div className="mx-auto max-w-4xl px-5">
-        <div className="text-center max-w-2xl mx-auto">
+    <section className="border-t border-border bg-background py-16 md:py-24">
+      <div className="mx-auto max-w-5xl px-5">
+        <div className="max-w-3xl">
           <SectionEyebrow>Frequently Asked Questions</SectionEyebrow>
-          <h2 className="mt-2 text-2xl sm:text-3xl font-display font-bold text-foreground tracking-tight">
-            Everything You Need to Know
+          <h2 className="mt-3 text-3xl font-display font-semibold leading-tight text-balance md:text-5xl">
+            Everything you need to know.
           </h2>
-          <p className="mt-2 text-sm text-muted-foreground">
-            Got questions about how Influencer Dhundo works for brands and creators? Find answers below.
+          <p className="mt-4 text-base text-pretty text-muted-foreground md:text-lg">
+            Got questions about how Influencer Dhundo works for brands and creators? Here are the most common questions answered.
           </p>
         </div>
 
-        <div className="mt-10 space-y-3">
+        <div className="mt-10 space-y-3.5">
           {FAQ_ITEMS.map((item, index) => {
             const isOpen = openIndex === index;
             return (
               <div
                 key={index}
-                className="rounded-2xl bg-card border border-border/80 shadow-2xs overflow-hidden transition-all"
+                className="glass-card rounded-2xl border border-border/80 overflow-hidden transition-all"
               >
                 <button
                   type="button"
                   onClick={() => setOpenIndex(isOpen ? null : index)}
-                  className="flex w-full items-center justify-between gap-4 p-5 text-left font-display text-base font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
+                  className="flex w-full items-center justify-between gap-4 p-5 sm:p-6 text-left font-display text-base sm:text-lg font-semibold text-foreground hover:text-primary transition-colors cursor-pointer"
                   aria-expanded={isOpen}
                 >
                   <span className="flex items-start gap-3">
@@ -932,7 +951,7 @@ function FaqSection() {
                   />
                 </button>
                 {isOpen && (
-                  <div className="px-5 pb-5 pt-1 text-sm text-muted-foreground leading-relaxed pl-12 border-t border-border/40">
+                  <div className="px-5 pb-6 sm:px-6 sm:pb-6 text-sm sm:text-base text-muted-foreground leading-relaxed pl-12 sm:pl-14 border-t border-border/40 pt-3">
                     {item.a}
                   </div>
                 )}
@@ -941,24 +960,26 @@ function FaqSection() {
           })}
         </div>
 
-        {/* Support Callout */}
-        <div className="mt-10 rounded-2xl bg-secondary/60 border border-border p-6 text-center">
-          <p className="text-sm font-semibold text-foreground">
-            Still have questions or need help onboarding?
-          </p>
-          <p className="mt-1 text-xs text-muted-foreground">
-            Reach out to our team directly on WhatsApp or explore our creator and business guides.
-          </p>
-          <div className="mt-4 flex flex-wrap justify-center gap-3">
+        {/* Support Callout Matching Page Cards */}
+        <div className="mt-10 glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+          <div className="space-y-1">
+            <h4 className="text-base sm:text-lg font-display font-semibold text-foreground">
+              Still have questions or need help onboarding?
+            </h4>
+            <p className="text-xs sm:text-sm text-muted-foreground">
+              Reach out to our team directly or explore our directory and guides.
+            </p>
+          </div>
+          <div className="flex flex-wrap gap-2.5 shrink-0">
             <Link
               to="/discover"
-              className="inline-flex rounded-xl bg-foreground px-4 py-2 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors"
+              className="inline-flex rounded-xl bg-foreground px-4 py-2.5 text-xs font-semibold text-background hover:bg-foreground/90 transition-colors"
             >
               Explore Directory
             </Link>
             <Link
               to="/about"
-              className="inline-flex rounded-xl bg-background px-4 py-2 text-xs font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-colors"
+              className="inline-flex rounded-xl bg-background px-4 py-2.5 text-xs font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-colors"
             >
               About Our Mission
             </Link>
