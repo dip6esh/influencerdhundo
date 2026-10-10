@@ -25,7 +25,7 @@ export const Route = createFileRoute("/")({
       {
         name: "description",
         content:
-          "Influencer Dhundo connects local businesses directly with verified Instagram creators. 0% commission, direct WhatsApp contact. Find the best creators for your business today.",
+          "Influencer Dhundo connects local businesses directly with Instagram creators. 0% commission, direct WhatsApp contact. Find the best creators for your business today.",
       },
       { property: "og:type", content: "website" },
       { property: "og:title", content: "Influencer Dhundo — Where Businesses Find Relevant Creators" },
@@ -488,7 +488,7 @@ function PricingSection() {
             Simple, honest plans for creators.
           </h2>
           <p className="mt-3.5 text-base text-pretty text-muted-foreground md:text-lg">
-            Charges are only for creators who want to be listed and verified in the public directory. No commissions on your brand deals — keep 100% of what you earn. Choose a plan or start with our 3-day free trial.
+            Charges are only for creators who want to be listed in the public directory. No commissions on your brand deals — keep 100% of what you earn. Choose a plan or start with our 3-day free trial.
           </p>
         </div>
 
@@ -507,7 +507,7 @@ function PricingSection() {
                 Try Influencer Dhundo Free for 3 Days
               </h3>
               <p className="text-sm text-muted-foreground leading-relaxed">
-                Test the directory with zero risk. Get your profile verified and unlocked immediately so local businesses around you can find and contact you directly.
+                Test the directory with zero risk. Get your profile active and unlocked immediately so local businesses around you can find and contact you directly.
               </p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 pt-1">
@@ -785,7 +785,7 @@ function PricingSection() {
 const FAQ_ITEMS = [
   {
     q: "How does Influencer Dhundo help local businesses find relevant creators?",
-    a: "Influencer Dhundo is India's direct local influencer discovery platform. Businesses can search and filter verified Instagram creators by city, locality, niche category (Food, Fashion, Fitness, Tech, etc.), audience size, turnaround time, and budget without having to hire expensive agencies.",
+    a: "Influencer Dhundo is India's direct local influencer discovery platform. Businesses can search and filter local Instagram creators by city, locality, niche category (Food, Fashion, Fitness, Tech, etc.), audience size, turnaround time, and budget without having to hire expensive agencies.",
   },
   {
     q: "Why is Influencer Dhundo 0% commission?",
@@ -793,7 +793,7 @@ const FAQ_ITEMS = [
   },
   {
     q: "How do businesses get direct WhatsApp and contact access with creators?",
-    a: "Subscribed businesses can instantly unlock direct WhatsApp chat, verified phone numbers, and email IDs for active creators on our platform, enabling fast communication, product gifting, and rapid campaign execution.",
+    a: "Subscribed businesses can instantly unlock direct WhatsApp chat, direct phone numbers, and email IDs for active creators on our platform, enabling fast communication, product gifting, and rapid campaign execution.",
   },
   {
     q: "Can nano and micro-influencers join Influencer Dhundo?",
@@ -845,7 +845,7 @@ function RegionalHubSection() {
             Discover Influencers by City &amp; Category
           </h2>
           <p className="mt-2 text-sm text-muted-foreground">
-            Explore verified local influencers across top Indian cities and high-growth niches.
+            Explore local influencers across top Indian cities and high-growth niches.
           </p>
         </div>
 

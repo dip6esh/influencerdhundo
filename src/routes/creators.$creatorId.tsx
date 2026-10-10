@@ -37,7 +37,7 @@ export const Route = createFileRoute("/creators/$creatorId")({
       {
         name: "description",
         content:
-          "See a local creator's verified audience, content categories, starting pricing, turnaround time, and direct collaboration preferences on Influencer Dhundo.",
+          "See a local creator's audience metrics, content categories, starting pricing, turnaround time, and direct collaboration preferences on Influencer Dhundo.",
       },
       { name: "robots", content: "index, follow, max-image-preview:large" },
       { property: "og:type", content: "profile" },
@@ -164,7 +164,7 @@ function CreatorProfile() {
     "mainEntity": {
       "@type": "Person",
       "name": creator.displayName || creator.name,
-      "description": creator.about || `Verified Instagram creator and influencer based in ${creator.city}`,
+      "description": creator.about || `Instagram creator and influencer based in ${creator.city}`,
       "image": creator.photo || "https://www.influencerdhundo.com/logo.png",
       "jobTitle": "Content Creator & Influencer",
       "homeLocation": {
@@ -243,7 +243,7 @@ function CreatorProfile() {
                 )}
                 <span
                   className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
-                  title="Verified Profile"
+                  title="Active Profile"
                 />
               </div>
 
@@ -503,7 +503,7 @@ function CreatorProfile() {
                 </p>
               </div>
               <span className="rounded-full bg-accent/15 px-3 py-1 text-xs font-semibold text-tealdeep border border-accent/25">
-                ✓ Verified Business Access
+                ✓ Unlocked Business Access
               </span>
             </div>
 

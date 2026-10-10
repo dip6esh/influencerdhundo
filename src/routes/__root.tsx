@@ -97,7 +97,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       {
         name: "description",
         content:
-          "Discover and connect directly with verified local Instagram creators and influencers across India. Filter by city, category, followers, and budget. 0% commission.",
+          "Discover and connect directly with local Instagram creators and influencers across India. Filter by city, category, followers, and budget. 0% commission.",
       },
       {
         name: "keywords",
@@ -124,7 +124,7 @@ export const Route = createRootRouteWithContext<{ queryClient: QueryClient }>()(
       { name: "twitter:title", content: "Influencer Dhundo — Local Influencer Discovery Platform" },
       {
         name: "twitter:description",
-        content: "Where businesses find relevant influencers to collaborate. Connect directly with verified local creators with 0% commission.",
+        content: "Where businesses find relevant influencers to collaborate. Connect directly with local creators with 0% commission.",
       },
       { name: "twitter:image", content: "https://www.influencerdhundo.com/logo.png" },
     ],
@@ -162,7 +162,7 @@ function RootShell({ children }: { children: ReactNode }) {
           "caption": "Influencer Dhundo",
         },
         "description":
-          "India's direct discovery platform connecting local businesses with verified Instagram creators and influencers with 0% commission.",
+          "India's direct discovery platform connecting local businesses with Instagram creators and influencers with 0% commission.",
       },
       {
         "@type": "WebSite",

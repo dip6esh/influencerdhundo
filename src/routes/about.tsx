@@ -142,7 +142,7 @@ function AboutPage() {
                 <div>
                   <h4 className="font-semibold text-foreground">Direct, Unfiltered Contact</h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Verified businesses can call, WhatsApp, or email creators directly to finalize
+                    Subscribed businesses can call, WhatsApp, or email creators directly to finalize
                     campaign briefs and deliverable details.
                   </p>
                 </div>
@@ -166,9 +166,9 @@ function AboutPage() {
                   <ShieldCheck className="size-4" />
                 </div>
                 <div>
-                  <h4 className="font-semibold text-foreground">Vetted &amp; Transparent Profiles</h4>
+                  <h4 className="font-semibold text-foreground">Transparent Profiles</h4>
                   <p className="text-xs text-muted-foreground mt-0.5">
-                    Clear starting rates, turnaround times, and verified Instagram metrics so there are
+                    Clear starting rates, turnaround times, and listed Instagram metrics so there are
                     never any hidden surprises.
                   </p>
                 </div>

@@ -468,11 +468,11 @@ function Dashboard() {
                       <Camera className="size-3 text-muted-foreground group-hover:text-white transition-colors" />
                     </span>
 
-                    {/* Status verified indicator */}
+                    {/* Status active indicator */}
                     {mine.status === "Active" && (
                       <span
                         className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
-                        title="Verified Active in Directory"
+                        title="Active in Directory"
                       />
                     )}
                   </div>

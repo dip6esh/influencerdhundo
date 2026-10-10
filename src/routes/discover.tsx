@@ -33,13 +33,13 @@ export const Route = createFileRoute("/discover")({
       {
         name: "description",
         content:
-          "Discover and connect directly with verified local Instagram creators and influencers across India. Filter by city, category, follower count, and budget.",
+          "Discover and connect directly with local Instagram creators and influencers across India. Filter by city, category, follower count, and budget.",
       },
       { property: "og:type", content: "website" },
       { property: "og:title", content: "Find Relevant Influencers & Content Creators — Influencer Dhundo" },
       {
         property: "og:description",
-        content: "Filter and connect directly with verified creators by location, niche, audience size, and budget with 0% commission.",
+        content: "Filter and connect directly with creators by location, niche, audience size, and budget with 0% commission.",
       },
       { property: "og:image", content: "https://www.influencerdhundo.com/logo.png" },
       { property: "og:url", content: "https://www.influencerdhundo.com/discover" },
@@ -47,7 +47,7 @@ export const Route = createFileRoute("/discover")({
       { name: "twitter:title", content: "Find Relevant Influencers & Content Creators — Influencer Dhundo" },
       {
         name: "twitter:description",
-        content: "Filter and connect directly with verified creators by location, niche, audience size, and budget with 0% commission.",
+        content: "Filter and connect directly with creators by location, niche, audience size, and budget with 0% commission.",
       },
       { name: "twitter:image", content: "https://www.influencerdhundo.com/logo.png" },
     ],
