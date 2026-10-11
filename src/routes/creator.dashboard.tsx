@@ -1939,21 +1939,6 @@ function PaymentReceiptModal({
   }, [onClose]);
 
   const handlePrint = () => {
-    const printFrame = document.createElement("iframe");
-    printFrame.style.position = "fixed";
-    printFrame.style.right = "0";
-    printFrame.style.bottom = "0";
-    printFrame.style.width = "0";
-    printFrame.style.height = "0";
-    printFrame.style.border = "none";
-    document.body.appendChild(printFrame);
-
-    const doc = printFrame.contentWindow?.document;
-    if (!doc) {
-      window.print();
-      return;
-    }
-
     const formattedDate = new Date(receipt.createdAt).toLocaleString("en-IN", {
       day: "numeric",
       month: "short",
@@ -1985,15 +1970,15 @@ function PaymentReceiptModal({
       `
         : "";
 
-    doc.open();
-    doc.write(`
+    const receiptHtml = `
       <!DOCTYPE html>
       <html>
         <head>
           <meta charset="utf-8" />
+          <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+          <base href="${window.location.origin}/" />
           <title>Receipt_${invoiceNumber}</title>
           <style>
-            @import url('https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wght@12..96,400;12..96,500;12..96,600;12..96,700;12..96,800&display=swap');
             @page {
               size: A4 portrait;
               margin: 10mm 12mm;
@@ -2013,11 +1998,57 @@ function PaymentReceiptModal({
               line-height: 1.45;
               padding: 0;
               margin: 0;
+              -webkit-font-smoothing: antialiased;
+            }
+            .mobile-action-bar {
+              display: flex;
+              align-items: center;
+              justify-content: space-between;
+              padding: 12px 16px;
+              background: #f8fafc;
+              border-bottom: 1px solid #e2e8f0;
+              margin-bottom: 12px;
+            }
+            .btn-print {
+              background: #ea580c;
+              color: #ffffff;
+              border: none;
+              border-radius: 8px;
+              padding: 8px 16px;
+              font-size: 13px;
+              font-weight: 700;
+              cursor: pointer;
+            }
+            .btn-close {
+              background: #e2e8f0;
+              color: #334155;
+              border: none;
+              border-radius: 8px;
+              padding: 8px 14px;
+              font-size: 13px;
+              font-weight: 600;
+              cursor: pointer;
+            }
+            @media print {
+              .no-print {
+                display: none !important;
+              }
+              body {
+                background: #ffffff !important;
+                padding: 0 !important;
+                margin: 0 !important;
+              }
+              .invoice-box {
+                border: 1px solid #cbd5e1 !important;
+                box-shadow: none !important;
+                margin: 0 auto !important;
+                padding: 20px 24px !important;
+              }
             }
             .invoice-box {
               width: 100%;
               max-width: 680px;
-              margin: 0 auto;
+              margin: 16px auto;
               border: 1px solid #cbd5e1;
               border-radius: 14px;
               padding: 24px 26px;
@@ -2048,13 +2079,11 @@ function PaymentReceiptModal({
             .brand-name {
               font-size: 19px;
               font-weight: 800;
-              font-family: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
               color: #0f172a;
               letter-spacing: -0.3px;
             }
             .brand-name span {
               color: #d97706;
-              font-family: 'Bricolage Grotesque', ui-sans-serif, sans-serif;
               font-weight: 800;
             }
             .brand-sub {
@@ -2235,6 +2264,13 @@ function PaymentReceiptModal({
           </style>
         </head>
         <body>
+          <div class="mobile-action-bar no-print">
+            <span style="font-size: 13px; font-weight: 700; color: #1e293b;">Official Payment Receipt #${invoiceNumber}</span>
+            <div style="display: flex; gap: 8px;">
+              <button class="btn-print" onclick="window.print()">Print / Save PDF</button>
+              <button class="btn-close" onclick="window.close()">Close</button>
+            </div>
+          </div>
           <div class="invoice-box">
             <!-- HEADER -->
             <div class="header">
@@ -2346,23 +2382,81 @@ function PaymentReceiptModal({
           </div>
         </body>
       </html>
-    `);
+    `;
+
+    const isIOS =
+      typeof navigator !== "undefined" &&
+      (/iPad|iPhone|iPod/.test(navigator.userAgent) ||
+        (navigator.platform === "MacIntel" && navigator.maxTouchPoints > 1));
+    const isMobile =
+      typeof navigator !== "undefined" &&
+      /Android|webOS|iPhone|iPad|iPod|BlackBerry|IEMobile|Opera Mini/i.test(
+        navigator.userAgent
+      );
+
+    // On iOS / Mobile devices, opening a dedicated printable tab is the only reliable way
+    // for AirPrint & Save-as-PDF to render all pixels without clipping or blank pages.
+    if (isIOS || isMobile) {
+      const printWin = window.open("", "_blank");
+      if (printWin) {
+        printWin.document.open();
+        printWin.document.write(receiptHtml);
+        printWin.document.close();
+        setTimeout(() => {
+          try {
+            printWin.focus();
+            printWin.print();
+          } catch {}
+        }, 350);
+        return;
+      }
+    }
+
+    // On Desktop, print in-place using a properly sized off-screen iframe
+    const printFrame = document.createElement("iframe");
+    printFrame.style.position = "fixed";
+    printFrame.style.left = "-9999px";
+    printFrame.style.top = "0";
+    printFrame.style.width = "1024px";
+    printFrame.style.height = "1400px";
+    printFrame.style.border = "none";
+    printFrame.style.opacity = "0";
+    printFrame.style.pointerEvents = "none";
+    document.body.appendChild(printFrame);
+
+    const doc = printFrame.contentWindow?.document;
+    if (!doc) {
+      window.print();
+      return;
+    }
+
+    doc.open();
+    doc.write(receiptHtml);
     doc.close();
 
     setTimeout(() => {
       const prevTitle = document.title;
       document.title = `Receipt_${invoiceNumber}`;
-      printFrame.contentWindow?.focus();
-      printFrame.contentWindow?.print();
+      try {
+        printFrame.contentWindow?.focus();
+        printFrame.contentWindow?.print();
+      } catch {
+        window.print();
+      }
       setTimeout(() => {
         document.title = prevTitle;
+      }, 1000);
+      // Safe cleanup timer (60s) so the browser's print spooler is never interrupted
+      setTimeout(() => {
         try {
-          document.body.removeChild(printFrame);
+          if (document.body.contains(printFrame)) {
+            document.body.removeChild(printFrame);
+          }
         } catch {
           // ignore
         }
-      }, 1500);
-    }, 1200);
+      }, 60000);
+    }, 300);
   };
 
   return (
