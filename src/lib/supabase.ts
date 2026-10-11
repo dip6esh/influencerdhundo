@@ -808,17 +808,45 @@ export const supabaseDb = {
         const { data } = await supabase
           .from("creators")
           .select("*")
-          .eq("auth_user_id", authUserId)
-          .limit(1);
-        if (data && data.length > 0) return rowToCreator(data[0] as CreatorRow);
+          .eq("auth_user_id", authUserId);
+        if (data && data.length > 0) {
+          // Prioritize active or non-draft profile
+          const preferred = data.find((r) => r.status !== "Draft") || data[0];
+          return rowToCreator(preferred as CreatorRow);
+        }
       }
       if (email) {
         const { data } = await supabase
           .from("creators")
           .select("*")
-          .filter("contact->>email", "ilike", email)
-          .limit(1);
-        if (data && data.length > 0) return rowToCreator(data[0] as CreatorRow);
+          .filter("contact->>email", "ilike", email);
+        if (data && data.length > 0) {
+          // Prioritize active or non-draft profile
+          const preferred = data.find((r) => r.status !== "Draft") || data[0];
+          return rowToCreator(preferred as CreatorRow);
+        }
+      }
+      // If authUserId was provided but no row matched auth_user_id, look up user email from session
+      if (authUserId && !email) {
+        const { data: sessionData } = await supabase.auth.getSession();
+        const sessionEmail = sessionData?.session?.user?.email;
+        if (sessionEmail) {
+          const { data } = await supabase
+            .from("creators")
+            .select("*")
+            .filter("contact->>email", "ilike", sessionEmail);
+          if (data && data.length > 0) {
+            const preferred = data.find((r) => r.status !== "Draft") || data[0];
+            // Auto-heal: Link the auth_user_id so subsequent lookups are instant
+            if (!preferred.auth_user_id) {
+              await supabase
+                .from("creators")
+                .update({ auth_user_id: authUserId })
+                .eq("id", preferred.id);
+            }
+            return rowToCreator(preferred as CreatorRow);
+          }
+        }
       }
       return null;
     } catch {
