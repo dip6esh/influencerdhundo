@@ -83,9 +83,9 @@ function Dashboard() {
     upsertCreator,
     updateCreatorPhoto,
     setCreatorStatus,
-    refreshFromSupabase,
   } = useAppState();
-  const [loading, setLoading] = useState(!myCreatorId);
+  const mine = creators.find((c) => c.id === myCreatorId);
+  const [loading, setLoading] = useState(!mine);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
   const [payments, setPayments] = useState<PaymentRecord[]>([]);
@@ -93,7 +93,13 @@ function Dashboard() {
   const [copiedPaymentId, setCopiedPaymentId] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentRecord | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
-  const mine = creators.find((c) => c.id === myCreatorId);
+
+  // If mine is found in state or hydrated from storage, dismiss loading spinner immediately
+  useEffect(() => {
+    if (mine) {
+      setLoading(false);
+    }
+  }, [mine]);
 
   // Subscriptions & Queued plans calculation
   const userSubs = subscriptions.filter((s) => s.creatorId === myCreatorId);
@@ -101,18 +107,16 @@ function Dashboard() {
   const queuedSubs = myCreatorId ? getQueuedSubscriptions(subscriptions, myCreatorId) : [];
   const latestSub = userSubs[0];
 
-  // Auto-fetch profile from Supabase & sync latest data on mount
+  // Auto-fetch profile from Supabase & sync latest data in background on mount
   useEffect(() => {
     let mounted = true;
     async function initDashboard() {
       try {
-        refreshFromSupabase();
         const uid = await supabaseDb.getCreatorSession();
         if (uid && mounted) {
           const profile = await supabaseDb.getCreatorProfileForAuthUser(uid);
           if (profile && mounted) {
             upsertCreator(profile, true);
-            fetchReferralEvents(profile.id);
           }
         }
       } finally {

@@ -59,6 +59,7 @@ export default {
           path === "/" ||
           path === "/about" ||
           path === "/pricing" ||
+          path === "/discover" ||
           path === "/terms" ||
           path === "/privacy" ||
           path === "/refund-policy";
