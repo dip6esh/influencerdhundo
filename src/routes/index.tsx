@@ -1,6 +1,7 @@
 import { useState } from "react";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { SectionEyebrow } from "@/components/ui-kit";
+import { useAppState } from "@/lib/app-state";
 import {
   ArrowRight,
   ChevronDown,
@@ -91,6 +92,10 @@ function ArrowLink({
 }
 
 function Landing() {
+  const { myCreatorId, creators } = useAppState();
+  const myCreator = creators.find((c) => c.id === myCreatorId);
+  const creatorTarget = myCreator ? "/creator/dashboard" : "/creator/register";
+
   const faqSchema = {
     "@context": "https://schema.org",
     "@type": "FAQPage",
@@ -125,7 +130,7 @@ function Landing() {
 
           <div className="mt-8 grid max-w-md grid-cols-1 gap-3 md:max-w-xl md:grid-cols-2">
             <ArrowLink to="/discover" label="Find a Creator" variant="ink" />
-            <ArrowLink to="/creator/register" label="I'm a Creator" variant="primary" />
+            <ArrowLink to={creatorTarget} label="I'm a Creator" variant="primary" />
           </div>
         </div>
       </section>
@@ -239,10 +244,10 @@ function Landing() {
             </ul>
             <div className="mt-auto pt-6">
               <Link
-                to="/creator/register"
+                to={creatorTarget}
                 className="inline-flex items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 font-display text-sm font-semibold text-primary-foreground ring-1 ring-saffrondeep/30 hover:bg-primary/90 transition-colors"
               >
-                Get Listed →
+                {myCreator ? "Go to Dashboard →" : "Get Listed →"}
               </Link>
             </div>
           </div>
@@ -357,7 +362,7 @@ function Landing() {
               Find a Creator
             </Link>
             <Link
-              to="/creator/register"
+              to={creatorTarget}
               className="inline-flex items-center gap-2 rounded-xl bg-background/10 px-6 py-3.5 font-display text-base font-semibold text-background ring-1 ring-background/20 hover:bg-background/20 transition-colors"
             >
               I'm a Creator
