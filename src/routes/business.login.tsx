@@ -26,7 +26,7 @@ function BusinessLogin() {
   const router = useRouter();
   const { redirect } = Route.useSearch();
   const targetUrl = redirect || "/discover";
-  const { setBusiness } = useAppState();
+  const { setBusiness, myCreator } = useAppState();
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -154,10 +154,14 @@ function BusinessLogin() {
 
             <div className="mt-6 text-center">
               <Link
-                to="/creator/login"
+                to={myCreator ? "/creator/dashboard" : "/creator/login"}
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                <span>← Are you a creator? Switch to Creator Login</span>
+                <span>
+                  {myCreator
+                    ? "← Are you a creator? Go to Creator Dashboard"
+                    : "← Are you a creator? Switch to Creator Login"}
+                </span>
               </Link>
             </div>
           </div>

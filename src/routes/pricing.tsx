@@ -1,6 +1,7 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useState } from "react";
 import { SectionEyebrow } from "@/components/ui-kit";
+import { useAppState } from "@/lib/app-state";
 import {
   PLANS,
   PROMO_CODE_3DAYS,
@@ -87,6 +88,8 @@ const PRICING_FAQS = [
 ];
 
 function PricingPage() {
+  const { myCreatorId, creators } = useAppState();
+  const myCreator = creators.find((c) => c.id === myCreatorId);
   const [copied, setCopied] = useState(false);
 
   const handleCopyCode = () => {
@@ -174,10 +177,10 @@ function PricingPage() {
                   <p className="text-lg font-display font-bold text-foreground">₹366/month</p>
                 </div>
                 <Link
-                  to="/creator/register"
+                  to={myCreator ? "/creator/dashboard" : "/creator/register"}
                   className="inline-flex items-center gap-2 rounded-xl bg-foreground px-5 py-3 font-display text-xs font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98"
                 >
-                  <span>Start Free Trial</span>
+                  <span>{myCreator ? "Go to Dashboard" : "Start Free Trial"}</span>
                   <ArrowRight className="size-4" />
                 </Link>
               </div>
@@ -311,10 +314,10 @@ function PricingPage() {
                 </div>
 
                 <Link
-                  to="/creator/register"
+                  to={myCreator ? "/creator/dashboard" : "/creator/register"}
                   className="w-full inline-flex items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3.5 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98"
                 >
-                  <span>Claim 3-Day Free Trial</span>
+                  <span>{myCreator ? "View in Dashboard" : "Claim 3-Day Free Trial"}</span>
                   <ArrowRight className="size-4" />
                 </Link>
               </div>
@@ -433,7 +436,7 @@ function PricingPage() {
 
                   <div className="mt-6 pt-2">
                     <Link
-                      to="/creator/register"
+                      to={myCreator ? "/creator/plans" : "/creator/register"}
                       className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
                         isLaunchOffer
                           ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
@@ -475,10 +478,10 @@ function PricingPage() {
 
                 <div className="shrink-0">
                   <Link
-                    to="/creator/register"
+                    to={myCreator ? "/creator/dashboard" : "/creator/register"}
                     className="inline-flex items-center gap-2 rounded-xl bg-foreground px-5 py-3 font-display text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md"
                   >
-                    <span>Get Your Referral Link</span>
+                    <span>{myCreator ? "View Your Referral Code" : "Get Your Referral Link"}</span>
                     <ArrowRight className="size-4" />
                   </Link>
                 </div>

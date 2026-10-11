@@ -49,9 +49,11 @@ export type Subscription = {
 };
 
 type AppState = {
+  hydrated: boolean;
   creators: Creator[];
   business: BusinessAccount | null;
   myCreatorId: string | null;
+  myCreator: Creator | null;
   reports: Report[];
   subscriptions: Subscription[];
   referralEvents: ReferralEvent[];
@@ -288,11 +290,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   };
 
+  const myCreator = useMemo(() => {
+    return myCreatorId ? creators.find((c) => c.id === myCreatorId) || null : null;
+  }, [creators, myCreatorId]);
+
   const value = useMemo<AppState>(
     () => ({
+      hydrated,
       creators,
       business,
       myCreatorId,
+      myCreator,
       reports,
       subscriptions,
       referralEvents,
@@ -696,9 +704,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       resetDiscoverFilters,
     }),
     [
+      hydrated,
       creators,
       business,
       myCreatorId,
+      myCreator,
       reports,
       subscriptions,
       referralEvents,

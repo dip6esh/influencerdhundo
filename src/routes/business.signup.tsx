@@ -28,7 +28,7 @@ function BusinessSignup() {
   const router = useRouter();
   const { redirect } = Route.useSearch();
   const targetUrl = redirect || "/discover";
-  const { signUpBusiness } = useAppState();
+  const { signUpBusiness, myCreator } = useAppState();
 
   const [form, setForm] = useState({
     name: "",
@@ -500,10 +500,14 @@ function BusinessSignup() {
 
             <div className="mt-6 text-center">
               <Link
-                to="/creator/register"
+                to={myCreator ? "/creator/dashboard" : "/creator/register"}
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
-                <span>Are you a creator? Create your creator profile →</span>
+                <span>
+                  {myCreator
+                    ? "Are you a creator? Go to your creator dashboard →"
+                    : "Are you a creator? Create your creator profile →"}
+                </span>
               </Link>
             </div>
           </div>

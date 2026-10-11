@@ -22,7 +22,14 @@ export const Route = createFileRoute("/creator/login")({
 function CreatorLogin() {
   const navigate = useNavigate();
   const router = useRouter();
-  const { loginCreator, upsertCreator } = useAppState();
+  const { loginCreator, upsertCreator, myCreatorId, hydrated } = useAppState();
+
+  // If already logged in, redirect directly to dashboard
+  useEffect(() => {
+    if (myCreatorId) {
+      navigate({ to: "/creator/dashboard", replace: true });
+    }
+  }, [myCreatorId, navigate]);
 
   // Opportunistically preload dashboard JS chunk while creator enters credentials
   useEffect(() => {
@@ -60,6 +67,11 @@ function CreatorLogin() {
       setLoading(false);
     }
   };
+
+  // Prevent flash of login cards if already authenticated or while state is hydrating
+  if (!hydrated || myCreatorId) {
+    return <div className="min-h-screen bg-secondary/50" />;
+  }
 
   return (
     <div className="min-h-screen bg-secondary/50 pb-16">
@@ -147,7 +159,7 @@ function CreatorLogin() {
 
             <div className="mt-6 text-center">
               <Link
-                to="/login"
+                to="/business/login"
                 className="text-xs text-muted-foreground hover:text-foreground inline-flex items-center gap-1"
               >
                 <span>← Are you a business? Switch to Business Login</span>

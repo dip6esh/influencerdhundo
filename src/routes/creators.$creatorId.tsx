@@ -65,7 +65,7 @@ function CreatorProfile() {
   const navigate = useNavigate();
   const { creatorId } = Route.useParams();
   const { preview } = Route.useSearch();
-  const { creators, business, addReport } = useAppState();
+  const { creators, business, addReport, myCreatorId } = useAppState();
   const cleanParam = (creatorId || "").trim().toLowerCase();
   const cleanParamNorm = cleanParam.replace(/^-+|-+$/g, "");
 
@@ -130,6 +130,8 @@ function CreatorProfile() {
     );
   }
 
+  const isOwner = !!(myCreatorId && creator && myCreatorId === creator.id);
+
   const expTime = creator.subscriptionExpiresAt
     ? new Date(creator.subscriptionExpiresAt).getTime()
     : 0;
@@ -140,6 +142,31 @@ function CreatorProfile() {
     (expTime > 0 && expTime <= Date.now());
 
   if (!preview && isExpired) {
+    if (isOwner) {
+      return (
+        <div className="mx-auto max-w-5xl px-5 py-16 text-center">
+          <h1 className="text-2xl font-bold">Your Profile is Currently Inactive</h1>
+          <p className="mt-2 text-sm text-muted-foreground max-w-md mx-auto">
+            Your subscription has expired or is inactive. Renew your plan to start appearing in searches again.
+          </p>
+          <div className="mt-6 flex flex-wrap justify-center gap-3">
+            <Link
+              to="/creator/plans"
+              className="inline-flex rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-colors"
+            >
+              Renew Subscription
+            </Link>
+            <Link
+              to="/creator/dashboard"
+              className="inline-flex rounded-xl bg-background px-5 py-3 text-sm font-semibold ring-1 ring-border hover:bg-secondary transition-colors"
+            >
+              Go to Dashboard
+            </Link>
+          </div>
+        </div>
+      );
+    }
+
     return (
       <div className="mx-auto max-w-5xl px-5 py-16 text-center">
         <h1 className="text-2xl font-bold">Profile Currently Inactive</h1>
@@ -579,6 +606,27 @@ function CreatorProfile() {
               )}
             </div>
           </Card>
+        ) : isOwner ? (
+          <div className="mt-6 rounded-2xl sm:rounded-3xl bg-secondary/80 p-6 sm:p-8 border border-border shadow-md">
+            <p className="font-display text-xl font-semibold">This is your public profile</p>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Businesses see this page when discovering your profile in the directory.
+            </p>
+            <div className="mt-5 flex flex-wrap gap-3">
+              <Link
+                to="/creator/dashboard"
+                className="inline-flex rounded-xl bg-foreground px-6 py-3 text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-sm"
+              >
+                Go to Dashboard
+              </Link>
+              <Link
+                to="/creator/register"
+                className="inline-flex rounded-xl bg-background px-6 py-3 text-sm font-semibold ring-1 ring-border hover:bg-secondary transition-all"
+              >
+                Edit Profile
+              </Link>
+            </div>
+          </div>
         ) : (
           <div className="mt-6 rounded-2xl sm:rounded-3xl bg-foreground p-6 sm:p-8 text-background shadow-xl">
             <p className="font-display text-xl font-semibold">Want to contact this creator?</p>
@@ -669,7 +717,22 @@ function CreatorProfile() {
                 {formatPrice(creator.startingPrice)}
               </p>
             </div>
-            {preview ? (
+            {isOwner ? (
+              <div className="flex items-center gap-2 shrink-0">
+                <Link
+                  to="/creator/dashboard"
+                  className="rounded-xl bg-foreground px-4 sm:px-6 py-3 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98"
+                >
+                  Dashboard
+                </Link>
+                <Link
+                  to="/creator/register"
+                  className="rounded-xl bg-background/20 px-3 sm:px-4 py-3 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-background/30 transition-all shadow-md active:scale-98"
+                >
+                  Edit Profile
+                </Link>
+              </div>
+            ) : preview ? (
               <Link
                 to="/creator/register"
                 className="rounded-xl bg-foreground px-6 py-3 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all shadow-md active:scale-98 shrink-0"

@@ -347,6 +347,7 @@ export function SiteHeader() {
 
 export function SiteFooter() {
   const routerState = useRouterState();
+  const { myCreator } = useAppState();
   const isLandingPage = routerState.location.pathname === "/";
 
   const handleLogoClick = (e: React.MouseEvent) => {
@@ -395,26 +396,57 @@ export function SiteFooter() {
               For Creators
             </p>
             <ul className="space-y-2 text-xs">
-              <li>
-                <Link to="/creator/register" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Join as Creator
-                </Link>
-              </li>
-              <li>
-                <Link to="/creator/login" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Creator Login
-                </Link>
-              </li>
-              <li>
-                <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Pricing &amp; 3-Day Trial
-                </Link>
-              </li>
-              <li>
-                <Link to="/creator/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
-                  Creator Dashboard
-                </Link>
-              </li>
+              {myCreator ? (
+                <>
+                  <li>
+                    <Link to="/creator/dashboard" className="text-muted-foreground hover:text-foreground transition-colors font-medium text-foreground/90">
+                      Creator Dashboard
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/creator/register" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Edit Profile
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/creator/plans" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Subscription Plans
+                    </Link>
+                  </li>
+                  <li>
+                    <Link
+                      to="/creators/$creatorId"
+                      params={{ creatorId: myCreator.id }}
+                      className="text-muted-foreground hover:text-foreground transition-colors"
+                    >
+                      View Public Profile
+                    </Link>
+                  </li>
+                </>
+              ) : (
+                <>
+                  <li>
+                    <Link to="/creator/register" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Join as Creator
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/creator/login" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Creator Login
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/pricing" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Pricing &amp; 3-Day Trial
+                    </Link>
+                  </li>
+                  <li>
+                    <Link to="/creator/dashboard" className="text-muted-foreground hover:text-foreground transition-colors">
+                      Creator Dashboard
+                    </Link>
+                  </li>
+                </>
+              )}
             </ul>
           </div>
 

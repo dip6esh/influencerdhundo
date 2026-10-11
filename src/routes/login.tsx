@@ -1,6 +1,8 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { useEffect } from "react";
 import { Button, Card, SectionEyebrow } from "@/components/ui-kit";
 import { Building2, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
+import { useAppState } from "@/lib/app-state";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -17,6 +19,22 @@ export const Route = createFileRoute("/login")({
 });
 
 function LoginPage() {
+  const navigate = useNavigate();
+  const { myCreator, business, hydrated } = useAppState();
+
+  useEffect(() => {
+    if (myCreator) {
+      navigate({ to: "/creator/dashboard", replace: true });
+    } else if (business) {
+      navigate({ to: "/discover", replace: true });
+    }
+  }, [myCreator, business, navigate]);
+
+  // Prevent flash of login cards if already authenticated or while state is hydrating
+  if (!hydrated || myCreator || business) {
+    return <div className="min-h-screen bg-secondary/50" />;
+  }
+
   return (
     <div className="min-h-screen bg-secondary/50 pb-16">
       <section className="relative overflow-hidden pt-12 pb-8 md:pt-16 md:pb-12">
@@ -107,19 +125,39 @@ function LoginPage() {
               </div>
 
               <div className="mt-8 space-y-3">
-                <Link
-                  to="/creator/login"
-                  className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background shadow-md transition-all hover:bg-foreground/90"
-                >
-                  <span>Creator Login</span>
-                  <ArrowRight className="size-4" />
-                </Link>
-                <Link
-                  to="/creator/register"
-                  className="inline-flex w-full items-center justify-center rounded-xl bg-background px-4 py-2.5 text-xs font-semibold ring-1 ring-border transition-colors hover:bg-secondary"
-                >
-                  Set up new creator profile
-                </Link>
+                {myCreator ? (
+                  <>
+                    <Link
+                      to="/creator/dashboard"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background shadow-md transition-all hover:bg-foreground/90"
+                    >
+                      <span>Go to Creator Dashboard</span>
+                      <ArrowRight className="size-4" />
+                    </Link>
+                    <Link
+                      to="/creator/register"
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-background px-4 py-2.5 text-xs font-semibold ring-1 ring-border transition-colors hover:bg-secondary"
+                    >
+                      Edit creator profile
+                    </Link>
+                  </>
+                ) : (
+                  <>
+                    <Link
+                      to="/creator/login"
+                      className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background shadow-md transition-all hover:bg-foreground/90"
+                    >
+                      <span>Creator Login</span>
+                      <ArrowRight className="size-4" />
+                    </Link>
+                    <Link
+                      to="/creator/register"
+                      className="inline-flex w-full items-center justify-center rounded-xl bg-background px-4 py-2.5 text-xs font-semibold ring-1 ring-border transition-colors hover:bg-secondary"
+                    >
+                      Set up new creator profile
+                    </Link>
+                  </>
+                )}
               </div>
             </Card>
           </div>
