@@ -92,12 +92,22 @@ function AuthCallbackPage() {
       setStatusMessage("Loading your profile...");
 
       const storedRole =
-        typeof window !== "undefined" ? sessionStorage.getItem("influencer_oauth_role") : null;
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("influencer_oauth_role") ||
+            localStorage.getItem("influencer_oauth_role")
+          : null;
       const storedRedirect =
-        typeof window !== "undefined" ? sessionStorage.getItem("influencer_oauth_redirect") : null;
+        typeof window !== "undefined"
+          ? sessionStorage.getItem("influencer_oauth_redirect") ||
+            localStorage.getItem("influencer_oauth_redirect")
+          : null;
       if (typeof window !== "undefined") {
-        sessionStorage.removeItem("influencer_oauth_role");
-        sessionStorage.removeItem("influencer_oauth_redirect");
+        try {
+          sessionStorage.removeItem("influencer_oauth_role");
+          sessionStorage.removeItem("influencer_oauth_redirect");
+          localStorage.removeItem("influencer_oauth_role");
+          localStorage.removeItem("influencer_oauth_redirect");
+        } catch (_) {}
       }
 
       // Look up existing creator or business profile

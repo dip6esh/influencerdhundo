@@ -646,20 +646,26 @@ export const supabaseDb = {
   ): Promise<{ error?: string }> {
     try {
       if (typeof window !== "undefined") {
-        sessionStorage.setItem("influencer_oauth_role", role);
-        if (redirectTarget) {
-          sessionStorage.setItem("influencer_oauth_redirect", redirectTarget);
-        } else {
-          sessionStorage.removeItem("influencer_oauth_redirect");
-        }
+        try {
+          sessionStorage.setItem("influencer_oauth_role", role);
+          localStorage.setItem("influencer_oauth_role", role);
+          if (redirectTarget) {
+            sessionStorage.setItem("influencer_oauth_redirect", redirectTarget);
+            localStorage.setItem("influencer_oauth_redirect", redirectTarget);
+          } else {
+            sessionStorage.removeItem("influencer_oauth_redirect");
+            localStorage.removeItem("influencer_oauth_redirect");
+          }
+        } catch (_) {}
       }
 
-      const origin = typeof window !== "undefined" ? window.location.origin : "";
-      const searchParams = new URLSearchParams();
-      searchParams.set("role", role);
-      if (redirectTarget) searchParams.set("redirect", redirectTarget);
+      const origin =
+        typeof window !== "undefined" && window.location.origin
+          ? window.location.origin
+          : "https://www.influencerdhundo.com";
 
-      const callbackUrl = `${origin}/auth/callback?${searchParams.toString()}`;
+      // Clean static callback URL without query params to avoid Supabase allowlist rejection
+      const callbackUrl = `${origin}/auth/callback`;
 
       const { error } = await supabase.auth.signInWithOAuth({
         provider: "google",
