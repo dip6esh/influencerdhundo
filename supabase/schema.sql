@@ -246,3 +246,10 @@ CREATE POLICY "Public can read active discount codes"
 CREATE POLICY "Admins full access to discount codes"
   ON public.discount_codes FOR ALL USING (true) WITH CHECK (true);
 
+-- 9. PERFORMANCE INDEXES
+CREATE INDEX IF NOT EXISTS idx_creators_auth_user_id ON public.creators(auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_subscriptions_creator_id ON public.subscriptions(creator_id);
+CREATE INDEX IF NOT EXISTS idx_business_accounts_auth_user_id ON public.business_accounts(auth_user_id);
+CREATE INDEX IF NOT EXISTS idx_referral_events_referrer_id ON public.referral_events(referrer_id);
+CREATE INDEX IF NOT EXISTS idx_referral_events_referred_creator_id ON public.referral_events(referred_creator_id);
+

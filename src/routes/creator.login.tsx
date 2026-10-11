@@ -1,5 +1,5 @@
-import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useState } from "react";
+import { createFileRoute, Link, useNavigate, useRouter } from "@tanstack/react-router";
+import { useEffect, useState } from "react";
 import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import { supabaseDb } from "@/lib/supabase";
@@ -21,7 +21,13 @@ export const Route = createFileRoute("/creator/login")({
 
 function CreatorLogin() {
   const navigate = useNavigate();
+  const router = useRouter();
   const { loginCreator, upsertCreator } = useAppState();
+
+  // Opportunistically preload dashboard JS chunk while creator enters credentials
+  useEffect(() => {
+    router.preloadRoute({ to: "/creator/dashboard" }).catch(() => {});
+  }, [router]);
 
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
