@@ -502,8 +502,8 @@ function Dashboard() {
           {mine.status === "Draft" || !mine.instagram ? (
             <div className="mt-6 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-amber-500/15 via-primary/10 to-amber-500/10 border border-amber-500/30 p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
               <div className="flex items-start gap-3.5">
-                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-lg">
-                  📝
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400">
+                  <Clock className="size-5" />
                 </div>
                 <div>
                   <h3 className="text-base font-display font-semibold text-foreground">

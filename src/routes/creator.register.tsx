@@ -34,7 +34,7 @@ import {
   validateTrustedEmail,
   type Creator,
 } from "@/lib/directory-data";
-import { Camera, Eye, EyeOff, Gift, Loader2, Sparkles, Trash2, Upload, User } from "lucide-react";
+import { Camera, Eye, EyeOff, Gift, Loader2, Save, Sparkles, Trash2, Upload, User } from "lucide-react";
 import { GoogleAuthButton } from "@/components/google-auth-button";
 
 export const Route = createFileRoute("/creator/register")({
@@ -1906,17 +1906,20 @@ function Register() {
                       <Button
                         variant="ink"
                         type="button"
-                        className="w-full sm:w-auto justify-center gap-2"
+                        className="w-full sm:w-auto inline-flex items-center justify-center gap-2"
                         disabled={savingLater || saving}
                         onClick={handleSaveAndExitLater}
                       >
                         {savingLater ? (
                           <>
-                            <Loader2 className="size-4 animate-spin" />
-                            Saving draft...
+                            <Loader2 className="size-4 animate-spin shrink-0" />
+                            <span>Saving draft...</span>
                           </>
                         ) : (
-                          "Save & finish later 💾"
+                          <>
+                            <Save className="size-4 shrink-0" />
+                            <span>Save & finish later</span>
+                          </>
                         )}
                       </Button>
                     )}
