@@ -16,7 +16,9 @@ function getRazorpayInstance() {
   const keySecret = process.env["RAZORPAY_KEY_SECRET"];
 
   if (!keyId || !keySecret) {
-    throw new Error("Razorpay API credentials (VITE_RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET) are missing.");
+    throw new Error(
+      "Razorpay API credentials (VITE_RAZORPAY_KEY_ID / RAZORPAY_KEY_SECRET) are missing.",
+    );
   }
 
   return {
@@ -27,7 +29,8 @@ function getRazorpayInstance() {
 }
 
 function getSupabaseAdminClient() {
-  const supabaseUrl = process.env["VITE_SUPABASE_URL"] || "https://ixfcoilswyagwifaronh.supabase.co";
+  const supabaseUrl =
+    process.env["VITE_SUPABASE_URL"] || "https://ixfcoilswyagwifaronh.supabase.co";
   const serviceRoleKey =
     process.env["SUPABASE_SERVICE_ROLE_KEY"] ||
     "eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Iml4ZmNvaWxzd3lhZ3dpZmFyb25oIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc5MDgzOTA5NSwiZXhwIjoyMTA2NDE1MDk1fQ.W8MofXjLgVJ15yXzDP_Cn7Y-lxBSl7RLPFgcuGhArbI";
@@ -111,8 +114,8 @@ export const createRazorpayOrderFn = createServerFn({ method: "POST" })
             const applicablePlans: string[] = Array.isArray(row.applicable_plans)
               ? row.applicable_plans
               : row.applicable_plans
-              ? [row.applicable_plans]
-              : [];
+                ? [row.applicable_plans]
+                : [];
             const planMismatch =
               applicablePlans.length > 0 &&
               !applicablePlans.includes("all") &&
@@ -190,11 +193,12 @@ export const createRazorpayOrderFn = createServerFn({ method: "POST" })
         appliedDiscountPercent,
         appliedDiscountCode,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[Razorpay] createOrder error:", error);
+      const message = error instanceof Error ? error.message : "Failed to create Razorpay order";
       return {
         success: false,
-        error: error.message || "Failed to create Razorpay order",
+        error: message,
       };
     }
   });
@@ -276,23 +280,55 @@ export const verifyRazorpayPaymentFn = createServerFn({ method: "POST" })
         orderId,
         paymentId,
       };
-    } catch (error: any) {
+    } catch (error: unknown) {
       console.error("[Razorpay] verifyPayment error:", error);
+      const message =
+        error instanceof Error
+          ? error.message
+          : "Payment verification encountered an unexpected error";
       return {
         success: false,
         isVerified: false,
-        error: error.message || "Payment verification encountered an unexpected error",
+        error: message,
       };
     }
   });
 
 // ── CLIENT-SIDE RAZORPAY CHECKOUT POPUP LOGIC ──
 
+export type RazorpayPaymentError = {
+  code?: string;
+  description?: string;
+  source?: string;
+  step?: string;
+  reason?: string;
+  metadata?: Record<string, unknown>;
+};
+
+export type RazorpayFailedResponse = {
+  error?: RazorpayPaymentError;
+};
+
+export interface RazorpayCheckoutInstance {
+  open: () => void;
+  on: (event: string, callback: (response: RazorpayFailedResponse) => void) => void;
+}
+
+export interface RazorpayCheckoutConstructor {
+  new (options: Record<string, unknown>): RazorpayCheckoutInstance;
+}
+
+declare global {
+  interface Window {
+    Razorpay?: RazorpayCheckoutConstructor;
+  }
+}
+
 let scriptLoadedPromise: Promise<boolean> | null = null;
 
 export function loadRazorpayScript(): Promise<boolean> {
   if (typeof window === "undefined") return Promise.resolve(false);
-  if ((window as any).Razorpay) return Promise.resolve(true);
+  if (window.Razorpay) return Promise.resolve(true);
 
   if (scriptLoadedPromise) return scriptLoadedPromise;
 
@@ -324,25 +360,25 @@ export type OpenRazorpayOptions = {
     email?: string;
     contact?: string;
   };
-  notes?: Record<string, string>;
+  notes?: Record<string, unknown>;
   onSuccess: (response: {
     razorpay_payment_id: string;
     razorpay_order_id: string;
     razorpay_signature: string;
   }) => void;
   onDismiss?: () => void;
-  onError?: (error: any) => void;
+  onError?: (error?: RazorpayPaymentError) => void;
 };
 
 export async function openRazorpayCheckout(options: OpenRazorpayOptions) {
   if (typeof window === "undefined") return;
 
   const loaded = await loadRazorpayScript();
-  if (!loaded || !(window as any).Razorpay) {
+  if (!loaded || !window.Razorpay) {
     throw new Error("Unable to load Razorpay payment SDK. Please check your internet connection.");
   }
 
-  const rzpOptions = {
+  const rzpOptions: Record<string, unknown> = {
     key: options.keyId,
     amount: options.amount,
     currency: options.currency || "INR",
@@ -377,8 +413,8 @@ export async function openRazorpayCheckout(options: OpenRazorpayOptions) {
     },
   };
 
-  const razorpayInstance = new (window as any).Razorpay(rzpOptions);
-  razorpayInstance.on("payment.failed", function (response: any) {
+  const razorpayInstance = new window.Razorpay(rzpOptions);
+  razorpayInstance.on("payment.failed", function (response: RazorpayFailedResponse) {
     console.error("[Razorpay] Payment failed:", response.error);
     if (options.onError) {
       options.onError(response.error);

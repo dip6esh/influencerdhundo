@@ -49,7 +49,33 @@ export default {
     try {
       const handler = await getServerEntry();
       const response = await handler.fetch(request, env, ctx);
-      return await normalizeCatastrophicSsrResponse(response);
+      const normalized = await normalizeCatastrophicSsrResponse(response);
+
+      // Cache public marketing pages on Vercel Edge CDN for rapid <100ms delivery
+      if (request.method === "GET" && normalized.status === 200) {
+        const url = new URL(request.url);
+        const path = url.pathname;
+        const isPublicStatic =
+          path === "/" ||
+          path === "/about" ||
+          path === "/pricing" ||
+          path === "/terms" ||
+          path === "/privacy" ||
+          path === "/refund-policy";
+
+        if (isPublicStatic) {
+          const headers = new Headers(normalized.headers);
+          // Serve from edge cache for 15 minutes, allow stale while revalidating for 24 hours
+          headers.set("cache-control", "public, s-maxage=900, stale-while-revalidate=86400");
+          return new Response(normalized.body, {
+            status: normalized.status,
+            statusText: normalized.statusText,
+            headers,
+          });
+        }
+      }
+
+      return normalized;
     } catch (error) {
       console.error(error);
       return new Response(renderErrorPage(), {

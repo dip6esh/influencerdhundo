@@ -179,9 +179,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         }
       }
     }
-    loadFromSupabase();
+    const timer = setTimeout(() => {
+      loadFromSupabase();
+    }, 150);
+
     return () => {
       isMounted = false;
+      clearTimeout(timer);
     };
   }, []);
 
