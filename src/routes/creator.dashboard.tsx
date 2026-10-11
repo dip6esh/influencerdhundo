@@ -1,4 +1,4 @@
-import { createFileRoute, Link } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
 import { InstagramIcon, WhatsAppIcon } from "@/components/icons";
@@ -84,6 +84,7 @@ function Dashboard() {
     updateCreatorPhoto,
     setCreatorStatus,
   } = useAppState();
+  const navigate = useNavigate();
   const mine = creators.find((c) => c.id === myCreatorId);
   const [loading, setLoading] = useState(!mine);
   const [copiedLink, setCopiedLink] = useState(false);
@@ -100,6 +101,13 @@ function Dashboard() {
       setLoading(false);
     }
   }, [mine]);
+
+  // If not logged in and done loading, redirect to creator login
+  useEffect(() => {
+    if (!loading && !myCreatorId) {
+      navigate({ to: "/creator/login" });
+    }
+  }, [loading, myCreatorId, navigate]);
 
   // Subscriptions & Queued plans calculation
   const userSubs = subscriptions.filter((s) => s.creatorId === myCreatorId);

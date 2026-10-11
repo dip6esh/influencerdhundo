@@ -318,6 +318,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       loginCreator: (id: string) => setMyCreatorId(id),
       signOutCreator: () => {
         setMyCreatorId(null);
+        try {
+          localStorage.removeItem("influencer-dhundo-creator-draft-v2");
+          localStorage.removeItem("influencer-dhundo-creator-draft-id-v2");
+          localStorage.removeItem("influencer_referral_code");
+        } catch {
+          // ignore
+        }
         supabaseDb.signOutCreator();
       },
       findBusinessByContact: async (contact: string) => {

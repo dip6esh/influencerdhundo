@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -336,6 +336,30 @@ function Register() {
     return () => clearTimeout(timer);
   }, [form, step, existing, referralCode]);
 
+  // Track if this form was loaded for an authenticated creator
+  const wasLoggedInRef = useRef(Boolean(myCreatorId));
+
+  // If the logged-in creator logs out while on the edit profile page:
+  // Immediately wipe all form fields, purge local drafts, and redirect to /creator/login
+  useEffect(() => {
+    if (wasLoggedInRef.current && !myCreatorId) {
+      setForm(initialForm);
+      setStep(0);
+      setAuthUserId(null);
+      setSaving(false);
+      setError("");
+      setSaveError("");
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        localStorage.removeItem(DRAFT_ID_KEY);
+      } catch {
+        // ignore
+      }
+      navigate({ to: "/creator/login" });
+    }
+    wasLoggedInRef.current = Boolean(myCreatorId);
+  }, [myCreatorId, navigate]);
+
   // Check for existing session & listen for cross-tab auth state changes (e.g. email confirmation in another tab)
   useEffect(() => {
     async function checkSession() {
@@ -352,18 +376,29 @@ function Register() {
 
     const {
       data: { subscription },
-    } = supabase.auth.onAuthStateChange((_event, session) => {
+    } = supabase.auth.onAuthStateChange((event, session) => {
       if (session?.user) {
         setAuthUserId(session.user.id);
         setAwaitingVerification(false);
         setStep((s) => (s === 0 ? 1 : s));
+      } else if (event === "SIGNED_OUT") {
+        setAuthUserId(null);
+        setForm(initialForm);
+        setStep(0);
+        try {
+          localStorage.removeItem(DRAFT_STORAGE_KEY);
+          localStorage.removeItem(DRAFT_ID_KEY);
+        } catch {
+          // ignore
+        }
+        navigate({ to: "/creator/login" });
       }
     });
 
     return () => {
       subscription.unsubscribe();
     };
-  }, [awaitingVerification]);
+  }, [awaitingVerification, navigate]);
 
   // Scroll to the top on every step change (Next / Continue / Back) for better UX
   useEffect(() => {

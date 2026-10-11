@@ -1,5 +1,5 @@
 import { useState, useEffect } from "react";
-import { Link, useRouterState } from "@tanstack/react-router";
+import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { useAppState } from "@/lib/app-state";
 import {
   Building2,
@@ -15,10 +15,21 @@ import {
 import { IndiaFlag } from "@/components/ui-kit";
 
 export function SiteHeader() {
+  const navigate = useNavigate();
   const { business, signOutBusiness, myCreatorId, creators, signOutCreator } =
     useAppState();
   const myCreator = creators.find((c) => c.id === myCreatorId);
   const isLoggedIn = !!(business || myCreator);
+
+  const handleCreatorSignOut = () => {
+    signOutCreator();
+    navigate({ to: "/creator/login" });
+  };
+
+  const handleBusinessSignOut = () => {
+    signOutBusiness();
+    navigate({ to: "/business/login" });
+  };
 
   const [menuOpen, setMenuOpen] = useState(false);
   const routerState = useRouterState();
@@ -98,7 +109,7 @@ export function SiteHeader() {
                   </span>
                 </span>
                 <button
-                  onClick={signOutBusiness}
+                  onClick={handleBusinessSignOut}
                   title="Sign out of business account"
                   className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border hover:bg-secondary transition-colors"
                 >
@@ -121,7 +132,7 @@ export function SiteHeader() {
                   </span>
                 </Link>
                 <button
-                  onClick={signOutCreator}
+                  onClick={handleCreatorSignOut}
                   title="Sign out of creator profile"
                   className="inline-flex items-center gap-1 rounded-full bg-background px-2.5 py-1 text-xs font-medium text-muted-foreground ring-1 ring-border hover:bg-secondary transition-colors"
                 >
@@ -239,7 +250,7 @@ export function SiteHeader() {
               </div>
               <button
                 onClick={() => {
-                  signOutBusiness();
+                  handleBusinessSignOut();
                   closeMenu();
                 }}
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
@@ -266,7 +277,7 @@ export function SiteHeader() {
               </Link>
               <button
                 onClick={() => {
-                  signOutCreator();
+                  handleCreatorSignOut();
                   closeMenu();
                 }}
                 className="flex items-center gap-3 rounded-xl px-4 py-3 text-sm font-medium text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
