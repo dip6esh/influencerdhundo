@@ -1,5 +1,6 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Card, SectionEyebrow, IndiaFlag } from "@/components/ui-kit";
+import { useAppState } from "@/lib/app-state";
 import {
   ArrowUpRight,
   Building2,
@@ -49,6 +50,10 @@ export const Route = createFileRoute("/about")({
 });
 
 function AboutPage() {
+  const { myCreatorId, creators } = useAppState();
+  const myCreator = creators.find((c) => c.id === myCreatorId);
+  const creatorTarget = myCreator ? "/creator/dashboard" : "/creator/register";
+
   return (
     <div className="min-h-screen bg-secondary/40 pb-20">
       {/* ── HERO SECTION ────────────────────────────────────────────────────────── */}
@@ -80,11 +85,11 @@ function AboutPage() {
               Explore Creators
             </Link>
             <Link
-              to="/creator/register"
+              to={creatorTarget}
               className="inline-flex items-center gap-2 rounded-xl bg-background px-6 py-3.5 text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all shadow-xs"
             >
               <User className="size-4 text-primary" />
-              Join as a Creator
+              {myCreator ? "Go to Dashboard" : "Join as a Creator"}
             </Link>
           </div>
         </div>
@@ -267,10 +272,10 @@ function AboutPage() {
 
             <div className="mt-6 pt-5 border-t border-border/60">
               <Link
-                to="/creator/register"
+                to={creatorTarget}
                 className="inline-flex items-center gap-1.5 text-xs sm:text-sm font-semibold text-saffrondeep hover:underline"
               >
-                Create your creator profile <ArrowUpRight className="size-4" />
+                {myCreator ? "Go to Dashboard" : "Create your creator profile"} <ArrowUpRight className="size-4" />
               </Link>
             </div>
           </Card>
