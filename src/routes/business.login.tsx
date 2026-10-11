@@ -4,6 +4,7 @@ import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-
 import { useAppState } from "@/lib/app-state";
 import { supabaseDb } from "@/lib/supabase";
 import { Building2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { GoogleAuthButton } from "@/components/google-auth-button";
 
 export const Route = createFileRoute("/business/login")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string | undefined } => ({
@@ -85,6 +86,19 @@ function BusinessLogin() {
           <div className="mt-8 max-w-md w-full">
             <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 text-left">
               <div className="space-y-4">
+                <GoogleAuthButton
+                  role="business"
+                  redirectTarget={targetUrl}
+                  label="Sign in with Google"
+                />
+
+                <div className="relative my-2 flex items-center justify-center">
+                  <div className="w-full border-t border-border" />
+                  <span className="relative bg-card px-3 text-[11px] font-medium uppercase tracking-wider text-muted-foreground">
+                    or with email
+                  </span>
+                </div>
+
                 <Field label="Email address">
                   <TextInput
                     type="email"

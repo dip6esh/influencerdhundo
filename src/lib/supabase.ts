@@ -639,6 +639,46 @@ export const supabaseDb = {
     await supabase.auth.signOut();
   },
 
+  /** Sign in / Sign up with Google OAuth */
+  async signInWithGoogle(
+    role: "business" | "creator" = "business",
+    redirectTarget?: string,
+  ): Promise<{ error?: string }> {
+    try {
+      if (typeof window !== "undefined") {
+        sessionStorage.setItem("influencer_oauth_role", role);
+        if (redirectTarget) {
+          sessionStorage.setItem("influencer_oauth_redirect", redirectTarget);
+        } else {
+          sessionStorage.removeItem("influencer_oauth_redirect");
+        }
+      }
+
+      const origin = typeof window !== "undefined" ? window.location.origin : "";
+      const searchParams = new URLSearchParams();
+      searchParams.set("role", role);
+      if (redirectTarget) searchParams.set("redirect", redirectTarget);
+
+      const callbackUrl = `${origin}/auth/callback?${searchParams.toString()}`;
+
+      const { error } = await supabase.auth.signInWithOAuth({
+        provider: "google",
+        options: {
+          redirectTo: callbackUrl,
+          queryParams: {
+            access_type: "offline",
+            prompt: "select_account",
+          },
+        },
+      });
+
+      if (error) return { error: error.message };
+      return {};
+    } catch (e) {
+      return { error: String(e) };
+    }
+  },
+
   /** Get business profile for current auth user id or email */
   async getBusinessProfileForAuthUser(
     authUserId?: string,

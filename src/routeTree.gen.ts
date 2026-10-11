@@ -18,6 +18,8 @@ import { Route as PricingRouteImport } from './routes/pricing'
 import { Route as PrivacyRouteImport } from './routes/privacy'
 import { Route as RefundPolicyRouteImport } from './routes/refund-policy'
 import { Route as TermsRouteImport } from './routes/terms'
+import { Route as AuthCallbackRouteImport } from './routes/auth.callback'
+import { Route as BusinessCompleteProfileRouteImport } from './routes/business.complete-profile'
 import { Route as BusinessLoginRouteImport } from './routes/business.login'
 import { Route as BusinessSignupRouteImport } from './routes/business.signup'
 import { Route as CreatorDashboardRouteImport } from './routes/creator.dashboard'
@@ -71,6 +73,16 @@ const TermsRoute = TermsRouteImport.update({
   path: '/terms',
   getParentRoute: () => rootRouteImport,
 } as any)
+const AuthCallbackRoute = AuthCallbackRouteImport.update({
+  id: '/auth/callback',
+  path: '/auth/callback',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const BusinessCompleteProfileRoute = BusinessCompleteProfileRouteImport.update({
+  id: '/business/complete-profile',
+  path: '/business/complete-profile',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BusinessLoginRoute = BusinessLoginRouteImport.update({
   id: '/business/login',
   path: '/business/login',
@@ -117,6 +129,8 @@ export interface FileRoutesByFullPath {
   '/privacy': typeof PrivacyRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms': typeof TermsRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/business/complete-profile': typeof BusinessCompleteProfileRoute
   '/business/login': typeof BusinessLoginRoute
   '/business/signup': typeof BusinessSignupRoute
   '/creator/dashboard': typeof CreatorDashboardRoute
@@ -135,6 +149,8 @@ export interface FileRoutesByTo {
   '/privacy': typeof PrivacyRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms': typeof TermsRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/business/complete-profile': typeof BusinessCompleteProfileRoute
   '/business/login': typeof BusinessLoginRoute
   '/business/signup': typeof BusinessSignupRoute
   '/creator/dashboard': typeof CreatorDashboardRoute
@@ -154,6 +170,8 @@ export interface FileRoutesById {
   '/privacy': typeof PrivacyRoute
   '/refund-policy': typeof RefundPolicyRoute
   '/terms': typeof TermsRoute
+  '/auth/callback': typeof AuthCallbackRoute
+  '/business/complete-profile': typeof BusinessCompleteProfileRoute
   '/business/login': typeof BusinessLoginRoute
   '/business/signup': typeof BusinessSignupRoute
   '/creator/dashboard': typeof CreatorDashboardRoute
@@ -174,6 +192,8 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/refund-policy'
     | '/terms'
+    | '/auth/callback'
+    | '/business/complete-profile'
     | '/business/login'
     | '/business/signup'
     | '/creator/dashboard'
@@ -192,6 +212,8 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/refund-policy'
     | '/terms'
+    | '/auth/callback'
+    | '/business/complete-profile'
     | '/business/login'
     | '/business/signup'
     | '/creator/dashboard'
@@ -210,6 +232,8 @@ export interface FileRouteTypes {
     | '/privacy'
     | '/refund-policy'
     | '/terms'
+    | '/auth/callback'
+    | '/business/complete-profile'
     | '/business/login'
     | '/business/signup'
     | '/creator/dashboard'
@@ -229,6 +253,8 @@ export interface RootRouteChildren {
   PrivacyRoute: typeof PrivacyRoute
   RefundPolicyRoute: typeof RefundPolicyRoute
   TermsRoute: typeof TermsRoute
+  AuthCallbackRoute: typeof AuthCallbackRoute
+  BusinessCompleteProfileRoute: typeof BusinessCompleteProfileRoute
   BusinessLoginRoute: typeof BusinessLoginRoute
   BusinessSignupRoute: typeof BusinessSignupRoute
   CreatorDashboardRoute: typeof CreatorDashboardRoute
@@ -303,6 +329,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof TermsRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/auth/callback': {
+      id: '/auth/callback'
+      path: '/auth/callback'
+      fullPath: '/auth/callback'
+      preLoaderRoute: typeof AuthCallbackRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/business/complete-profile': {
+      id: '/business/complete-profile'
+      path: '/business/complete-profile'
+      fullPath: '/business/complete-profile'
+      preLoaderRoute: typeof BusinessCompleteProfileRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/business/login': {
       id: '/business/login'
       path: '/business/login'
@@ -365,6 +405,8 @@ const rootRouteChildren: RootRouteChildren = {
   PrivacyRoute: PrivacyRoute,
   RefundPolicyRoute: RefundPolicyRoute,
   TermsRoute: TermsRoute,
+  AuthCallbackRoute: AuthCallbackRoute,
+  BusinessCompleteProfileRoute: BusinessCompleteProfileRoute,
   BusinessLoginRoute: BusinessLoginRoute,
   BusinessSignupRoute: BusinessSignupRoute,
   CreatorDashboardRoute: CreatorDashboardRoute,

@@ -3,6 +3,7 @@ import { useEffect } from "react";
 import { Button, Card, SectionEyebrow } from "@/components/ui-kit";
 import { Building2, Sparkles, ArrowRight, CheckCircle2 } from "lucide-react";
 import { useAppState } from "@/lib/app-state";
+import { GoogleAuthButton } from "@/components/google-auth-button";
 
 export const Route = createFileRoute("/login")({
   head: () => ({
@@ -81,11 +82,15 @@ function LoginPage() {
               </div>
 
               <div className="mt-8 space-y-3">
+                <GoogleAuthButton
+                  role="business"
+                  label="Continue with Google"
+                />
                 <Link
                   to="/business/login"
                   className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-primary px-5 py-3 text-sm font-semibold text-primary-foreground shadow-md transition-all hover:bg-primary/90"
                 >
-                  <span>Business Login</span>
+                  <span>Business Login with Password</span>
                   <ArrowRight className="size-4" />
                 </Link>
                 <Link
@@ -143,11 +148,15 @@ function LoginPage() {
                   </>
                 ) : (
                   <>
+                    <GoogleAuthButton
+                      role="creator"
+                      label="Continue with Google"
+                    />
                     <Link
                       to="/creator/login"
                       className="inline-flex w-full items-center justify-center gap-2 rounded-xl bg-foreground px-5 py-3 text-sm font-semibold text-background shadow-md transition-all hover:bg-foreground/90"
                     >
-                      <span>Creator Login</span>
+                      <span>Creator Login with Password</span>
                       <ArrowRight className="size-4" />
                     </Link>
                     <Link

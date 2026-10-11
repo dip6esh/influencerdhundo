@@ -34,9 +34,21 @@ import {
   validateTrustedEmail,
   type Creator,
 } from "@/lib/directory-data";
-import { Camera, Eye, EyeOff, Loader2, Trash2, Upload, User } from "lucide-react";
+import { Camera, Eye, EyeOff, Gift, Loader2, Sparkles, Trash2, Upload, User } from "lucide-react";
+import { GoogleAuthButton } from "@/components/google-auth-button";
 
 export const Route = createFileRoute("/creator/register")({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): {
+    email?: string | undefined;
+    name?: string | undefined;
+    ref?: string | undefined;
+  } => ({
+    email: typeof search["email"] === "string" ? search["email"] : undefined,
+    name: typeof search["name"] === "string" ? search["name"] : undefined,
+    ref: typeof search["ref"] === "string" ? search["ref"] : undefined,
+  }),
   head: () => ({
     meta: [
       { title: "Create your creator profile — Influencer Dhundo" },
@@ -152,12 +164,14 @@ function wordCount(s: string) {
 
 function Register() {
   const navigate = useNavigate();
+  const { email: queryEmail, name: queryName, ref: queryRef } = Route.useSearch();
   const { creators, myCreatorId, upsertCreatorWithAuth, loginCreator, startFreeTrial, hasUsedTrial } =
     useAppState();
   const existing = creators.find((c) => c.id === myCreatorId);
 
   const [step, setStep] = useState(existing ? 1 : 0);
   const [authUserId, setAuthUserId] = useState<string | null>(null);
+  const [isGoogleAuth, setIsGoogleAuth] = useState(false);
   const [awaitingVerification, setAwaitingVerification] = useState(false);
   const [verifyError, setVerifyError] = useState("");
   const [resendCooldown, setResendCooldown] = useState(0);
@@ -169,8 +183,9 @@ function Register() {
   const [error, setError] = useState("");
   const [uploadingPhoto, setUploadingPhoto] = useState(false);
 
-  // Referral code from URL param, localStorage draft, or manual input
+  // Referral code from URL param, query param, localStorage draft, or manual input
   const [referralCode, setReferralCode] = useState(() => {
+    if (queryRef) return queryRef.trim().toUpperCase();
     if (typeof window !== "undefined") {
       const params = new URLSearchParams(window.location.search);
       const urlRef = params.get("ref");
@@ -186,6 +201,40 @@ function Register() {
   });
   const [referrerInfo, setReferrerInfo] = useState<{ id: string; name: string } | null>(null);
   const [referralStatus, setReferralStatus] = useState<string>("");
+
+  // Check for active Google / Supabase session on mount
+  useEffect(() => {
+    async function checkAuthSession() {
+      try {
+        const {
+          data: { session },
+        } = await supabase.auth.getSession();
+        if (session?.user) {
+          setAuthUserId(session.user.id);
+          const hasGoogle =
+            session.user.app_metadata?.provider === "google" ||
+            session.user.identities?.some((id) => id.provider === "google");
+          setIsGoogleAuth(Boolean(hasGoogle));
+          if (session.user.email) {
+            setForm((prev) => ({
+              ...prev,
+              email: session.user.email || prev.email,
+              name: prev.name || (session.user.user_metadata?.["full_name"] as string) || queryName || "",
+            }));
+          }
+        } else if (queryEmail || queryName) {
+          setForm((prev) => ({
+            ...prev,
+            email: queryEmail || prev.email,
+            name: prev.name || queryName || "",
+          }));
+        }
+      } catch (e) {
+        console.warn("Could not check session:", e);
+      }
+    }
+    checkAuthSession();
+  }, [queryEmail, queryName]);
 
   // Persist referral code to localStorage
   useEffect(() => {
@@ -521,6 +570,7 @@ function Register() {
     if (step === 0) {
       // Account step — only for new sign-ups
       if (existing) return "";
+      if (authUserId || isGoogleAuth) return ""; // Google-verified account
       const emailCheck = validateTrustedEmail(form.email);
       if (!emailCheck.valid) return emailCheck.error!;
       if (form.password.length < 8) return "Password must be at least 8 characters.";
@@ -590,6 +640,11 @@ function Register() {
 
     // Step 0: create Supabase Auth account
     if (step === 0 && !existing) {
+      if (authUserId || isGoogleAuth) {
+        // Direct advancement for Google-authenticated creators
+        setStep(1);
+        return;
+      }
       setSigningUp(true);
       try {
         const result = await supabaseDb.signUpCreator(form.email.trim(), form.password);
@@ -879,95 +934,134 @@ function Register() {
               {/* ── Step 0: Account (sign-up) ─────────────────────────────────── */}
               {step === 0 && !existing ? (
                 <div className="space-y-5">
-                  <div className="rounded-xl bg-primary/5 border border-primary/15 p-4">
-                    <p className="text-sm font-semibold text-foreground">
-                      Create your account first
-                    </p>
-                    <p className="mt-1 text-xs text-muted-foreground">
-                      You'll use these credentials to log in and edit your profile any time.
-                    </p>
-                  </div>
-
-                  <Field
-                    label="Email address"
-                    hint="Trusted providers only (Gmail, Yahoo, Outlook, etc.)"
-                    error={emailLiveError || undefined}
-                  >
-                    <TextInput
-                      type="email"
-                      value={form.email}
-                      maxLength={255}
-                      onChange={(e) => set("email", e.target.value)}
-                      onBlur={handleEmailBlur}
-                      placeholder="you@gmail.com"
-                      className={emailLiveError ? "ring-2 ring-rose focus:ring-rose" : ""}
-                      autoFocus
-                    />
-                    {emailSuggestion && (
-                      <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
-                        <span>Suggestion:</span>
-                        <button
-                          type="button"
-                          onClick={() => {
-                            set("email", emailSuggestion);
-                            setEmailLiveError(null);
-                            setEmailSuggestion(null);
-                          }}
-                          className="font-semibold text-primary underline hover:text-primary/80 cursor-pointer"
-                        >
-                          Use {emailSuggestion}
-                        </button>
+                  {authUserId || isGoogleAuth ? (
+                    /* Google-authenticated account badge */
+                    <div className="rounded-2xl border border-tealdeep/30 bg-tealdeep/10 p-4">
+                      <div className="flex items-center gap-3">
+                        <div className="flex size-8 shrink-0 items-center justify-center rounded-full bg-tealdeep text-white font-bold text-xs">
+                          ✓
+                        </div>
+                        <div className="min-w-0">
+                          <p className="text-sm font-semibold text-foreground">
+                            Connected with Google
+                          </p>
+                          <p className="text-xs text-muted-foreground truncate">{form.email}</p>
+                        </div>
                       </div>
-                    )}
-                  </Field>
-
-                  <Field label="Password" hint="At least 8 characters">
-                    <div className="relative">
-                      <TextInput
-                        type={showPwd ? "text" : "password"}
-                        value={form.password}
-                        onChange={(e) => set("password", e.target.value)}
-                        placeholder="Create a password"
-                        className="pr-10"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => setShowPwd((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showPwd ? "Hide password" : "Show password"}
-                      >
-                        {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
-                      </button>
+                      <p className="mt-2 text-xs text-muted-foreground">
+                        Your account identity is verified via Google. No password needed!
+                      </p>
                     </div>
-                  </Field>
+                  ) : (
+                    /* Standard flow: Google 1-click option + email/password */
+                    <>
+                      <div className="rounded-xl bg-primary/5 border border-primary/15 p-4">
+                        <p className="text-sm font-semibold text-foreground">
+                          Create your creator account
+                        </p>
+                        <p className="mt-1 text-xs text-muted-foreground">
+                          Sign up in 1 click or use your email and password to get started.
+                        </p>
+                      </div>
 
-                  <Field label="Confirm password">
-                    <div className="relative">
-                      <TextInput
-                        type={showConfirmPwd ? "text" : "password"}
-                        value={form.confirmPassword}
-                        onChange={(e) => set("confirmPassword", e.target.value)}
-                        placeholder="Repeat your password"
-                        className="pr-10"
+                      <GoogleAuthButton
+                        role="creator"
+                        redirectTarget="/creator/register"
+                        label="Sign up in 1-click with Google"
                       />
-                      <button
-                        type="button"
-                        onClick={() => setShowConfirmPwd((v) => !v)}
-                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                        aria-label={showConfirmPwd ? "Hide password" : "Show password"}
+
+                      <div className="relative flex items-center justify-center">
+                        <div className="absolute inset-0 flex items-center">
+                          <div className="w-full border-t border-border" />
+                        </div>
+                        <div className="relative bg-card px-3 text-xs uppercase tracking-wider text-muted-foreground">
+                          Or sign up with email
+                        </div>
+                      </div>
+
+                      <Field
+                        label="Email address"
+                        hint="Trusted providers only (Gmail, Yahoo, Outlook, etc.)"
+                        error={emailLiveError || undefined}
                       >
-                        {showConfirmPwd ? (
-                          <EyeOff className="size-4" />
-                        ) : (
-                          <Eye className="size-4" />
+                        <TextInput
+                          type="email"
+                          value={form.email}
+                          maxLength={255}
+                          onChange={(e) => set("email", e.target.value)}
+                          onBlur={handleEmailBlur}
+                          placeholder="you@gmail.com"
+                          className={emailLiveError ? "ring-2 ring-rose focus:ring-rose" : ""}
+                          autoFocus
+                        />
+                        {emailSuggestion && (
+                          <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                            <span>Suggestion:</span>
+                            <button
+                              type="button"
+                              onClick={() => {
+                                set("email", emailSuggestion);
+                                setEmailLiveError(null);
+                                setEmailSuggestion(null);
+                              }}
+                              className="font-semibold text-primary underline hover:text-primary/80 cursor-pointer"
+                            >
+                              Use {emailSuggestion}
+                            </button>
+                          </div>
                         )}
-                      </button>
-                    </div>
-                  </Field>
+                      </Field>
 
+                      <Field label="Password" hint="At least 8 characters">
+                        <div className="relative">
+                          <TextInput
+                            type={showPwd ? "text" : "password"}
+                            value={form.password}
+                            onChange={(e) => set("password", e.target.value)}
+                            placeholder="Create a password"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowPwd((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            aria-label={showPwd ? "Hide password" : "Show password"}
+                          >
+                            {showPwd ? <EyeOff className="size-4" /> : <Eye className="size-4" />}
+                          </button>
+                        </div>
+                      </Field>
+
+                      <Field label="Confirm password">
+                        <div className="relative">
+                          <TextInput
+                            type={showConfirmPwd ? "text" : "password"}
+                            value={form.confirmPassword}
+                            onChange={(e) => set("confirmPassword", e.target.value)}
+                            placeholder="Repeat your password"
+                            className="pr-10"
+                          />
+                          <button
+                            type="button"
+                            onClick={() => setShowConfirmPwd((v) => !v)}
+                            className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                            aria-label={showConfirmPwd ? "Hide password" : "Show password"}
+                          >
+                            {showConfirmPwd ? (
+                              <EyeOff className="size-4" />
+                            ) : (
+                              <Eye className="size-4" />
+                            )}
+                          </button>
+                        </div>
+                      </Field>
+                    </>
+                  )}
+
+                  {/* Referral Code (Available for both Google & Manual) */}
                   <Field
                     label="Referral code (optional)"
-                    hint="Enter a creator's referral code to connect accounts"
+                    hint="Have a creator's referral code? Type or paste it here to link your invitations"
                   >
                     <TextInput
                       type="text"
@@ -1015,6 +1109,45 @@ function Register() {
               {/* ── Step 1: Basics ────────────────────────────────────────────── */}
               {step === 1 ? (
                 <div className="space-y-4">
+                  {/* Referral Code input (shown right after account creation / email verification so creators never miss it) */}
+                  {!existing ? (
+                    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2">
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2">
+                          <Gift className="size-4 text-primary shrink-0" />
+                          <span className="text-xs font-semibold uppercase tracking-wider text-primary">
+                            Referral code (optional)
+                          </span>
+                        </div>
+                        {referrerInfo ? (
+                          <span className="text-[11px] font-semibold text-tealdeep bg-tealdeep/10 px-2.5 py-0.5 rounded-full border border-tealdeep/20">
+                            ✓ Connected
+                          </span>
+                        ) : null}
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Were you invited by another creator? Enter their referral code here so they receive credit when you upgrade.
+                      </p>
+                      <TextInput
+                        type="text"
+                        value={referralCode}
+                        maxLength={30}
+                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. DHUNDO-RS7X2A"
+                        className="font-mono uppercase tracking-wider bg-background"
+                      />
+                      {referrerInfo ? (
+                        <p className="text-xs font-semibold text-tealdeep">
+                          ✓ Valid invitation from {referrerInfo.name}
+                        </p>
+                      ) : referralCode.trim().length >= 4 ? (
+                        <p className="text-xs text-muted-foreground">
+                          {referralStatus || "Checking code..."}
+                        </p>
+                      ) : null}
+                    </div>
+                  ) : null}
+
                   <Field label="Full name">
                     <TextInput
                       value={form.name}

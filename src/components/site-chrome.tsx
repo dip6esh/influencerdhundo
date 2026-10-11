@@ -102,12 +102,16 @@ export function SiteHeader() {
             {/* Logged in as Business */}
             {business ? (
               <div className="flex items-center gap-2">
-                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                <Link
+                  to="/business/complete-profile"
+                  title="View or edit your business details"
+                  className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 hover:bg-primary/20 px-3 py-1 text-xs font-semibold text-primary transition-colors"
+                >
                   <Building2 className="size-3" />
                   <span className="max-w-[120px] truncate sm:max-w-[160px]">
                     {business.businessName}
                   </span>
-                </span>
+                </Link>
                 <button
                   onClick={handleBusinessSignOut}
                   title="Sign out of business account"
@@ -128,7 +132,7 @@ export function SiteHeader() {
                 >
                   <User className="size-3.5" />
                   <span className="max-w-[120px] truncate sm:max-w-[160px]">
-                    {myCreator.name.split(" ")[0]}
+                    {(myCreator.displayName || myCreator.name || "Creator").split(" ")[0]}
                   </span>
                 </Link>
                 <button
@@ -242,12 +246,17 @@ export function SiteHeader() {
           {/* ── Logged in as Business ── */}
           {business ? (
             <>
-              <div className="flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-3">
+              <Link
+                to="/business/complete-profile"
+                onClick={closeMenu}
+                className="flex items-center gap-2 rounded-xl bg-primary/10 px-4 py-3 text-primary hover:bg-primary/20 transition-colors"
+              >
                 <Building2 className="size-4 text-primary shrink-0" />
-                <span className="text-sm font-semibold text-primary truncate">
+                <span className="text-sm font-semibold truncate">
                   {business.businessName}
                 </span>
-              </div>
+                <span className="ml-auto text-xs text-muted-foreground">Edit →</span>
+              </Link>
               <button
                 onClick={() => {
                   handleBusinessSignOut();
@@ -271,7 +280,7 @@ export function SiteHeader() {
               >
                 <User className="size-4 text-saffrondeep shrink-0" />
                 <span className="text-sm font-semibold text-saffrondeep truncate">
-                  {myCreator.name.split(" ")[0]}
+                  {(myCreator.displayName || myCreator.name || "Creator").split(" ")[0]}
                 </span>
                 <span className="ml-auto text-xs text-muted-foreground">Dashboard →</span>
               </Link>

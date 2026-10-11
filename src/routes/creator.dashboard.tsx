@@ -1,6 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
-import { Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
+import { Button, Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
 import { InstagramIcon, WhatsAppIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
 import {
@@ -81,6 +81,7 @@ function Dashboard() {
     referralEvents,
     fetchReferralEvents,
     upsertCreator,
+    updateCreator,
     updateCreatorPhoto,
     setCreatorStatus,
   } = useAppState();
@@ -94,6 +95,12 @@ function Dashboard() {
   const [copiedPaymentId, setCopiedPaymentId] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentRecord | null>(null);
   const [showPhotoModal, setShowPhotoModal] = useState(false);
+  const [inputReferralCode, setInputReferralCode] = useState("");
+  const [applyingReferral, setApplyingReferral] = useState(false);
+  const [referralFeedback, setReferralFeedback] = useState<{
+    type: "success" | "error";
+    message: string;
+  } | null>(null);
 
   // If mine is found in state or hydrated from storage, dismiss loading spinner immediately
   useEffect(() => {
@@ -247,6 +254,53 @@ function Dashboard() {
     navigator.clipboard.writeText(referralCode);
     setCopiedCode(true);
     setTimeout(() => setCopiedCode(false), 2000);
+  };
+
+  const handleApplyReferral = async (e: React.FormEvent) => {
+    e.preventDefault();
+    if (!mine?.id || !inputReferralCode.trim()) return;
+    const clean = inputReferralCode.trim().toUpperCase();
+    setApplyingReferral(true);
+    setReferralFeedback(null);
+    try {
+      const local = creators.find(
+        (c) => c.referralCode && c.referralCode.toUpperCase() === clean,
+      );
+      const remote = local
+        ? { id: local.id, name: local.name || local.displayName }
+        : await supabaseDb.lookupReferralCode(clean);
+
+      if (!remote) {
+        setReferralFeedback({
+          type: "error",
+          message: "Referral code not found. Please verify the code and try again.",
+        });
+        return;
+      }
+
+      if (remote.id === mine.id) {
+        setReferralFeedback({
+          type: "error",
+          message: "You cannot use your own referral code.",
+        });
+        return;
+      }
+
+      const updated = { ...mine, referredBy: remote.id };
+      await updateCreator(updated);
+      setReferralFeedback({
+        type: "success",
+        message: `✓ Connected with ${remote.name || "inviting creator"}! When you subscribe to a paid plan, they'll receive +7 bonus days.`,
+      });
+      setInputReferralCode("");
+    } catch {
+      setReferralFeedback({
+        type: "error",
+        message: "Failed to apply referral code. Please try again.",
+      });
+    } finally {
+      setApplyingReferral(false);
+    }
   };
 
   const whatsappMessage = encodeURIComponent(
@@ -1010,6 +1064,54 @@ function Dashboard() {
                   </Link>
                 </div>
               )}
+
+              {/* CONNECT INVITATION CODE (If this creator was invited but didn't enter code at registration) */}
+              {!mine?.referredBy ? (
+                <div className="mt-5 rounded-2xl bg-secondary/40 border border-border/80 p-4 sm:p-5">
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                    <div>
+                      <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
+                        <Gift className="size-4 text-primary" />
+                        <span>Invited by a fellow creator?</span>
+                      </h4>
+                      <p className="text-xs text-muted-foreground mt-0.5">
+                        Enter their referral code here so they automatically receive +7 bonus subscription days when you upgrade.
+                      </p>
+                    </div>
+
+                    <form onSubmit={handleApplyReferral} className="flex items-center gap-2 shrink-0">
+                      <input
+                        type="text"
+                        value={inputReferralCode}
+                        onChange={(e) => setInputReferralCode(e.target.value.toUpperCase())}
+                        placeholder="e.g. DHUNDO-XYZ"
+                        maxLength={25}
+                        className="rounded-xl bg-background border border-border px-3 py-1.5 text-xs font-mono uppercase tracking-wider text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-1 focus:ring-primary w-36 sm:w-44"
+                      />
+                      <Button
+                        variant="ink"
+                        type="submit"
+                        disabled={applyingReferral || !inputReferralCode.trim()}
+                        className="py-1.5 px-3 text-xs font-semibold"
+                      >
+                        {applyingReferral ? <Loader2 className="size-3.5 animate-spin" /> : "Connect Code"}
+                      </Button>
+                    </form>
+                  </div>
+
+                  {referralFeedback ? (
+                    <div
+                      className={`mt-3 rounded-xl p-2.5 text-xs font-medium ${
+                        referralFeedback.type === "success"
+                          ? "bg-tealdeep/10 text-tealdeep border border-tealdeep/20"
+                          : "bg-destructive/10 text-destructive border border-destructive/20"
+                      }`}
+                    >
+                      {referralFeedback.message}
+                    </div>
+                  ) : null}
+                </div>
+              ) : null}
 
               {/* ── UNIFIED REFERRAL ACTIVITY & REWARDS ── */}
               <div className="mt-7 sm:mt-8">
