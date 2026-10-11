@@ -66,6 +66,7 @@ export const Route = createFileRoute("/creator/register")({
 const STEPS = ["Account", "Basics", "Social", "Content", "Collaboration", "Preview"] as const;
 const DRAFT_STORAGE_KEY = "influencer-dhundo-creator-draft-v2";
 const DRAFT_ID_KEY = "influencer-dhundo-creator-draft-id-v2";
+const DRAFT_STEP_KEY = "influencer-dhundo-creator-draft-step-v2";
 
 function getOrCreateDraftId(name: string, email: string, mobile: string): string {
   if (typeof window === "undefined") return "draft-lead";
@@ -169,7 +170,19 @@ function Register() {
     useAppState();
   const existing = creators.find((c) => c.id === myCreatorId);
 
-  const [step, setStep] = useState(existing ? 1 : 0);
+  const [step, setStep] = useState(() => {
+    if (existing) return 1;
+    if (typeof window !== "undefined") {
+      try {
+        const savedStep = localStorage.getItem(DRAFT_STEP_KEY);
+        if (savedStep) {
+          const num = Number(savedStep);
+          if (!isNaN(num) && num >= 1 && num < STEPS.length) return num;
+        }
+      } catch {}
+    }
+    return 0;
+  });
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isGoogleAuth, setIsGoogleAuth] = useState(false);
   const [awaitingVerification, setAwaitingVerification] = useState(false);
@@ -178,6 +191,7 @@ function Register() {
   const [showPwd, setShowPwd] = useState(false);
   const [showConfirmPwd, setShowConfirmPwd] = useState(false);
   const [saving, setSaving] = useState(false);
+  const [savingLater, setSavingLater] = useState(false);
   const [saveError, setSaveError] = useState("");
   const [signingUp, setSigningUp] = useState(false);
   const [error, setError] = useState("");
@@ -519,21 +533,21 @@ function Register() {
 
       return {
         id: existing?.id ?? (generatedId || "my-profile"),
-        name: cleanName || "Your name",
-        displayName: cleanDisplay || cleanName || "Your name",
+        name: cleanName || form.email.split("@")[0] || "New Creator",
+        displayName: cleanDisplay || cleanName || form.email.split("@")[0] || "New Creator",
         photo: (form.photo || "").trim(),
-        city: (form.city || "").trim() || "Your city",
-        locality: (form.locality || "").trim() || "Your area",
+        city: (form.city || "").trim() || "Unassigned",
+        locality: (form.locality || "").trim(),
         state: (form.state || "").trim(),
         pincode: (form.pincode || "").trim(),
         followers: Number(form.followers) || 0,
-        instagram: normalizeInstagramHandle(form.instagram)
-          ? `@${normalizeInstagramHandle(form.instagram)}`
-          : form.instagram.startsWith("@")
-            ? form.instagram.trim()
-            : form.instagram
-              ? `@${form.instagram.trim()}`
-              : "@yourhandle",
+        instagram: form.instagram.trim()
+          ? (normalizeInstagramHandle(form.instagram)
+              ? `@${normalizeInstagramHandle(form.instagram)}`
+              : form.instagram.startsWith("@")
+                ? form.instagram.trim()
+                : `@${form.instagram.trim()}`)
+          : "",
         otherSocials: [
           form.facebook ? { platform: "Facebook", handle: form.facebook.trim() } : null,
           form.youtube ? { platform: "YouTube", handle: form.youtube.trim() } : null,
@@ -543,33 +557,37 @@ function Register() {
         contentTypes: form.contentTypes,
         languages: form.languages,
         about: (form.about || "").trim(),
-      collabType: (form.collabType || "Paid") as Creator["collabType"],
-      startingPrice: Number(form.startingPrice) || 0,
-      travels: form.travels === "Yes",
-      travelRange: form.travels === "Yes" ? form.travelRange : undefined,
-      acceptsProducts: (form.acceptsProducts || "Depends") as Creator["acceptsProducts"],
-      acceptsProductsDetails:
-        form.acceptsProducts === "Depends"
-          ? form.acceptsProductsDetails.trim() || undefined
-          : undefined,
-      turnaround: form.turnaround || "3–5 days",
-      status: existing?.status ?? "Inactive",
-      birthDate: form.birthDate || undefined,
-      gender: form.gender || undefined,
-      referralCode: existing?.referralCode,
-      referredBy: referrerInfo?.id ?? existing?.referredBy,
-      contact: {
-        phone: (form.mobile || "").trim(),
-        whatsapp: (form.mobile || "").trim(),
-        email: (form.email || "").trim(),
-      },
-    };
-  }, [form, existing, referrerInfo]);
+        collabType: (form.collabType || "Paid") as Creator["collabType"],
+        startingPrice: Number(form.startingPrice) || 0,
+        travels: form.travels === "Yes",
+        travelRange: form.travels === "Yes" ? form.travelRange : undefined,
+        acceptsProducts: (form.acceptsProducts || "Depends") as Creator["acceptsProducts"],
+        acceptsProductsDetails:
+          form.acceptsProducts === "Depends"
+            ? form.acceptsProductsDetails.trim() || undefined
+            : undefined,
+        turnaround: form.turnaround || "3–5 days",
+        status: existing?.status ?? "Draft",
+        birthDate: form.birthDate || undefined,
+        gender: form.gender || undefined,
+        referralCode: existing?.referralCode,
+        referredBy: referrerInfo?.id ?? existing?.referredBy,
+        contact: {
+          phone: (form.mobile || "").trim(),
+          whatsapp: (form.mobile || "").trim(),
+          email: (form.email || "").trim(),
+        },
+      };
+    }, [form, existing, referrerInfo]);
 
   const validateStep = () => {
     if (step === 0) {
       // Account step — only for new sign-ups
       if (existing) return "";
+      const cleanMobile = form.mobile.replace(/\D/g, "");
+      if (!cleanMobile || cleanMobile.length < 10) {
+        return "Please enter a valid 10-digit WhatsApp / mobile number.";
+      }
       if (authUserId || isGoogleAuth) return ""; // Google-verified account
       const emailCheck = validateTrustedEmail(form.email);
       if (!emailCheck.valid) return emailCheck.error!;
@@ -578,54 +596,56 @@ function Register() {
       return "";
     }
     if (step === 1) {
-      if (!form.name.trim()) return "Please enter your name.";
-      if (!form.birthDate) return "Please enter your date of birth.";
-      const age = calculateAge(form.birthDate);
-      if (age === null || isNaN(age)) return "Please enter a valid date of birth.";
-      if (age < 13) return "Creators must be at least 13 years old.";
-      if (age > 100) return "Please enter a valid date of birth.";
-      if (!form.gender) return "Please select your gender.";
-      if (!form.mobile.trim() || form.mobile.replace(/\D/g, "").length < 10)
+      // Step 1: Mandatory fields are Full name, Email, Mobile, Gender, State, City, Pincode
+      if (!form.name.trim()) return "Please enter your full name.";
+      const emailCheck = validateTrustedEmail(form.email);
+      if (!emailCheck.valid) return emailCheck.error || "Please enter a valid email address.";
+      const cleanMobile = form.mobile.replace(/\D/g, "");
+      if (!cleanMobile || cleanMobile.length < 10)
         return "Please enter a valid 10-digit mobile number.";
-      if (!form.city) return "Select your city.";
-      if (!form.locality.trim()) return "Enter your area.";
-      if (wordCount(form.about) > 300) return "About must be 300 words or less.";
+      if (!form.gender) return "Please select your gender.";
+      if (!form.state) return "Please select your state.";
+      if (!form.city) return "Please select your city.";
+      const cleanPin = form.pincode.replace(/\D/g, "");
+      if (!cleanPin || cleanPin.length < 6)
+        return "Please enter a valid 6-digit pincode.";
+
+      // Optional fields in Step 1
+      if (form.birthDate) {
+        const age = calculateAge(form.birthDate);
+        if (age === null || isNaN(age)) return "Please enter a valid date of birth.";
+        if (age < 13) return "Creators must be at least 13 years old.";
+        if (age > 100) return "Please enter a valid date of birth.";
+      }
+      if (form.about && wordCount(form.about) > 300) return "About must be 300 words or less.";
+      return "";
     }
+
+    // After step 1: NO mandatory field inputs (all optional, can be completed now or later)
     if (step === 2) {
-      const cleanHandle = normalizeInstagramHandle(form.instagram);
-      if (!form.instagram.trim() || !cleanHandle)
-        return "Please enter a valid Instagram username or profile link.";
-      const numFollowers = Number(form.followers);
-      if (!form.followers || isNaN(numFollowers) || numFollowers <= 0)
-        return "Please enter your Instagram follower count.";
-      if (numFollowers < 500)
-        return "Follower count must be at least 500.";
-      if (numFollowers > 300000)
-        return "Follower count cannot exceed 300,000 (300K).";
+      if (form.instagram.trim()) {
+        const cleanHandle = normalizeInstagramHandle(form.instagram);
+        if (!cleanHandle) return "Please enter a valid Instagram username or profile link.";
+      }
+      if (form.followers) {
+        const numFollowers = Number(form.followers);
+        if (isNaN(numFollowers) || numFollowers < 0)
+          return "Please enter a valid follower count.";
+        if (numFollowers > 300000)
+          return "Follower count cannot exceed 300,000 (300K).";
+      }
+      return "";
     }
     if (step === 3) {
-      if (!form.categories.length) return "Select at least one category.";
-      if (!form.contentTypes.length) return "Select at least one content type.";
-      if (!form.languages.length) return "Select at least one language.";
+      return ""; // categories, content types, languages are optional
     }
     if (step === 4) {
-      if (!form.collabType) return "Select your collaboration type.";
-      const price = Number(form.startingPrice);
-      if (form.collabType !== "Barter") {
-        if (!form.startingPrice || isNaN(price) || price <= 0)
-          return "Please enter your starting price.";
+      if (form.startingPrice) {
+        const price = Number(form.startingPrice);
+        if (isNaN(price) || price < 0) return "Starting price cannot be negative.";
+        if (price > 100000) return "Starting price cannot exceed ₹1,00,000.";
       }
-      if (price < 0)
-        return "Starting price cannot be negative.";
-      if (price > 100000)
-        return "Starting price cannot exceed ₹1,00,000.";
-      if (!form.travels) return "Tell us whether you travel for collaborations.";
-      if (form.travels === "Yes" && !form.travelRange) return "Select your travel range.";
-      if (!form.acceptsProducts)
-        return "Tell us whether you accept products or services delivered to you.";
-      if (form.acceptsProducts === "Depends" && !form.acceptsProductsDetails.trim())
-        return "Please explain what your product/service delivery acceptance depends on.";
-      if (!form.turnaround) return "Select your typical turnaround.";
+      return ""; // collaboration options are optional
     }
     return "";
   };
@@ -638,8 +658,49 @@ function Register() {
     }
     setError("");
 
-    // Step 0: create Supabase Auth account
+    // Step 0: create Supabase Auth account & immediately capture lead
     if (step === 0 && !existing) {
+      // Immediately write lead to Supabase so Email and WhatsApp are 100% saved
+      try {
+        const draftId = getOrCreateDraftId(form.name, form.email, form.mobile);
+        const draftLead: Creator = {
+          id: draftId,
+          name: form.name.trim() || form.email.split("@")[0] || "New Creator Lead",
+          displayName: form.displayName.trim() || form.name.trim() || form.email.split("@")[0] || "New Creator",
+          photo: form.photo || "",
+          city: form.city || "Unassigned",
+          locality: form.locality || "",
+          state: form.state || "",
+          pincode: form.pincode || "",
+          followers: Number(form.followers) || 0,
+          instagram: form.instagram || "",
+          otherSocials: [],
+          categories: form.categories || [],
+          contentTypes: form.contentTypes || [],
+          languages: form.languages || [],
+          about: form.about || `In-progress registration started on ${new Date().toLocaleDateString("en-IN")}.`,
+          collabType: (form.collabType as any) || "Paid",
+          startingPrice: Number(form.startingPrice) || 0,
+          travels: form.travels === "Yes",
+          travelRange: form.travelRange || "",
+          acceptsProducts: (form.acceptsProducts as any) || "Depends",
+          acceptsProductsDetails: "[Initial Account Lead - Step 0 Completed]",
+          turnaround: form.turnaround || "3–5 days",
+          status: "Draft",
+          contact: {
+            phone: form.mobile.trim(),
+            whatsapp: form.mobile.trim(),
+            email: form.email.trim(),
+          },
+          birthDate: form.birthDate || undefined,
+          gender: form.gender || undefined,
+          referredBy: referralCode || undefined,
+        };
+        supabaseDb.upsertCreator(draftLead).catch(() => {});
+      } catch {
+        // non-blocking
+      }
+
       if (authUserId || isGoogleAuth) {
         // Direct advancement for Google-authenticated creators
         setStep(1);
@@ -683,7 +744,56 @@ function Register() {
       }
     }
 
-    setStep((s) => Math.min(s + 1, STEPS.length - 1));
+    setStep((s) => {
+      const nextStep = Math.min(s + 1, STEPS.length - 1);
+      if (typeof window !== "undefined" && !existing) {
+        try {
+          localStorage.setItem(DRAFT_STEP_KEY, String(nextStep));
+        } catch {}
+      }
+      return nextStep;
+    });
+  };
+
+  /** Allows creator to save in-progress draft and finish later from dashboard */
+  const handleSaveAndExitLater = async () => {
+    // If on Step 1, ensure the 7 mandatory fields are filled first so core contact & location are saved
+    if (step === 1) {
+      const err = validateStep();
+      if (err) {
+        setError(err);
+        return;
+      }
+    }
+    setSavingLater(true);
+    setError("");
+    try {
+      if (typeof window !== "undefined") {
+        try {
+          localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form));
+          localStorage.setItem(DRAFT_STEP_KEY, String(step));
+        } catch {}
+      }
+
+      const draftId = existing?.id || getOrCreateDraftId(form.name, form.email, form.mobile);
+      const currentStepName = STEPS[step] || "Basics";
+      const draftCreator: Creator = {
+        ...draft,
+        id: draftId,
+        status: existing?.status === "Active" ? "Active" : "Draft",
+        acceptsProductsDetails: existing?.acceptsProductsDetails || `[In-Progress Draft - Paused at ${currentStepName}]`,
+      };
+
+      const uid = authUserId || (await supabaseDb.getCreatorSession());
+      await upsertCreatorWithAuth(draftCreator, uid).catch(() => {});
+
+      loginCreator(draftId);
+      navigate({ to: "/creator/dashboard" });
+    } catch {
+      setError("Could not save draft. Please check your internet connection.");
+    } finally {
+      setSavingLater(false);
+    }
   };
 
   /** User clicks "I've confirmed" — check if session is active or sign in */
@@ -787,6 +897,7 @@ function Register() {
         }
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
+        localStorage.removeItem(DRAFT_STEP_KEY);
         localStorage.removeItem("influencer_referral_code");
       } catch {
         // ignore
@@ -931,6 +1042,26 @@ function Register() {
           {/* FORM CARD (ALIGNED FLUSH WITH CONTAINER) */}
           <div className="mt-6">
             <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
+              {/* CARD HEADER: step indicator only — Save & finish later is in the bottom action bar */}
+              <div className="pb-5 mb-6 border-b border-border/70">
+                <div className="flex items-center gap-2">
+                  <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                    Step {existing ? step : step + 1} of {existing ? STEPS.length - 1 : STEPS.length}
+                  </span>
+                  <span className="text-muted-foreground text-xs">•</span>
+                  <span className="text-sm font-semibold text-foreground">
+                    {STEPS[step]}
+                  </span>
+                </div>
+                <p className="text-xs text-muted-foreground mt-0.5">
+                  {step === 0
+                    ? "Create your credentials and link your contact number"
+                    : step === 1
+                      ? "Required fields marked * — all other fields can be completed later"
+                      : "All fields on this step are optional — skip or fill and continue anytime"}
+                </p>
+              </div>
+
               {/* ── Step 0: Account (sign-up) ─────────────────────────────────── */}
               {step === 0 && !existing ? (
                 <div className="space-y-5">
@@ -1058,6 +1189,22 @@ function Register() {
                     </>
                   )}
 
+                  {/* WhatsApp / Mobile Number - Captured upfront in Step 0 */}
+                  <Field
+                    label="WhatsApp / Mobile number"
+                    hint="10-digit number. Brands & local businesses will use this to contact you"
+                  >
+                    <TextInput
+                      type="tel"
+                      value={form.mobile}
+                      maxLength={15}
+                      onChange={(e) => set("mobile", e.target.value)}
+                      placeholder="9876543210"
+                      className="font-mono"
+                      required
+                    />
+                  </Field>
+
                   {/* Referral Code (Available for both Google & Manual) */}
                   <Field
                     label="Referral code (optional)"
@@ -1148,15 +1295,16 @@ function Register() {
                     </div>
                   ) : null}
 
-                  <Field label="Full name">
+                  <Field label="Full name *">
                     <TextInput
                       value={form.name}
                       maxLength={100}
                       onChange={(e) => set("name", e.target.value)}
                       placeholder="Aditi Sharma"
+                      required
                     />
                   </Field>
-                  <Field label="Profile photo" hint="JPG, PNG or WebP. Portrait or square works best. (Optional)">
+                  <Field label="Profile photo (Optional)" hint="JPG, PNG or WebP. Portrait or square works best.">
                     <div className="space-y-3">
                       {form.photo ? (
                         <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-secondary/40 border border-border/80">
@@ -1249,24 +1397,24 @@ function Register() {
                               accept="image/*"
                               className="hidden"
                               onChange={async (e) => {
-                                const file = e.target.files?.[0];
-                                if (!file) return;
-                                const localPreview = URL.createObjectURL(file);
-                                set("photo", localPreview);
-                                setUploadingPhoto(true);
-                                try {
-                                  const publicUrl = await supabaseDb.uploadCreatorPhoto(
-                                    file,
-                                    form.name || "creator",
-                                  );
-                                  if (publicUrl) {
-                                    set("photo", publicUrl);
+                                  const file = e.target.files?.[0];
+                                  if (!file) return;
+                                  const localPreview = URL.createObjectURL(file);
+                                  set("photo", localPreview);
+                                  setUploadingPhoto(true);
+                                  try {
+                                    const publicUrl = await supabaseDb.uploadCreatorPhoto(
+                                      file,
+                                      form.name || "creator",
+                                    );
+                                    if (publicUrl) {
+                                      set("photo", publicUrl);
+                                    }
+                                  } catch (err) {
+                                    console.error("Photo upload failed:", err);
+                                  } finally {
+                                    setUploadingPhoto(false);
                                   }
-                                } catch (err) {
-                                  console.error("Photo upload failed:", err);
-                                } finally {
-                                  setUploadingPhoto(false);
-                                }
                               }}
                             />
                           </label>
@@ -1275,32 +1423,35 @@ function Register() {
                     </div>
                   </Field>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Email">
+                    <Field label="Email *">
                       <TextInput
                         type="email"
                         value={form.email}
                         maxLength={255}
                         onChange={(e) => set("email", e.target.value)}
                         placeholder="you@email.com"
+                        required
                       />
                     </Field>
-                    <Field label="Mobile number">
+                    <Field label="Mobile number *" hint="10-digit number. Used for WhatsApp & brand inquiries">
                       <TextInput
                         value={form.mobile}
                         inputMode="numeric"
-                        maxLength={10}
+                        maxLength={15}
                         onChange={(e) => set("mobile", e.target.value)}
                         placeholder="9820011223"
+                        className="font-mono"
+                        required
                       />
                     </Field>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field
-                      label="Date of birth"
+                      label="Date of birth (Optional)"
                       hint={
                         form.birthDate && calculateAge(form.birthDate) !== null
-                          ? `Age: ${calculateAge(form.birthDate)} years old (auto-updated every year)`
-                          : "Required to calculate your age accurately for brand listings"
+                          ? `Age: ${calculateAge(form.birthDate)} years old`
+                          : "Optional — helps calculate your age for targeted campaigns (can be filled later)"
                       }
                     >
                       <DatePicker
@@ -1311,7 +1462,7 @@ function Register() {
                       />
                     </Field>
                     <Field
-                      label="Gender"
+                      label="Gender *"
                       hint="Helps businesses find relevant creators for targeted campaigns"
                     >
                       <DropdownSelect
@@ -1323,7 +1474,7 @@ function Register() {
                     </Field>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="State">
+                    <Field label="State *">
                       <DropdownSelect
                         value={form.state}
                         onChange={(val) => set("state", val)}
@@ -1332,7 +1483,7 @@ function Register() {
                         options={STATES}
                       />
                     </Field>
-                    <Field label="City">
+                    <Field label="City *">
                       <DropdownSelect
                         value={form.city}
                         onChange={(val) => set("city", val)}
@@ -1343,26 +1494,28 @@ function Register() {
                     </Field>
                   </div>
                   <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Area">
+                    <Field label="Area / Locality (Optional)">
                       <TextInput
                         value={form.locality}
                         onChange={(e) => set("locality", e.target.value)}
                         placeholder="e.g. Thane West, Indiranagar"
                       />
                     </Field>
-                    <Field label="Pincode">
+                    <Field label="Pincode *">
                       <TextInput
                         value={form.pincode}
                         inputMode="numeric"
                         maxLength={6}
                         onChange={(e) => set("pincode", e.target.value)}
                         placeholder="400601"
+                        className="font-mono"
+                        required
                       />
                     </Field>
                   </div>
                   <Field
-                    label="About you"
-                    hint={`${wordCount(form.about)}/300 words — tell businesses briefly about yourself and the content you create.`}
+                    label="About you (Optional)"
+                    hint={`${wordCount(form.about)}/300 words — optional, tell businesses briefly about yourself (can be filled later)`}
                   >
                     <TextArea
                       value={form.about}
@@ -1729,48 +1882,61 @@ function Register() {
                 </div>
               ) : null}
 
-              <div className="mt-6 flex flex-wrap gap-2">
-                {/* Back: hide on step 0, or on step 1 when editing (existing user skips account step) */}
-                {step > 0 && !(step === 1 && existing) ? (
-                  <Button variant="ghost" disabled={saving} onClick={() => setStep((s) => s - 1)}>
-                    Go Back
-                  </Button>
-                ) : null}
+              <div className="mt-8 pt-6 border-t border-border space-y-3">
+                {/* ROW 1 (mobile): Save & finish later — full width, dark ink style */}
+                {/* ROW 1 (desktop): inline with Continue → on the right */}
+                <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-3">
+                  {/* Left: Go Back */}
+                  {step > 0 && !(step === 1 && existing && existing.status === "Active") ? (
+                    <Button
+                      variant="ghost"
+                      type="button"
+                      disabled={saving || savingLater}
+                      onClick={() => setStep((s) => s - 1)}
+                    >
+                      ← Go Back
+                    </Button>
+                  ) : (
+                    <div />
+                  )}
 
-                {/* For existing creators: show Save on every step, plus Continue (except Preview) */}
-                {existing ? (
-                  <>
-                    {step < STEPS.length - 1 ? (
+                  {/* Right: Save & finish later + Continue/Submit */}
+                  <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
+                    {step >= 1 && (
                       <Button
-                        variant="ghost"
-                        className="justify-center gap-2 border border-border"
-                        disabled={saving}
-                        onClick={async () => {
-                          const err = validateStep();
-                          if (err) { setError(err); return; }
-                          setError("");
-                          await handleFinalSave("/creator/dashboard");
-                        }}
+                        variant="ink"
+                        type="button"
+                        className="w-full sm:w-auto justify-center gap-2"
+                        disabled={savingLater || saving}
+                        onClick={handleSaveAndExitLater}
                       >
-                        {saving ? (
+                        {savingLater ? (
                           <>
                             <Loader2 className="size-4 animate-spin" />
-                            Saving...
+                            Saving draft...
                           </>
                         ) : (
-                          "Save changes"
+                          "Save & finish later 💾"
                         )}
                       </Button>
-                    ) : null}
+                    )}
+
                     {step < STEPS.length - 1 ? (
-                      <Button variant="primary" className="flex-1" onClick={next}>
-                        Continue →
+                      <Button
+                        variant="primary"
+                        type="button"
+                        className="w-full sm:w-auto justify-center"
+                        disabled={signingUp || savingLater}
+                        onClick={next}
+                      >
+                        {signingUp ? "Saving & continuing..." : "Continue →"}
                       </Button>
                     ) : (
                       <Button
-                        variant="ink"
-                        className="flex-1 justify-center gap-2"
-                        disabled={saving}
+                        variant="primary"
+                        type="button"
+                        className="w-full sm:w-auto justify-center gap-2 shadow-xs"
+                        disabled={saving || savingLater}
                         onClick={() => handleFinalSave("/creator/dashboard")}
                       >
                         {saving ? (
@@ -1778,38 +1944,15 @@ function Register() {
                             <Loader2 className="size-4 animate-spin" />
                             Saving changes...
                           </>
-                        ) : (
+                        ) : existing?.status === "Active" ? (
                           "Save changes"
-                        )}
-                      </Button>
-                    )}
-                  </>
-                ) : (
-                  /* New creator: simple Go Back + Continue flow with automatic 3-day trial activation */
-                  <>
-                    {step < STEPS.length - 1 ? (
-                      <Button variant="primary" className="flex-1" disabled={signingUp} onClick={next}>
-                        {signingUp ? "Creating account..." : "Continue"}
-                      </Button>
-                    ) : (
-                      <Button
-                        variant="primary"
-                        className="flex-1 justify-center gap-2 shadow-xs"
-                        disabled={saving}
-                        onClick={() => handleFinalSave("/creator/dashboard")}
-                      >
-                        {saving ? (
-                          <>
-                            <Loader2 className="size-4 animate-spin" />
-                            Creating profile & starting trial...
-                          </>
                         ) : (
-                          "Continue"
+                          "Launch Profile & Start Free Trial 🚀"
                         )}
                       </Button>
                     )}
-                  </>
-                )}
+                  </div>
+                </div>
               </div>
             </Card>
 

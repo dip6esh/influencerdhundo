@@ -498,6 +498,31 @@ function Dashboard() {
             </div>
           </div>
 
+          {/* INCOMPLETE PROFILE / DRAFT RESUME BANNER */}
+          {mine.status === "Draft" || !mine.instagram ? (
+            <div className="mt-6 rounded-2xl sm:rounded-3xl bg-gradient-to-r from-amber-500/15 via-primary/10 to-amber-500/10 border border-amber-500/30 p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="flex size-10 shrink-0 items-center justify-center rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 font-bold text-lg">
+                  📝
+                </div>
+                <div>
+                  <h3 className="text-base font-display font-semibold text-foreground">
+                    Profile Setup in Progress (Draft Saved)
+                  </h3>
+                  <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
+                    Your contact details are safely saved! Complete your Instagram handle and starting rates to publish your profile and begin receiving business inquiries.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/creator/register"
+                className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
+              >
+                Resume Profile Setup →
+              </Link>
+            </div>
+          ) : null}
+
           {/* MAIN PROFILE & SUBSCRIPTION CARDS */}
           <div className="mt-8 grid gap-6 md:grid-cols-3 items-stretch">
             {/* CREATOR PROFILE HERO CARD */}
