@@ -33,7 +33,21 @@ function AuthCallbackPage() {
 
     async function handleAuth() {
       try {
-        // 1. Give Supabase auth client a brief moment to parse hash / code tokens
+        // Check if there is an auth code in the query params (PKCE OAuth flow)
+        if (typeof window !== "undefined") {
+          const urlParams = new URLSearchParams(window.location.search);
+          const code = urlParams.get("code");
+          if (code) {
+            const { data: exchanged, error: exchangeErr } =
+              await supabase.auth.exchangeCodeForSession(code);
+            if (!exchangeErr && exchanged?.session && active) {
+              await processSession(exchanged.session);
+              return;
+            }
+          }
+        }
+
+        // Give Supabase auth client a brief moment to parse hash / existing session
         const { data: { session }, error: sessionError } = await supabase.auth.getSession();
 
         if (sessionError) {
