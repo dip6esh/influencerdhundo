@@ -13,6 +13,7 @@ import {
 } from "@/lib/directory-data";
 import {
   AlertCircle,
+  ArrowLeft,
   CalendarClock,
   Check,
   CheckCircle2,
@@ -372,6 +373,17 @@ function Plans() {
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
         <div className="relative mx-auto max-w-5xl px-5">
+          {/* TOP BACK TO DASHBOARD NAVIGATION */}
+          <div className="mb-6">
+            <Link
+              to="/creator/dashboard"
+              className="inline-flex items-center gap-2 rounded-xl bg-background/90 hover:bg-background border border-border/80 px-3.5 py-2 text-xs font-semibold text-muted-foreground hover:text-foreground transition-all shadow-2xs hover:scale-102"
+            >
+              <ArrowLeft className="size-3.5 shrink-0" />
+              <span>Back to Dashboard</span>
+            </Link>
+          </div>
+
           <div className="max-w-2xl">
             <SectionEyebrow>Membership &amp; Payment</SectionEyebrow>
             <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
@@ -845,9 +857,10 @@ function Plans() {
 
                     <Link
                       to="/creator/dashboard"
-                      className="block text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 pt-1"
+                      className="inline-flex items-center justify-center gap-1.5 w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground pt-2 transition-colors"
                     >
-                      Back to Dashboard
+                      <ArrowLeft className="size-3 shrink-0" />
+                      <span>Back to Dashboard</span>
                     </Link>
                   </div>
                 )}
