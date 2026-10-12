@@ -580,8 +580,9 @@ function Register() {
       };
     }, [form, existing, referrerInfo]);
 
-  const validateStep = () => {
-    if (step === 0) {
+  const validateStep = (overrideStep?: number): string => {
+    const s = overrideStep !== undefined ? overrideStep : step;
+    if (s === 0) {
       // Account step — only for new sign-ups
       if (existing) return "";
       const cleanMobile = form.mobile.replace(/\D/g, "");
@@ -595,7 +596,7 @@ function Register() {
       if (form.password !== form.confirmPassword) return "Passwords do not match.";
       return "";
     }
-    if (step === 1) {
+    if (s === 1) {
       // Step 1: Mandatory fields are Full name, Email, Mobile, Gender, State, City, Pincode
       if (!form.name.trim()) return "Please enter your full name.";
       const emailCheck = validateTrustedEmail(form.email);
@@ -610,7 +611,7 @@ function Register() {
       if (!cleanPin || cleanPin.length < 6)
         return "Please enter a valid 6-digit pincode.";
 
-      // Optional fields in Step 1
+      // Optional fields in Step 1: Area / Locality, Date of birth, About bio, Profile photo
       if (form.birthDate) {
         const age = calculateAge(form.birthDate);
         if (age === null || isNaN(age)) return "Please enter a valid date of birth.";
@@ -621,32 +622,74 @@ function Register() {
       return "";
     }
 
-    // After step 1: NO mandatory field inputs (all optional, can be completed now or later)
-    if (step === 2) {
-      if (form.instagram.trim()) {
-        const cleanHandle = normalizeInstagramHandle(form.instagram);
-        if (!cleanHandle) return "Please enter a valid Instagram username or profile link.";
+    if (s === 2) {
+      // Step 2: Instagram username and followers are MANDATORY
+      // Other platforms (Facebook, YouTube, etc.) are OPTIONAL
+      if (!form.instagram.trim()) {
+        return "Please enter your Instagram username or profile link.";
       }
-      if (form.followers) {
-        const numFollowers = Number(form.followers);
-        if (isNaN(numFollowers) || numFollowers < 0)
-          return "Please enter a valid follower count.";
-        if (numFollowers > 300000)
-          return "Follower count cannot exceed 300,000 (300K).";
+      const cleanHandle = normalizeInstagramHandle(form.instagram);
+      if (!cleanHandle) {
+        return "Please enter a valid Instagram username or profile link.";
+      }
+      if (!form.followers.trim()) {
+        return "Please enter your Instagram follower count.";
+      }
+      const numFollowers = Number(form.followers);
+      if (isNaN(numFollowers) || numFollowers < 500) {
+        return "Minimum follower count is 500.";
+      }
+      if (numFollowers > 300000) {
+        return "Follower count cannot exceed 300,000 (300K).";
       }
       return "";
     }
-    if (step === 3) {
-      return ""; // categories, content types, languages are optional
-    }
-    if (step === 4) {
-      if (form.startingPrice) {
-        const price = Number(form.startingPrice);
-        if (isNaN(price) || price < 0) return "Starting price cannot be negative.";
-        if (price > 100000) return "Starting price cannot exceed ₹1,00,000.";
+
+    if (s === 3) {
+      // Step 3: Categories, content types, and languages are MANDATORY
+      if (!form.categories || form.categories.length === 0) {
+        return "Please select at least one content category.";
       }
-      return ""; // collaboration options are optional
+      if (!form.contentTypes || form.contentTypes.length === 0) {
+        return "Please select at least one content format (e.g. Reels, Stories).";
+      }
+      if (!form.languages || form.languages.length === 0) {
+        return "Please select at least one language.";
+      }
+      return "";
     }
+
+    if (s === 4) {
+      // Step 4: Collaboration options
+      if (!form.collabType) return "Please select a collaboration type.";
+      if (form.collabType !== "Barter") {
+        if (!form.startingPrice || !form.startingPrice.trim()) {
+          return "Please enter your starting price.";
+        }
+        const price = Number(form.startingPrice);
+        if (isNaN(price) || price < 500) {
+          return "Please enter a valid starting price (minimum ₹500).";
+        }
+        if (price > 100000) {
+          return "Starting price cannot exceed ₹1,00,000.";
+        }
+      }
+      return "";
+    }
+
+    if (s === 5) {
+      // Step 5: Full pre-launch audit to ensure all mandatory fields are filled
+      const errStep1 = validateStep(1);
+      if (errStep1) return errStep1;
+      const errStep2 = validateStep(2);
+      if (errStep2) return errStep2;
+      const errStep3 = validateStep(3);
+      if (errStep3) return errStep3;
+      const errStep4 = validateStep(4);
+      if (errStep4) return errStep4;
+      return "";
+    }
+
     return "";
   };
 
@@ -907,6 +950,12 @@ function Register() {
 
   /** Final save handler on step 5 (Preview) */
   const handleFinalSave = async (redirectTo: "/creator/plans" | "/creator/dashboard") => {
+    const preLaunchErr = validateStep(5);
+    if (preLaunchErr) {
+      setSaveError(preLaunchErr);
+      return;
+    }
+
     setSaving(true);
     setSaveError("");
 
@@ -1658,7 +1707,7 @@ function Register() {
                 <div className="space-y-4">
                   <div className="grid gap-4 sm:grid-cols-2">
                     <Field
-                      label="Instagram profile (Username or Link)"
+                      label="Instagram profile (Username or Link) *"
                       hint={
                         normalizeInstagramHandle(form.instagram)
                           ? `Detected handle: @${normalizeInstagramHandle(form.instagram)}`
@@ -1671,7 +1720,7 @@ function Register() {
                         placeholder="@aditi.eats or https://instagram.com/aditi.eats"
                       />
                     </Field>
-                    <Field label="Instagram followers" hint="Min 500, max 300,000 (300K) followers">
+                    <Field label="Instagram followers *" hint="Min 500, max 300,000 (300K) followers">
                       <TextInput
                         value={form.followers}
                         inputMode="numeric"
@@ -1712,7 +1761,7 @@ function Register() {
               {step === 3 ? (
                 <div className="space-y-6">
                   <div>
-                    <Label>Category</Label>
+                    <Label>Category *</Label>
                     <p className="mt-1 text-xs text-muted-foreground">
                       Pick the broad categories that describe your content.
                     </p>
@@ -1728,7 +1777,7 @@ function Register() {
                     </div>
                   </div>
                   <div>
-                    <Label>Content type</Label>
+                    <Label>Content type *</Label>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {CONTENT_TYPES.map((c) => (
                         <Chip
@@ -1742,7 +1791,7 @@ function Register() {
                     </div>
                   </div>
                   <div>
-                    <Label>Languages</Label>
+                    <Label>Languages *</Label>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {LANGUAGES.map((l) => (
                         <Chip
@@ -1761,7 +1810,7 @@ function Register() {
               {step === 4 ? (
                 <div className="space-y-6">
                   <div>
-                    <Label>Collaboration type</Label>
+                    <Label>Collaboration type *</Label>
                     <div className="mt-3 flex flex-wrap gap-2">
                       {COLLAB_TYPES.map((c) => (
                         <Chip
@@ -1775,7 +1824,7 @@ function Register() {
                   </div>
 
                   <Field
-                    label="Starting price (₹)"
+                    label={`Starting price (₹) ${form.collabType === "Barter" ? "(Optional)" : "*"}`}
                     hint={
                       form.collabType === "Barter"
                         ? "Optional for Barter collaborations (or enter base rate up to ₹1,00,000)."
