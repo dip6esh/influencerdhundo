@@ -194,6 +194,7 @@ function Dashboard() {
   const isTrial =
     currentSub?.planId === "trial-3d" ||
     currentSub?.duration?.toLowerCase().includes("3 day");
+  const isDraft = Boolean(mine && (mine.status === "Draft" || !mine.instagram));
   const sub = currentSub;
   const subExpiry = currentSubExpiry;
 
@@ -904,11 +905,12 @@ function Dashboard() {
                     <span>Referral Program — Earn +7 Days Free</span>
                   </div>
                   <h2 className="text-xl sm:text-2xl font-display font-semibold tracking-tight text-foreground">
-                    Invite Creators &amp; Extend Your Subscription
+                    Never Let Your Plan Expire! ⚡
                   </h2>
                   <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-xl">
-                    Share your unique link. When a creator signs up and buys any paid plan, you
-                    receive <strong>+7 extra days</strong> added directly to your subscription.
+                    Share your link or referral code with creator friends. Every time someone joins, you
+                    get <strong>+7 extra days added directly to your active plan</strong> — the more you
+                    invite, the longer your membership plan stays active!
                   </p>
                 </div>
 
@@ -919,6 +921,11 @@ function Dashboard() {
                       <span className="size-2 rounded-full bg-tealdeep animate-pulse" />
                       Referral Code Active
                     </span>
+                  ) : isDraft ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/30">
+                      <span className="size-2 rounded-full bg-amber-500" />
+                      Locked — Complete Profile
+                    </span>
                   ) : isTrial && subActive ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary border border-primary/30">
                       <span className="size-2 rounded-full bg-primary" />
@@ -927,7 +934,7 @@ function Dashboard() {
                   ) : (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 px-3 py-1.5 text-xs font-semibold text-amber-700 dark:text-amber-400 border border-amber-500/30">
                       <span className="size-2 rounded-full bg-amber-500" />
-                      Inactive (Renew plan to earn rewards)
+                      Inactive — Renew Plan
                     </span>
                   )}
                 </div>
@@ -1076,27 +1083,37 @@ function Dashboard() {
                   </div>
                 </div>
               ) : (
-                /* Locked state — trial or expired */
+                /* Locked state — draft, trial, or expired */
                 <div className="mt-5 sm:mt-6 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-5 sm:p-6 text-center">
                   <div className="inline-flex items-center justify-center size-11 rounded-full bg-primary/10 border border-primary/20 mb-2.5">
                     <AlertCircle className="size-5 text-primary" />
                   </div>
                   <h3 className="text-sm font-bold text-foreground">
-                    {isTrial && subActive
-                      ? "Referral Code Locked — Available on Paid Plans"
-                      : "Referral Code Inactive — Renew to Reactivate"}
+                    {isDraft
+                      ? "Complete Your Profile First"
+                      : isTrial && subActive
+                        ? "Referral Code Unlocks on Paid Plans ⚡"
+                        : "Referral Code Inactive — Renew to Reactivate"}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                    {isTrial && subActive
-                      ? "Your referral code unlocks once you activate any paid subscription. Trial accounts cannot share referral links."
-                      : "Your subscription has expired. Renew any paid plan to reactivate your referral code and start earning bonus days again."}
+                    {isDraft
+                      ? "Finish setting up your profile to start your 3-day free trial. Your referral link unlocks once you activate a membership plan!"
+                      : isTrial && subActive
+                        ? "You are currently on the 3-day free trial. Upgrade to any paid plan to unlock your unique referral link and start earning +7 extra days for every friend!"
+                        : "Your subscription has expired. Renew any plan to reactivate your referral link and continue earning +7 extra days!"}
                   </p>
                   <Link
-                    to="/creator/plans"
+                    to={isDraft ? "/creator/register" : "/creator/plans"}
                     className="inline-flex items-center gap-1.5 mt-3.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs"
                   >
                     <ArrowUpRight className="size-4 shrink-0" />
-                    <span>{isTrial && subActive ? "Upgrade to Paid Plan" : "Renew Subscription"}</span>
+                    <span>
+                      {isDraft
+                        ? "Complete Profile Setup →"
+                        : isTrial && subActive
+                          ? "Upgrade to Unlock Referral Code →"
+                          : "Renew Plan →"}
+                    </span>
                   </Link>
                 </div>
               )}
