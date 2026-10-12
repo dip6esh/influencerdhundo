@@ -1106,14 +1106,14 @@ function Dashboard() {
                     to={isDraft ? "/creator/register" : "/creator/plans"}
                     className="inline-flex items-center gap-1.5 mt-3.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs"
                   >
-                    <ArrowUpRight className="size-4 shrink-0" />
                     <span>
                       {isDraft
-                        ? "Complete Profile Setup →"
+                        ? "Complete Profile Setup"
                         : isTrial && subActive
-                          ? "Upgrade to Unlock Referral Code →"
-                          : "Renew Plan →"}
+                          ? "Upgrade to Unlock Referral Code"
+                          : "Renew Plan"}
                     </span>
+                    <ArrowUpRight className="size-3.5 shrink-0" />
                   </Link>
                 </div>
               )}
