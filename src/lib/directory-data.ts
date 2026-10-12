@@ -1039,3 +1039,35 @@ export function validateTrustedEmail(email?: string | null): { valid: boolean; e
 
   return { valid: true };
 }
+
+/**
+ * Clean display name for creators that prevents raw email addresses
+ * or "Incomplete Profile" strings from breaking headings and UI layouts.
+ */
+export function getCreatorDisplayName(
+  creator?: {
+    name?: string | null | undefined;
+    displayName?: string | null | undefined;
+    instagram?: string | null | undefined;
+    status?: string | null | undefined;
+  } | null,
+): string {
+  if (!creator) return "Creator";
+  const rawName = (creator.name || "").trim();
+  const rawDisplay = (creator.displayName || "").trim();
+  const rawInstagram = (creator.instagram || "").trim();
+
+  // If valid name exists and is not an email address or placeholder
+  if (rawName && !rawName.includes("@") && rawName.toLowerCase() !== "incomplete profile") {
+    return rawName;
+  }
+  // If valid displayName exists and is not an email address or placeholder
+  if (rawDisplay && !rawDisplay.includes("@") && rawDisplay.toLowerCase() !== "incomplete profile") {
+    return rawDisplay;
+  }
+  // If instagram handle exists and isn't an email
+  if (rawInstagram && !rawInstagram.includes("@gmail") && !rawInstagram.includes("@yahoo")) {
+    return rawInstagram.startsWith("@") ? rawInstagram : `@${rawInstagram}`;
+  }
+  return creator.status === "Draft" ? "New Creator" : "Creator";
+}

@@ -287,7 +287,9 @@ function CreatorProfile() {
                 <p className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-1.5">
                   <span className="inline-flex items-center gap-1 text-foreground/80">
                     <MapPin className="size-3.5 text-primary" />
-                    {[creator.locality, creator.city, creator.state].filter(Boolean).join(", ")}
+                    {[creator.locality, creator.city, creator.state].filter(Boolean).length > 0
+                      ? `${[creator.locality, creator.city, creator.state].filter(Boolean).join(", ")}${creator.pincode ? ` - ${creator.pincode}` : ""}`
+                      : (creator.pincode ? `PIN: ${creator.pincode}` : "")}
                   </span>
                   {[
                     age !== null ? `${age} yrs old` : null,

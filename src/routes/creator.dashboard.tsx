@@ -11,6 +11,7 @@ import {
   formatTimeRemaining,
   generateReferralCode,
   getActiveSubscription,
+  getCreatorDisplayName,
   getInstagramUrl,
   getCreatorProfileSlug,
   getQueuedSubscriptions,
@@ -176,7 +177,7 @@ function Dashboard() {
       (s) => s.planId !== "trial-3d" && !s.duration?.toLowerCase().includes("3 day"),
     );
     if (mine && !mine.referralCode && hasPaidPlan) {
-      const code = generateReferralCode(mine.name || mine.displayName);
+      const code = generateReferralCode(getCreatorDisplayName(mine));
       supabaseDb.setReferralCode(mine.id, code);
       upsertCreator({ ...mine, referralCode: code });
     }
@@ -468,9 +469,9 @@ function Dashboard() {
           <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
             <div>
               <SectionEyebrow>Creator Portal</SectionEyebrow>
-              <div className="mt-1 flex flex-wrap items-center gap-3">
-                <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-foreground md:text-4xl">
-                  {mine.name}
+              <div className="mt-1 flex flex-wrap items-center gap-3 min-w-0">
+                <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-foreground md:text-4xl truncate max-w-full">
+                  {getCreatorDisplayName(mine)}
                 </h1>
                 <StatusPill status={mine.status} />
               </div>
@@ -572,9 +573,9 @@ function Dashboard() {
                   {/* Creator Info */}
                   <div className="min-w-0 flex-1 space-y-1 sm:space-y-1.5">
                     {/* Line 1: Name + Status */}
-                    <div className="flex items-center gap-2 flex-wrap">
+                    <div className="flex items-center gap-2 flex-wrap min-w-0">
                       <h2 className="text-lg sm:text-2xl font-display font-bold tracking-tight text-foreground truncate max-w-full">
-                        {mine.name || mine.displayName}
+                        {getCreatorDisplayName(mine)}
                       </h2>
                       {mine.status === "Active" ? (
                         <span className="inline-flex items-center gap-1.5 rounded-full bg-tealdeep/10 text-tealdeep border border-tealdeep/25 px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold shrink-0">
@@ -588,11 +589,15 @@ function Dashboard() {
                       )}
                     </div>
 
-                    {/* Line 2: Location, Age, Gender */}
+                    {/* Line 2: Location, Pincode, Age, Gender */}
                     <div className="text-xs sm:text-sm text-muted-foreground flex items-center gap-x-2 gap-y-1 flex-wrap">
                       <span className="inline-flex items-center gap-1 text-foreground/85 font-medium">
                         <MapPin className="size-3.5 text-primary shrink-0" />
-                        <span>{[mine.locality, mine.city, mine.state].filter(Boolean).join(", ") || "Location not set"}</span>
+                        <span>
+                          {[mine.locality, mine.city, mine.state].filter(Boolean).length > 0
+                            ? `${[mine.locality, mine.city, mine.state].filter(Boolean).join(", ")}${mine.pincode ? ` - ${mine.pincode}` : ""}`
+                            : (mine.pincode ? `PIN: ${mine.pincode}` : "Location not set")}
+                        </span>
                       </span>
                       {calculateAge(mine.birthDate) !== null && (
                         <span className="inline-flex items-center gap-1 text-muted-foreground">
@@ -1793,7 +1798,7 @@ function Dashboard() {
           isOpen={showPhotoModal}
           onClose={() => setShowPhotoModal(false)}
           currentPhoto={mine.photo || ""}
-          creatorName={mine.name || mine.displayName || "Creator"}
+          creatorName={getCreatorDisplayName(mine)}
           onUpdatePhoto={async (newPhotoUrl) => {
             return await updateCreatorPhoto(mine.id, newPhotoUrl);
           }}

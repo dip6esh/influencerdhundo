@@ -356,11 +356,17 @@ function Register() {
     const timer = setTimeout(async () => {
       try {
         const draftId = getOrCreateDraftId(form.name, form.email, form.mobile);
-        const currentStepName = STEPS[step] || "Account";
+        const cleanIg = form.instagram?.trim();
+        const fallbackDraftName = cleanIg
+          ? (cleanIg.startsWith("@") ? cleanIg : `@${cleanIg}`)
+          : "New Creator";
+        const resolvedName = form.name.trim() || form.displayName.trim() || fallbackDraftName;
+        const resolvedDisplayName = form.displayName.trim() || form.name.trim() || fallbackDraftName;
+
         const draftLead: Creator = {
           id: draftId,
-          name: form.name.trim() || form.displayName.trim() || form.instagram.trim() || form.email || "Incomplete Profile",
-          displayName: form.displayName.trim() || form.name.trim() || form.instagram.trim() || "Incomplete Profile",
+          name: resolvedName,
+          displayName: resolvedDisplayName,
           photo: form.photo || "",
           city: form.city || "Unassigned",
           locality: form.locality || "",
