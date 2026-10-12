@@ -1090,14 +1090,14 @@ function Dashboard() {
                   </div>
                   <h3 className="text-sm font-bold text-foreground">
                     {isDraft
-                      ? "Complete Your Profile First"
+                      ? "Referral Code Locked — Profile Incomplete"
                       : isTrial && subActive
                         ? "Referral Code Unlocks on Paid Plans ⚡"
                         : "Referral Code Inactive — Renew to Reactivate"}
                   </h3>
                   <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
                     {isDraft
-                      ? "Finish setting up your profile to start your 3-day free trial. Your referral link unlocks once you activate a membership plan!"
+                      ? "Referral codes and links are only available on active paid membership plans. Complete your profile setup to get started!"
                       : isTrial && subActive
                         ? "You are currently on the 3-day free trial. Upgrade to any paid plan to unlock your unique referral link and start earning +7 extra days for every friend!"
                         : "Your subscription has expired. Renew any plan to reactivate your referral link and continue earning +7 extra days!"}
