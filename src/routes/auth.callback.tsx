@@ -94,7 +94,8 @@ function AuthCallbackPage() {
       const storedRole =
         typeof window !== "undefined"
           ? sessionStorage.getItem("influencer_oauth_role") ||
-            localStorage.getItem("influencer_oauth_role")
+            localStorage.getItem("influencer_oauth_role") ||
+            localStorage.getItem("influencer_active_role")
           : null;
       const storedRedirect =
         typeof window !== "undefined"
@@ -125,11 +126,15 @@ function AuthCallbackPage() {
       } else if (explicitRole === "business") {
         isCreatorIntent = false;
       } else {
-        // Fallback when general /login is used without a role
-        isCreatorIntent = !!(creatorProfile && !businessProfile);
+        // Fallback when general /login is used without an explicit role:
+        // Prioritize creator if a creator profile exists, otherwise business
+        isCreatorIntent = Boolean(creatorProfile);
       }
 
       if (isCreatorIntent) {
+        try {
+          localStorage.setItem("influencer_active_role", "creator");
+        } catch (_) {}
         if (creatorProfile) {
           upsertCreator(creatorProfile, true);
           loginCreator(creatorProfile.id);
@@ -146,6 +151,9 @@ function AuthCallbackPage() {
           });
         }
       } else {
+        try {
+          localStorage.setItem("influencer_active_role", "business");
+        } catch (_) {}
         // Business path (default)
         if (businessProfile && businessProfile.mobile) {
           signUpBusiness(businessProfile, user.id);

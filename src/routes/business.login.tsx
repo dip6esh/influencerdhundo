@@ -51,6 +51,9 @@ function BusinessLogin() {
         setError(result.error);
         return;
       }
+      try {
+        localStorage.setItem("influencer_active_role", "business");
+      } catch {}
       setBusiness(result);
       router.history.push(targetUrl);
     } catch {

@@ -59,6 +59,9 @@ function CreatorLogin() {
         return;
       }
       // result is a Creator — load into local state
+      try {
+        localStorage.setItem("influencer_active_role", "creator");
+      } catch {}
       upsertCreator(result, true);
       loginCreator(result.id);
       navigate({ to: "/creator/dashboard" });

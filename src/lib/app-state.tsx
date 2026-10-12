@@ -182,18 +182,26 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         ]);
 
         if (isMounted) {
-          if (persistedCreatorId || (creatorProfile && !persistedBusiness)) {
-            if (creatorProfile) {
-              setCreators((prev) =>
-                prev.some((x) => x.id === creatorProfile.id) ? prev : [creatorProfile, ...prev],
-              );
-              setMyCreatorId(creatorProfile.id);
-              setBusiness(null);
+          const activeRole =
+            typeof window !== "undefined"
+              ? localStorage.getItem("influencer_active_role")
+              : null;
 
-              // Fetch referral events
-              const events = await supabaseDb.fetchReferralEvents(creatorProfile.id);
-              if (isMounted) setReferralEvents(events);
-            }
+          const prefersCreator =
+            activeRole === "creator" ||
+            (activeRole !== "business" && Boolean(persistedCreatorId && !persistedBusiness)) ||
+            (activeRole !== "business" && Boolean(creatorProfile && !businessProfile));
+
+          if (creatorProfile && (prefersCreator || !businessProfile)) {
+            setCreators((prev) =>
+              prev.some((x) => x.id === creatorProfile.id) ? prev : [creatorProfile, ...prev],
+            );
+            setMyCreatorId(creatorProfile.id);
+            setBusiness(null);
+
+            // Fetch referral events
+            const events = await supabaseDb.fetchReferralEvents(creatorProfile.id);
+            if (isMounted) setReferralEvents(events);
           } else if (businessProfile) {
             setBusiness(businessProfile);
             setMyCreatorId(null);
@@ -337,16 +345,29 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       signUpBusiness: (b, authUserId) => {
         setBusiness(b);
         setMyCreatorId(null);
+        try {
+          localStorage.setItem("influencer_active_role", "business");
+        } catch {
+          // ignore
+        }
         supabaseDb.saveBusinessAccount(b, authUserId);
       },
       setBusiness: (b) => {
         setBusiness(b);
-        if (b) setMyCreatorId(null);
+        if (b) {
+          setMyCreatorId(null);
+          try {
+            localStorage.setItem("influencer_active_role", "business");
+          } catch {
+            // ignore
+          }
+        }
       },
       signOutBusiness: () => {
         setBusiness(null);
         setMyCreatorId(null);
         try {
+          localStorage.removeItem("influencer_active_role");
           const raw = localStorage.getItem(STORAGE_KEY);
           if (raw) {
             const p = JSON.parse(raw);
@@ -362,11 +383,17 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       loginCreator: (id: string) => {
         setMyCreatorId(id);
         setBusiness(null);
+        try {
+          localStorage.setItem("influencer_active_role", "creator");
+        } catch {
+          // ignore
+        }
       },
       signOutCreator: () => {
         setMyCreatorId(null);
         setBusiness(null);
         try {
+          localStorage.removeItem("influencer_active_role");
           localStorage.removeItem("influencer-dhundo-creator-draft-v2");
           localStorage.removeItem("influencer-dhundo-creator-draft-id-v2");
           localStorage.removeItem("influencer_referral_code");
