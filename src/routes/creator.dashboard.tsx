@@ -507,10 +507,10 @@ function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-base font-display font-semibold text-foreground">
-                    Profile Setup in Progress (Draft Saved)
+                    Complete your profile
                   </h3>
                   <p className="mt-0.5 text-xs sm:text-sm text-muted-foreground">
-                    Your contact details are safely saved! Complete your Instagram handle and starting rates to publish your profile and begin receiving business inquiries.
+                    Fill in the remaining details to make your profile live and start getting brand deals.
                   </p>
                 </div>
               </div>
@@ -518,7 +518,7 @@ function Dashboard() {
                 to="/creator/register"
                 className="shrink-0 inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
               >
-                Resume Profile Setup →
+                Complete Profile →
               </Link>
             </div>
           ) : null}
@@ -855,28 +855,39 @@ function Dashboard() {
                 ) : (
                   <div className="mt-4 space-y-3">
                     <p className="text-xs text-muted-foreground">
-                      No active subscription. Activate a plan to list your profile in the directory.
+                      {mine?.status === "Draft"
+                        ? "Your profile setup is in progress. Complete your profile to launch your 3-day free trial."
+                        : "No active subscription. Activate a plan to list your profile in the directory."}
                     </p>
                   </div>
                 )}
               </div>
 
               <div className="mt-5 pt-3 border-t border-border/60">
-                <Link
-                  to="/creator/plans"
-                  className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
-                >
-                  <IndianRupee className="size-3.5 shrink-0" />
-                  <span>
-                    {queuedSubs.length > 0
-                      ? "Manage Subscription"
-                      : isTrial && subActive
-                        ? "Upgrade to Paid Plan"
-                        : subActive
-                          ? "Renew / Upgrade Plan"
-                          : "Choose a Plan"}
-                  </span>
-                </Link>
+                {mine?.status === "Draft" ? (
+                  <Link
+                    to="/creator/register"
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
+                  >
+                    <span>Complete Profile to Start Trial →</span>
+                  </Link>
+                ) : (
+                  <Link
+                    to="/creator/plans"
+                    className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary px-4 py-2.5 text-xs sm:text-sm font-semibold text-primary-foreground hover:bg-primary/90 transition-all shadow-xs"
+                  >
+                    <IndianRupee className="size-3.5 shrink-0" />
+                    <span>
+                      {queuedSubs.length > 0
+                        ? "Manage Subscription"
+                        : isTrial && subActive
+                          ? "Upgrade to Paid Plan"
+                          : subActive
+                            ? "Renew / Upgrade Plan"
+                            : "Choose a Plan"}
+                    </span>
+                  </Link>
+                )}
               </div>
             </Card>
           </div>
@@ -1726,13 +1737,23 @@ function Dashboard() {
                     When you purchase a subscription pass, your official Razorpay payment receipts,
                     amounts, and transaction references will appear here.
                   </p>
-                  <Link
-                    to="/creator/plans"
-                    className="inline-flex items-center gap-1.5 mt-4 rounded-xl bg-foreground text-background px-4 py-2 text-xs font-semibold hover:bg-foreground/90 transition-all shadow-xs"
-                  >
-                    <span>View Subscription Plans</span>
-                    <ArrowUpRight className="size-3.5" />
-                  </Link>
+                  {mine?.status === "Draft" ? (
+                    <Link
+                      to="/creator/register"
+                      className="inline-flex items-center gap-1.5 mt-4 rounded-xl bg-foreground text-background px-4 py-2 text-xs font-semibold hover:bg-foreground/90 transition-all shadow-xs"
+                    >
+                      <span>Complete Profile Setup</span>
+                      <ArrowUpRight className="size-3.5" />
+                    </Link>
+                  ) : (
+                    <Link
+                      to="/creator/plans"
+                      className="inline-flex items-center gap-1.5 mt-4 rounded-xl bg-foreground text-background px-4 py-2 text-xs font-semibold hover:bg-foreground/90 transition-all shadow-xs"
+                    >
+                      <span>View Subscription Plans</span>
+                      <ArrowUpRight className="size-3.5" />
+                    </Link>
+                  )}
                 </div>
               )}
             </Card>

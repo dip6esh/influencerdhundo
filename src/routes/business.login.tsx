@@ -3,7 +3,7 @@ import { useState } from "react";
 import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import { supabaseDb } from "@/lib/supabase";
-import { Building2, Eye, EyeOff, Loader2 } from "lucide-react";
+import { Eye, EyeOff, Loader2 } from "lucide-react";
 import { GoogleAuthButton } from "@/components/google-auth-button";
 
 export const Route = createFileRoute("/business/login")({
@@ -66,24 +66,18 @@ function BusinessLogin() {
         <div className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-primary/15 blur-2xl" />
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
-        <div className="relative mx-auto max-w-5xl px-5 flex flex-col items-center text-center">
-          <div className="max-w-xl w-full">
+        <div className="relative mx-auto max-w-5xl px-5 flex flex-col items-start text-left md:items-center md:text-center">
+          <div className="max-w-xl w-full md:mx-auto">
             <SectionEyebrow>Business Portal</SectionEyebrow>
-            <div className="mt-2 flex items-center justify-center gap-3">
-              <div className="flex size-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                <Building2 className="size-5" />
-              </div>
-              <h1 className="text-3xl font-display font-semibold tracking-tight text-balance md:text-4xl">
-                Log in to your business account
-              </h1>
-            </div>
+            <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-4xl">
+              Log in to your business account
+            </h1>
             <p className="mt-3 text-base text-pretty text-muted-foreground">
-              Enter your business email and password to access direct creator contacts and
-              collaboration features.
+              Access direct creator contacts and collaboration features.
             </p>
           </div>
 
-          <div className="mt-8 max-w-md w-full">
+          <div className="mt-8 max-w-md w-full md:mx-auto">
             <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 text-left">
               <div className="space-y-4">
                 <GoogleAuthButton

@@ -343,8 +343,8 @@ function BusinessSignup() {
         <div className="pointer-events-none absolute -top-16 -right-16 size-56 rounded-full bg-primary/15 blur-2xl" />
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
-        <div className="relative mx-auto max-w-5xl px-5 flex flex-col items-center text-center">
-          <div className="max-w-xl w-full">
+        <div className="relative mx-auto max-w-5xl px-5 flex flex-col items-start text-left md:items-center md:text-center">
+          <div className="max-w-2xl w-full md:mx-auto">
             <SectionEyebrow>Free business account</SectionEyebrow>
             <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
               Want to contact creators?
@@ -354,7 +354,7 @@ function BusinessSignup() {
             </p>
           </div>
 
-          <div className="mt-8 max-w-xl w-full">
+          <div className="mt-8 max-w-xl w-full md:mx-auto">
             <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 text-left">
               <div className="space-y-4">
                 <GoogleAuthButton

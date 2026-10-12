@@ -43,9 +43,9 @@ function LoginPage() {
         <div className="pointer-events-none absolute top-40 -left-20 size-48 rounded-full bg-accent/15 blur-2xl" />
 
         <div className="relative mx-auto max-w-5xl px-5">
-          <div className="mx-auto max-w-2xl text-center">
+          <div className="mx-auto max-w-2xl text-left md:text-center">
             <SectionEyebrow>Welcome to Influencer Dhundo</SectionEyebrow>
-            <h1 className="mt-3 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
+            <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
               Choose how you want to log in
             </h1>
             <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">

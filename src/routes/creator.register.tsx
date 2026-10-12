@@ -796,6 +796,67 @@ function Register() {
     }
   };
 
+  /** Creates initial draft profile from the 7 basic fields and takes new creator directly to dashboard */
+  const handleCreateInitialProfile = async () => {
+    const err = validateStep();
+    if (err) {
+      setError(err);
+      return;
+    }
+    setSaving(true);
+    setError("");
+    try {
+      let finalReferredBy: string | null = null;
+      const cleaned = (referralCode || "").trim().toUpperCase();
+      if (cleaned) {
+        const local = creators.find((c) => c.referralCode?.toUpperCase() === cleaned);
+        if (local) {
+          finalReferredBy = local.id;
+        } else {
+          const remote = await supabaseDb.lookupReferralCode(cleaned);
+          if (remote) {
+            finalReferredBy = remote.id;
+          }
+        }
+      }
+
+      const cleanName = (form.name || "").trim();
+      const generatedId = cleanName
+        .toLowerCase()
+        .replace(/[^a-z0-9]+/g, "-")
+        .replace(/^-+|-+$/g, "");
+      const draftId = getOrCreateDraftId(form.name, form.email, form.mobile) || generatedId || `creator-${Date.now()}`;
+
+      const initialDraft: Creator = {
+        ...draft,
+        id: draftId,
+        status: "Draft",
+        referredBy: finalReferredBy || undefined,
+        acceptsProductsDetails: "[Initial Setup - Draft]",
+      };
+
+      const uid = authUserId || (await supabaseDb.getCreatorSession());
+      const res = await upsertCreatorWithAuth(initialDraft, uid);
+      if (!res.success) {
+        setError(res.error || "Could not save your profile. Please check your internet connection.");
+        return;
+      }
+
+      try {
+        localStorage.removeItem(DRAFT_STORAGE_KEY);
+        localStorage.removeItem(DRAFT_ID_KEY);
+        localStorage.removeItem(DRAFT_STEP_KEY);
+      } catch {}
+
+      loginCreator(initialDraft.id);
+      navigate({ to: "/creator/dashboard" });
+    } catch {
+      setError("An unexpected error occurred. Please try again.");
+    } finally {
+      setSaving(false);
+    }
+  };
+
   /** User clicks "I've confirmed" — check if session is active or sign in */
   const handleVerificationCheck = async () => {
     setVerifyError("");
@@ -867,8 +928,10 @@ function Register() {
         }
       }
 
+      const isDraftOrNew = !existing || existing.status === "Draft";
       const finalDraft: Creator = {
         ...draft,
+        status: isDraftOrNew ? "Active" : (existing?.status ?? "Active"),
         referredBy: finalReferredBy || undefined,
       };
 
@@ -883,8 +946,8 @@ function Register() {
         return;
       }
 
-      // Automatically start 3-day free trial for new creators
-      if (!existing && !hasUsedTrial(finalDraft.id)) {
+      // Automatically start 3-day free trial once profile setup is fully completed
+      if (isDraftOrNew && !hasUsedTrial(finalDraft.id) && !existing?.trialStartedAt) {
         await startFreeTrial(finalDraft.id);
       }
 
@@ -1006,60 +1069,98 @@ function Register() {
 
         {/* CONTAINER ALIGNED EXACTLY WITH SITE HEADER / LOGO */}
         <div className="relative mx-auto max-w-5xl px-5">
-          <div className="max-w-2xl">
+          <div className="max-w-2xl text-left md:text-center md:mx-auto">
             <SectionEyebrow>Creator registration</SectionEyebrow>
             <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
               {existing ? "Edit your profile" : "Create your creator profile"}
             </h1>
             <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">
-              Free to create and takes a few minutes. You only pay when you want to be visible in
-              the directory.
+              Set up your profile in 2 minutes and get discovered by local businesses.
             </p>
           </div>
 
-          {/* STEP RAIL */}
-          <div className="mt-8 flex flex-wrap gap-2">
-            {STEPS.filter((_, i) => !(existing && i === 0)).map((s, i) => {
-              // When editing, skip index 0 (Account), so visual index shifts by -1
-              const actualIndex = existing ? i + 1 : i;
-              return (
+          {/* STEP RAIL (Only visible when existing creator is editing) */}
+          {existing && (
+            <div className="mt-8 flex flex-wrap gap-2 md:justify-center">
+              {[
+                { label: "1. Basics", stepIdx: 1 },
+                { label: "2. Social", stepIdx: 2 },
+                { label: "3. Content", stepIdx: 3 },
+                { label: "4. Collaboration", stepIdx: 4 },
+                { label: "Preview", stepIdx: 5 },
+              ].map(({ label, stepIdx }) => (
                 <span
-                  key={s}
+                  key={label}
                   className={
-                    actualIndex === step
+                    step === stepIdx
                       ? "rounded-full bg-foreground px-3.5 py-1.5 text-xs font-semibold text-background shadow-sm"
-                      : actualIndex < step
+                      : step > stepIdx
                         ? "rounded-full bg-accent/15 px-3.5 py-1.5 text-xs font-semibold text-tealdeep"
                         : "rounded-full bg-background px-3.5 py-1.5 text-xs font-medium text-muted-foreground ring-1 ring-border"
                   }
                 >
-                  {i + 1}. {s}
+                  {label}
                 </span>
-              );
-            })}
-          </div>
+              ))}
+            </div>
+          )}
 
           {/* FORM CARD (ALIGNED FLUSH WITH CONTAINER) */}
           <div className="mt-6">
             <Card className="glass-card rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80">
-              {/* CARD HEADER: step indicator only — Save & finish later is in the bottom action bar */}
+              {/* CARD HEADER */}
               <div className="pb-5 mb-6 border-b border-border/70">
-                <div className="flex items-center gap-2">
-                  <span className="text-xs font-bold uppercase tracking-wider text-primary">
-                    Step {existing ? step : step + 1} of {existing ? STEPS.length - 1 : STEPS.length}
-                  </span>
-                  <span className="text-muted-foreground text-xs">•</span>
-                  <span className="text-sm font-semibold text-foreground">
-                    {STEPS[step]}
-                  </span>
-                </div>
-                <p className="text-xs text-muted-foreground mt-0.5">
-                  {step === 0
-                    ? "Create your credentials and link your contact number"
-                    : step === 1
-                      ? "Required fields marked * — all other fields can be completed later"
-                      : "All fields on this step are optional — skip or fill and continue anytime"}
-                </p>
+                {step === 0 && !existing ? (
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">
+                      Create your account
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Set up your login credentials and contact details to get started.
+                    </p>
+                  </div>
+                ) : step === 1 && !existing ? (
+                  <div>
+                    <h2 className="text-lg font-semibold text-foreground">
+                      Basic details
+                    </h2>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      Fill in these 7 quick details to create your creator profile.
+                    </p>
+                  </div>
+                ) : step === 5 ? (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-tealdeep bg-tealdeep/10 px-2.5 py-0.5 rounded-full">
+                        Final Step
+                      </span>
+                      <span className="text-muted-foreground text-xs">•</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        Profile Preview
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      This is how businesses will see your profile in the directory.
+                    </p>
+                  </div>
+                ) : (
+                  <div>
+                    <div className="flex items-center gap-2">
+                      <span className="text-xs font-bold uppercase tracking-wider text-primary">
+                        Step {step} of 4
+                      </span>
+                      <span className="text-muted-foreground text-xs">•</span>
+                      <span className="text-sm font-semibold text-foreground">
+                        {STEPS[step]}
+                      </span>
+                    </div>
+                    <p className="text-xs text-muted-foreground mt-0.5">
+                      {step === 1
+                        ? "Required fields marked * — all other fields can be completed later"
+                        : "All fields on this step are optional — skip or fill and continue anytime"}
+                    </p>
+                  </div>
+                )}
               </div>
 
               {/* ── Step 0: Account (sign-up) ─────────────────────────────────── */}
@@ -1084,21 +1185,12 @@ function Register() {
                       </p>
                     </div>
                   ) : (
-                    /* Standard flow: Google 1-click option + email/password */
+                    /* Standard flow: Google option + email/password */
                     <>
-                      <div className="rounded-xl bg-primary/5 border border-primary/15 p-4">
-                        <p className="text-sm font-semibold text-foreground">
-                          Create your creator account
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                          Sign up in 1 click or use your email and password to get started.
-                        </p>
-                      </div>
-
                       <GoogleAuthButton
                         role="creator"
                         redirectTarget="/creator/register"
-                        label="Sign up in 1-click with Google"
+                        label="Sign up with Google"
                       />
 
                       <div className="relative flex items-center justify-center">
@@ -1229,17 +1321,6 @@ function Register() {
                     ) : null}
                   </Field>
 
-                  <div className="rounded-xl bg-gradient-to-r from-primary/10 via-accent/10 to-primary/10 border border-primary/20 p-3.5 flex items-center gap-3">
-                    <div className="flex size-7 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground font-bold text-xs">
-                      3D
-                    </div>
-                    <div className="text-xs">
-                      <p className="font-semibold text-foreground">3-Day Free Trial Included</p>
-                      <p className="text-muted-foreground">
-                        Your profile automatically goes live for 3 days once created. No credit card required.
-                      </p>
-                    </div>
-                  </div>
 
                   <p className="text-xs text-muted-foreground">
                     Already have an account?{" "}
@@ -1256,273 +1337,319 @@ function Register() {
               {/* ── Step 1: Basics ────────────────────────────────────────────── */}
               {step === 1 ? (
                 <div className="space-y-4">
-                  {/* Referral Code input (shown right after account creation / email verification so creators never miss it) */}
                   {!existing ? (
-                    <div className="rounded-2xl border border-primary/20 bg-primary/5 p-4 space-y-2">
-                      <div className="flex items-center justify-between">
-                        <div className="flex items-center gap-2">
-                          <Gift className="size-4 text-primary shrink-0" />
-                          <span className="text-xs font-semibold uppercase tracking-wider text-primary">
-                            Referral code (optional)
-                          </span>
-                        </div>
-                        {referrerInfo ? (
-                          <span className="text-[11px] font-semibold text-tealdeep bg-tealdeep/10 px-2.5 py-0.5 rounded-full border border-tealdeep/20">
-                            ✓ Connected
-                          </span>
-                        ) : null}
-                      </div>
-                      <p className="text-xs text-muted-foreground">
-                        Were you invited by another creator? Enter their referral code here so they receive credit when you upgrade.
-                      </p>
-                      <TextInput
-                        type="text"
-                        value={referralCode}
-                        maxLength={30}
-                        onChange={(e) => setReferralCode(e.target.value.toUpperCase())}
-                        placeholder="e.g. DHUNDO-RS7X2A"
-                        className="font-mono uppercase tracking-wider bg-background"
-                      />
-                      {referrerInfo ? (
-                        <p className="text-xs font-semibold text-tealdeep">
-                          ✓ Valid invitation from {referrerInfo.name}
-                        </p>
-                      ) : referralCode.trim().length >= 4 ? (
-                        <p className="text-xs text-muted-foreground">
-                          {referralStatus || "Checking code..."}
-                        </p>
-                      ) : null}
-                    </div>
-                  ) : null}
+                    <>
+                      <Field label="Full name *">
+                        <TextInput
+                          value={form.name}
+                          maxLength={100}
+                          onChange={(e) => set("name", e.target.value)}
+                          placeholder="Aditi Sharma"
+                          required
+                        />
+                      </Field>
 
-                  <Field label="Full name *">
-                    <TextInput
-                      value={form.name}
-                      maxLength={100}
-                      onChange={(e) => set("name", e.target.value)}
-                      placeholder="Aditi Sharma"
-                      required
-                    />
-                  </Field>
-                  <Field label="Profile photo (Optional)" hint="JPG, PNG or WebP. Portrait or square works best.">
-                    <div className="space-y-3">
-                      {form.photo ? (
-                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-secondary/40 border border-border/80">
-                          <div className="flex items-center gap-3.5">
-                            <div className="relative size-16 shrink-0 rounded-2xl overflow-hidden ring-2 ring-border shadow-md bg-secondary">
-                              <img
-                                src={form.photo}
-                                alt="Preview"
-                                className="size-full object-cover"
-                              />
-                            </div>
-                            <div>
-                              <p className="text-sm font-semibold text-foreground">Profile Photo Selected</p>
-                              <div className="text-xs text-muted-foreground mt-0.5">
-                                {uploadingPhoto ? (
-                                  <span className="inline-flex items-center text-primary font-medium">
-                                    <Loader2 className="size-3.5 animate-spin mr-1.5" /> Uploading to storage...
-                                  </span>
-                                ) : (
-                                  <span className="text-tealdeep font-medium inline-flex items-center">
-                                    ✓ Photo ready
-                                  </span>
-                                )}
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Email *">
+                          <TextInput
+                            type="email"
+                            value={form.email}
+                            maxLength={255}
+                            onChange={(e) => set("email", e.target.value)}
+                            placeholder="you@email.com"
+                            required
+                          />
+                        </Field>
+                        <Field label="Mobile number *" hint="10-digit number. Used for WhatsApp & brand inquiries">
+                          <TextInput
+                            value={form.mobile}
+                            inputMode="numeric"
+                            maxLength={15}
+                            onChange={(e) => set("mobile", e.target.value)}
+                            placeholder="9820011223"
+                            className="font-mono"
+                            required
+                          />
+                        </Field>
+                      </div>
+
+                      <Field
+                        label="Gender *"
+                        hint="Helps businesses find relevant creators for targeted campaigns"
+                      >
+                        <DropdownSelect
+                          value={form.gender}
+                          onChange={(val) => set("gender", val)}
+                          placeholder="Select gender"
+                          options={GENDERS}
+                        />
+                      </Field>
+
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="State *">
+                          <DropdownSelect
+                            value={form.state}
+                            onChange={(val) => set("state", val)}
+                            placeholder="Select state"
+                            searchPlaceholder="Search state..."
+                            options={STATES}
+                          />
+                        </Field>
+                        <Field label="City *">
+                          <DropdownSelect
+                            value={form.city}
+                            onChange={(val) => set("city", val)}
+                            placeholder="Select city"
+                            searchPlaceholder="Search city..."
+                            options={CITIES}
+                          />
+                        </Field>
+                      </div>
+
+                      <Field label="Pincode *">
+                        <TextInput
+                          value={form.pincode}
+                          inputMode="numeric"
+                          maxLength={6}
+                          onChange={(e) => set("pincode", e.target.value)}
+                          placeholder="400601"
+                          className="font-mono"
+                          required
+                        />
+                      </Field>
+                    </>
+                  ) : (
+                    <>
+                      <Field label="Full name *">
+                        <TextInput
+                          value={form.name}
+                          maxLength={100}
+                          onChange={(e) => set("name", e.target.value)}
+                          placeholder="Aditi Sharma"
+                          required
+                        />
+                      </Field>
+                      <Field label="Profile photo (Optional)" hint="JPG, PNG or WebP. Portrait or square works best.">
+                        <div className="space-y-3">
+                          {form.photo ? (
+                            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 p-4 rounded-2xl bg-secondary/40 border border-border/80">
+                              <div className="flex items-center gap-3.5">
+                                <div className="relative size-16 shrink-0 rounded-2xl overflow-hidden ring-2 ring-border shadow-md bg-secondary">
+                                  <img
+                                    src={form.photo}
+                                    alt="Preview"
+                                    className="size-full object-cover"
+                                  />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">Profile Photo Selected</p>
+                                  <div className="text-xs text-muted-foreground mt-0.5">
+                                    {uploadingPhoto ? (
+                                      <span className="inline-flex items-center text-primary font-medium">
+                                        <Loader2 className="size-3.5 animate-spin mr-1.5" /> Uploading to storage...
+                                      </span>
+                                    ) : (
+                                      <span className="text-tealdeep font-medium inline-flex items-center">
+                                        ✓ Photo ready
+                                      </span>
+                                    )}
+                                  </div>
+                                </div>
+                              </div>
+
+                              <div className="flex items-center gap-2">
+                                {/* Change Photo Button */}
+                                <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-secondary text-foreground text-xs font-semibold ring-1 ring-border/80 transition-all shadow-xs">
+                                  <Camera className="size-3.5 text-primary" />
+                                  <span>Change Photo</span>
+                                  <input
+                                    type="file"
+                                    accept="image/*"
+                                    className="hidden"
+                                    onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (!file) return;
+                                      const localPreview = URL.createObjectURL(file);
+                                      set("photo", localPreview);
+                                      setUploadingPhoto(true);
+                                      try {
+                                        const publicUrl = await supabaseDb.uploadCreatorPhoto(
+                                          file,
+                                          form.name || "creator",
+                                        );
+                                        if (publicUrl) {
+                                          set("photo", publicUrl);
+                                        }
+                                      } catch (err) {
+                                        console.error("Photo upload failed:", err);
+                                      } finally {
+                                        setUploadingPhoto(false);
+                                      }
+                                    }}
+                                  />
+                                </label>
+
+                                {/* Delete / Remove Photo Button */}
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    set("photo", "");
+                                  }}
+                                  className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-semibold ring-1 ring-destructive/30 transition-all shadow-xs cursor-pointer"
+                                  title="Delete photo"
+                                >
+                                  <Trash2 className="size-3.5" />
+                                  <span>Remove</span>
+                                </button>
                               </div>
                             </div>
-                          </div>
-
-                          <div className="flex items-center gap-2">
-                            {/* Change Photo Button */}
-                            <label className="cursor-pointer inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-background hover:bg-secondary text-foreground text-xs font-semibold ring-1 ring-border/80 transition-all shadow-xs">
-                              <Camera className="size-3.5 text-primary" />
-                              <span>Change Photo</span>
-                              <input
-                                type="file"
-                                accept="image/*"
-                                className="hidden"
-                                onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  const localPreview = URL.createObjectURL(file);
-                                  set("photo", localPreview);
-                                  setUploadingPhoto(true);
-                                  try {
-                                    const publicUrl = await supabaseDb.uploadCreatorPhoto(
-                                      file,
-                                      form.name || "creator",
-                                    );
-                                    if (publicUrl) {
-                                      set("photo", publicUrl);
-                                    }
-                                  } catch (err) {
-                                    console.error("Photo upload failed:", err);
-                                  } finally {
-                                    setUploadingPhoto(false);
-                                  }
-                                }}
-                              />
-                            </label>
-
-                            {/* Delete / Remove Photo Button */}
-                            <button
-                              type="button"
-                              onClick={() => {
-                                set("photo", "");
-                              }}
-                              className="inline-flex items-center gap-1.5 px-3 py-1.5 rounded-xl bg-destructive/10 hover:bg-destructive/20 text-destructive text-xs font-semibold ring-1 ring-destructive/30 transition-all shadow-xs cursor-pointer"
-                              title="Delete photo"
-                            >
-                              <Trash2 className="size-3.5" />
-                              <span>Remove</span>
-                            </button>
-                          </div>
-                        </div>
-                      ) : (
-                        <div>
-                          <label className="group flex flex-col items-center justify-center gap-2 p-6 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/60 bg-secondary/15 hover:bg-secondary/30 transition-all cursor-pointer text-center">
-                            <div className="size-12 rounded-2xl bg-secondary/80 flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:scale-105 transition-all">
-                              <Upload className="size-6" />
-                            </div>
+                          ) : (
                             <div>
-                              <p className="text-sm font-semibold text-foreground">
-                                Click or drag to upload photo
-                              </p>
-                              <p className="text-xs text-muted-foreground mt-0.5">
-                                JPG, PNG or WebP up to 5MB (leave empty if you prefer no photo)
-                              </p>
+                              <label className="group flex flex-col items-center justify-center gap-2 p-6 rounded-2xl border-2 border-dashed border-border/80 hover:border-primary/60 bg-secondary/15 hover:bg-secondary/30 transition-all cursor-pointer text-center">
+                                <div className="size-12 rounded-2xl bg-secondary/80 flex items-center justify-center text-muted-foreground group-hover:text-primary group-hover:scale-105 transition-all">
+                                  <Upload className="size-6" />
+                                </div>
+                                <div>
+                                  <p className="text-sm font-semibold text-foreground">
+                                    Click or drag to upload photo
+                                  </p>
+                                  <p className="text-xs text-muted-foreground mt-0.5">
+                                    JPG, PNG or WebP up to 5MB (leave empty if you prefer no photo)
+                                  </p>
+                                </div>
+                                <input
+                                  type="file"
+                                  accept="image/*"
+                                  className="hidden"
+                                  onChange={async (e) => {
+                                      const file = e.target.files?.[0];
+                                      if (!file) return;
+                                      const localPreview = URL.createObjectURL(file);
+                                      set("photo", localPreview);
+                                      setUploadingPhoto(true);
+                                      try {
+                                        const publicUrl = await supabaseDb.uploadCreatorPhoto(
+                                          file,
+                                          form.name || "creator",
+                                        );
+                                        if (publicUrl) {
+                                          set("photo", publicUrl);
+                                        }
+                                      } catch (err) {
+                                        console.error("Photo upload failed:", err);
+                                      } finally {
+                                        setUploadingPhoto(false);
+                                      }
+                                  }}
+                                />
+                              </label>
                             </div>
-                            <input
-                              type="file"
-                              accept="image/*"
-                              className="hidden"
-                              onChange={async (e) => {
-                                  const file = e.target.files?.[0];
-                                  if (!file) return;
-                                  const localPreview = URL.createObjectURL(file);
-                                  set("photo", localPreview);
-                                  setUploadingPhoto(true);
-                                  try {
-                                    const publicUrl = await supabaseDb.uploadCreatorPhoto(
-                                      file,
-                                      form.name || "creator",
-                                    );
-                                    if (publicUrl) {
-                                      set("photo", publicUrl);
-                                    }
-                                  } catch (err) {
-                                    console.error("Photo upload failed:", err);
-                                  } finally {
-                                    setUploadingPhoto(false);
-                                  }
-                              }}
-                            />
-                          </label>
+                          )}
                         </div>
-                      )}
-                    </div>
-                  </Field>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Email *">
-                      <TextInput
-                        type="email"
-                        value={form.email}
-                        maxLength={255}
-                        onChange={(e) => set("email", e.target.value)}
-                        placeholder="you@email.com"
-                        required
-                      />
-                    </Field>
-                    <Field label="Mobile number *" hint="10-digit number. Used for WhatsApp & brand inquiries">
-                      <TextInput
-                        value={form.mobile}
-                        inputMode="numeric"
-                        maxLength={15}
-                        onChange={(e) => set("mobile", e.target.value)}
-                        placeholder="9820011223"
-                        className="font-mono"
-                        required
-                      />
-                    </Field>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field
-                      label="Date of birth (Optional)"
-                      hint={
-                        form.birthDate && calculateAge(form.birthDate) !== null
-                          ? `Age: ${calculateAge(form.birthDate)} years old`
-                          : "Optional — helps calculate your age for targeted campaigns (can be filled later)"
-                      }
-                    >
-                      <DatePicker
-                        value={form.birthDate}
-                        maxDate={new Date().toISOString().split("T")[0]}
-                        onChange={(val) => set("birthDate", val)}
-                        placeholder="Select your date of birth"
-                      />
-                    </Field>
-                    <Field
-                      label="Gender *"
-                      hint="Helps businesses find relevant creators for targeted campaigns"
-                    >
-                      <DropdownSelect
-                        value={form.gender}
-                        onChange={(val) => set("gender", val)}
-                        placeholder="Select gender"
-                        options={GENDERS}
-                      />
-                    </Field>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="State *">
-                      <DropdownSelect
-                        value={form.state}
-                        onChange={(val) => set("state", val)}
-                        placeholder="Select state"
-                        searchPlaceholder="Search state..."
-                        options={STATES}
-                      />
-                    </Field>
-                    <Field label="City *">
-                      <DropdownSelect
-                        value={form.city}
-                        onChange={(val) => set("city", val)}
-                        placeholder="Select city"
-                        searchPlaceholder="Search city..."
-                        options={CITIES}
-                      />
-                    </Field>
-                  </div>
-                  <div className="grid gap-4 sm:grid-cols-2">
-                    <Field label="Area / Locality (Optional)">
-                      <TextInput
-                        value={form.locality}
-                        onChange={(e) => set("locality", e.target.value)}
-                        placeholder="e.g. Thane West, Indiranagar"
-                      />
-                    </Field>
-                    <Field label="Pincode *">
-                      <TextInput
-                        value={form.pincode}
-                        inputMode="numeric"
-                        maxLength={6}
-                        onChange={(e) => set("pincode", e.target.value)}
-                        placeholder="400601"
-                        className="font-mono"
-                        required
-                      />
-                    </Field>
-                  </div>
-                  <Field
-                    label="About you (Optional)"
-                    hint={`${wordCount(form.about)}/300 words — optional, tell businesses briefly about yourself (can be filled later)`}
-                  >
-                    <TextArea
-                      value={form.about}
-                      onChange={(e) => set("about", e.target.value)}
-                      placeholder="I create short-form food content around cafés and local experiences…"
-                    />
-                  </Field>
+                      </Field>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Email *">
+                          <TextInput
+                            type="email"
+                            value={form.email}
+                            maxLength={255}
+                            onChange={(e) => set("email", e.target.value)}
+                            placeholder="you@email.com"
+                            required
+                          />
+                        </Field>
+                        <Field label="Mobile number *" hint="10-digit number. Used for WhatsApp & brand inquiries">
+                          <TextInput
+                            value={form.mobile}
+                            inputMode="numeric"
+                            maxLength={15}
+                            onChange={(e) => set("mobile", e.target.value)}
+                            placeholder="9820011223"
+                            className="font-mono"
+                            required
+                          />
+                        </Field>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field
+                          label="Date of birth (Optional)"
+                          hint={
+                            form.birthDate && calculateAge(form.birthDate) !== null
+                              ? `Age: ${calculateAge(form.birthDate)} years old`
+                              : "Optional — helps calculate your age for targeted campaigns (can be filled later)"
+                          }
+                        >
+                          <DatePicker
+                            value={form.birthDate}
+                            maxDate={new Date().toISOString().split("T")[0]}
+                            onChange={(val) => set("birthDate", val)}
+                            placeholder="Select your date of birth"
+                          />
+                        </Field>
+                        <Field
+                          label="Gender *"
+                          hint="Helps businesses find relevant creators for targeted campaigns"
+                        >
+                          <DropdownSelect
+                            value={form.gender}
+                            onChange={(val) => set("gender", val)}
+                            placeholder="Select gender"
+                            options={GENDERS}
+                          />
+                        </Field>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="State *">
+                          <DropdownSelect
+                            value={form.state}
+                            onChange={(val) => set("state", val)}
+                            placeholder="Select state"
+                            searchPlaceholder="Search state..."
+                            options={STATES}
+                          />
+                        </Field>
+                        <Field label="City *">
+                          <DropdownSelect
+                            value={form.city}
+                            onChange={(val) => set("city", val)}
+                            placeholder="Select city"
+                            searchPlaceholder="Search city..."
+                            options={CITIES}
+                          />
+                        </Field>
+                      </div>
+                      <div className="grid gap-4 sm:grid-cols-2">
+                        <Field label="Area / Locality (Optional)">
+                          <TextInput
+                            value={form.locality}
+                            onChange={(e) => set("locality", e.target.value)}
+                            placeholder="e.g. Thane West, Indiranagar"
+                          />
+                        </Field>
+                        <Field label="Pincode *">
+                          <TextInput
+                            value={form.pincode}
+                            inputMode="numeric"
+                            maxLength={6}
+                            onChange={(e) => set("pincode", e.target.value)}
+                            placeholder="400601"
+                            className="font-mono"
+                            required
+                          />
+                        </Field>
+                      </div>
+                      <Field
+                        label="About you (Optional)"
+                        hint={`${wordCount(form.about)}/300 words — optional, tell businesses briefly about yourself (can be filled later)`}
+                      >
+                        <TextArea
+                          value={form.about}
+                          onChange={(e) => set("about", e.target.value)}
+                          placeholder="I create short-form food content around cafés and local experiences…"
+                        />
+                      </Field>
+                    </>
+                  )}
                 </div>
               ) : null}
 
@@ -1900,9 +2027,9 @@ function Register() {
                     <div />
                   )}
 
-                  {/* Right: Save & finish later + Continue/Submit */}
+                  {/* Right: Save & finish later + Continue/Submit / Create your profile */}
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-3">
-                    {step >= 1 && (
+                    {step >= 1 && existing && (
                       <Button
                         variant="ink"
                         type="button"
@@ -1924,7 +2051,24 @@ function Register() {
                       </Button>
                     )}
 
-                    {step < STEPS.length - 1 ? (
+                    {step === 1 && !existing ? (
+                      <Button
+                        variant="primary"
+                        type="button"
+                        className="w-full sm:w-auto justify-center gap-2 shadow-xs"
+                        disabled={saving}
+                        onClick={handleCreateInitialProfile}
+                      >
+                        {saving ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            <span>Creating profile...</span>
+                          </>
+                        ) : (
+                          "Create your profile 🚀"
+                        )}
+                      </Button>
+                    ) : step < STEPS.length - 1 ? (
                       <Button
                         variant="primary"
                         type="button"
@@ -1950,7 +2094,7 @@ function Register() {
                         ) : existing?.status === "Active" ? (
                           "Save changes"
                         ) : (
-                          "Launch Profile & Start Free Trial 🚀"
+                          "Launch Profile 🚀"
                         )}
                       </Button>
                     )}
@@ -1958,16 +2102,6 @@ function Register() {
                 </div>
               </div>
             </Card>
-
-            <p className="mt-6 text-center text-xs text-muted-foreground">
-              Already created a profile?{" "}
-              <Link
-                to="/creator/dashboard"
-                className="underline underline-offset-4 font-medium text-foreground hover:text-primary"
-              >
-                Go to your dashboard
-              </Link>
-            </p>
           </div>
         </div>
       </section>

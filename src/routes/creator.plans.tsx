@@ -74,6 +74,9 @@ function Plans() {
       ),
   );
 
+  // Profile completion check: creator must have a completed, active profile to upgrade/purchase plans
+  const isProfileIncomplete = Boolean(!mine || mine.status === "Draft" || !mine.instagram);
+
   const [selectedPlanId, setSelectedPlanId] = useState<string>("3m");
   const [promoCodeInput, setPromoCodeInput] = useState("");
   const [appliedDiscount, setAppliedDiscount] = useState<{
@@ -214,6 +217,14 @@ function Plans() {
   const handleActivate = async () => {
     if (!mine) return;
     setPaymentError("");
+
+    if (isProfileIncomplete) {
+      setPaymentError(
+        "Please complete your profile setup first. Your 3-day free trial will start once complete, before you need to choose a paid plan.",
+      );
+      return;
+    }
+
     setProcessing(true);
 
     try {
@@ -372,6 +383,31 @@ function Plans() {
             </p>
           </div>
 
+          {/* INCOMPLETE PROFILE WARNING BANNER */}
+          {isProfileIncomplete ? (
+            <div className="mt-6 rounded-2xl sm:rounded-3xl bg-amber-500/10 border-2 border-amber-500/40 p-5 sm:p-6 shadow-md flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+              <div className="flex items-start gap-3.5">
+                <div className="flex size-11 shrink-0 items-center justify-center rounded-2xl bg-amber-500 text-white shadow-sm">
+                  <AlertCircle className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-base font-display font-semibold text-foreground">
+                    Complete your profile first
+                  </h3>
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground leading-relaxed">
+                    Your profile setup is not complete yet. Complete your profile details to launch your <strong>3-day free trial</strong> and make your profile active before choosing a membership plan.
+                  </p>
+                </div>
+              </div>
+              <Link
+                to="/creator/register"
+                className="shrink-0 inline-flex items-center justify-center gap-2 rounded-xl bg-primary text-primary-foreground px-5 py-2.5 text-xs sm:text-sm font-semibold hover:bg-primary/90 transition-all shadow-sm"
+              >
+                Complete Profile Setup →
+              </Link>
+            </div>
+          ) : null}
+
           {/* ACTIVE SUBSCRIPTION QUEUE NOTICE BANNER */}
           {hasActivePlan && queueStartTime ? (
             <div className="mt-6 rounded-2xl bg-gradient-to-r from-accent/20 via-primary/15 to-accent/10 p-4 border border-accent/30 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
@@ -402,8 +438,8 @@ function Plans() {
             </div>
           ) : null}
 
-          {/* QUICK PROMO NOTICE BANNER — only shown if trial not yet used and no active plan */}
-          {!hasActivePlan && !appliedDiscount && !trialAlreadyUsed ? (
+          {/* QUICK PROMO NOTICE BANNER — only shown if trial not yet used, profile is complete, and no active plan */}
+          {!isProfileIncomplete && !hasActivePlan && !appliedDiscount && !trialAlreadyUsed ? (
             <div className="mt-6 rounded-2xl bg-gradient-to-r from-primary/15 via-accent/15 to-primary/10 p-4 border border-primary/20 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-3 shadow-sm">
               <div className="flex items-center gap-3">
                 <div className="flex size-9 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow-sm">
@@ -766,38 +802,52 @@ function Plans() {
                       </div>
                     ) : null}
 
-                    <Button
-                      variant={isTrialApplied ? "ink" : "primary"}
-                      className="w-full justify-center py-4 text-base font-semibold shadow-md gap-2"
-                      disabled={processing}
-                      onClick={handleActivate}
-                    >
-                      {processing ? (
-                        <>
-                          <Loader2 className="size-4 animate-spin" />
-                          {isTrialApplied
-                            ? "Activating free trial..."
-                            : hasActivePlan
-                            ? "Queueing plan..."
-                            : "Processing payment..."}
-                        </>
-                      ) : isTrialApplied ? (
-                        <>
-                          <Zap className="size-4" />
-                          Activate 3 Days Free Trial (₹0)
-                        </>
-                      ) : hasActivePlan ? (
-                        `Pay ${formatPrice(finalPrice)} & Queue Plan`
-                      ) : (
-                        `Pay ${formatPrice(finalPrice)} & Activate`
-                      )}
-                    </Button>
+                    {isProfileIncomplete ? (
+                      <div className="space-y-2">
+                        <Link
+                          to="/creator/register"
+                          className="w-full inline-flex items-center justify-center py-4 px-4 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-base font-semibold shadow-md gap-2 transition-all text-center"
+                        >
+                          Complete Profile to Unlock Plans →
+                        </Link>
+                        <p className="text-center text-[11px] text-muted-foreground">
+                          Your profile must be complete and active before selecting a membership plan.
+                        </p>
+                      </div>
+                    ) : (
+                      <Button
+                        variant={isTrialApplied ? "ink" : "primary"}
+                        className="w-full justify-center py-4 text-base font-semibold shadow-md gap-2"
+                        disabled={processing}
+                        onClick={handleActivate}
+                      >
+                        {processing ? (
+                          <>
+                            <Loader2 className="size-4 animate-spin" />
+                            {isTrialApplied
+                              ? "Activating free trial..."
+                              : hasActivePlan
+                              ? "Queueing plan..."
+                              : "Processing payment..."}
+                          </>
+                        ) : isTrialApplied ? (
+                          <>
+                            <Zap className="size-4" />
+                            Activate 3 Days Free Trial (₹0)
+                          </>
+                        ) : hasActivePlan ? (
+                          `Pay ${formatPrice(finalPrice)} & Queue Plan`
+                        ) : (
+                          `Pay ${formatPrice(finalPrice)} & Activate`
+                        )}
+                      </Button>
+                    )}
 
                     <Link
                       to="/creator/dashboard"
                       className="block text-center text-xs text-muted-foreground hover:text-foreground underline underline-offset-4 pt-1"
                     >
-                      Skip for now (remain hidden)
+                      Back to Dashboard
                     </Link>
                   </div>
                 )}
