@@ -17,11 +17,9 @@ import {
   CalendarClock,
   Check,
   CheckCircle2,
-  CreditCard,
   Gift,
   Layers,
   Loader2,
-  QrCode,
   ShieldCheck,
   Sparkles,
   Tag,
@@ -48,8 +46,6 @@ export const Route = createFileRoute("/creator/plans")({
   }),
   component: Plans,
 });
-
-type PaymentMethod = "upi" | "card" | "netbanking";
 
 function Plans() {
   const navigate = useNavigate();
@@ -92,7 +88,6 @@ function Plans() {
   } | null>(null);
   const [promoError, setPromoError] = useState("");
   const [validatingPromo, setValidatingPromo] = useState(false);
-  const [paymentMethod, setPaymentMethod] = useState<PaymentMethod>("upi");
   const [processing, setProcessing] = useState(false);
   const [paymentError, setPaymentError] = useState("");
   const [success, setSuccess] = useState(false);
@@ -678,37 +673,6 @@ function Plans() {
                 )}
               </Card>
 
-              {/* PAYMENT METHOD (Only if amount > 0) */}
-              {finalPrice > 0 ? (
-                <Card className="glass-card rounded-2xl p-6 border border-border/80">
-                  <h3 className="text-sm font-semibold mb-3">3. Payment method</h3>
-                  <div className="grid grid-cols-3 gap-2">
-                    {[
-                      { id: "upi", label: "UPI / QR", icon: QrCode },
-                      { id: "card", label: "Card", icon: CreditCard },
-                      { id: "netbanking", label: "NetBanking", icon: ShieldCheck },
-                    ].map((pm) => {
-                      const Icon = pm.icon;
-                      const active = paymentMethod === pm.id;
-                      return (
-                        <button
-                          key={pm.id}
-                          type="button"
-                          onClick={() => setPaymentMethod(pm.id as PaymentMethod)}
-                          className={`rounded-xl p-3 text-center border transition-all cursor-pointer flex flex-col items-center gap-1.5 ${
-                            active
-                              ? "bg-primary/10 border-primary text-foreground font-semibold shadow-xs"
-                              : "bg-background border-border text-muted-foreground hover:border-foreground/30"
-                          }`}
-                        >
-                          <Icon className={`size-4 ${active ? "text-primary" : ""}`} />
-                          <span className="text-xs">{pm.label}</span>
-                        </button>
-                      );
-                    })}
-                  </div>
-                </Card>
-              ) : null}
             </div>
 
             {/* RIGHT COLUMN: ORDER SUMMARY */}
@@ -855,9 +819,22 @@ function Plans() {
                       </Button>
                     )}
 
+                    {/* Razorpay Trust Badge */}
+                    {finalPrice > 0 && !isProfileIncomplete && (
+                      <div className="pt-2 text-center">
+                        <div className="inline-flex items-center justify-center gap-1.5 text-[11px] text-muted-foreground font-medium">
+                          <ShieldCheck className="size-3.5 text-tealdeep shrink-0" />
+                          <span>100% Secure Checkout via Razorpay</span>
+                        </div>
+                        <p className="text-[10px] text-muted-foreground/80 mt-0.5">
+                          UPI (GPay, PhonePe, Paytm), Cards &amp; NetBanking
+                        </p>
+                      </div>
+                    )}
+
                     <Link
                       to="/creator/dashboard"
-                      className="inline-flex items-center justify-center gap-1.5 w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground pt-2 transition-colors"
+                      className="inline-flex items-center justify-center gap-1.5 w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground pt-1 transition-colors"
                     >
                       <ArrowLeft className="size-3 shrink-0" />
                       <span>Back to Dashboard</span>
