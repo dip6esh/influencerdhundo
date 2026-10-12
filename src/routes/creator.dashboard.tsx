@@ -615,11 +615,11 @@ function Dashboard() {
                           href={getInstagramUrl(mine.instagram)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/80 hover:bg-secondary text-xs font-semibold text-foreground/80 hover:text-foreground border border-border/70 transition-all hover:scale-102 shadow-2xs shrink-0"
+                          className="inline-flex items-center justify-center size-7 rounded-lg bg-secondary/80 hover:bg-secondary text-foreground border border-border/70 transition-all hover:scale-105 shadow-2xs shrink-0"
                           title="Open Instagram profile"
+                          aria-label="Open Instagram profile"
                         >
-                          <InstagramIcon className="size-3.5 shrink-0" />
-                          <span className="font-mono text-[11px]">{mine.instagram.startsWith("@") ? mine.instagram : `@${mine.instagram}`}</span>
+                          <InstagramIcon className="size-4 shrink-0" />
                         </a>
                       )}
                       <button
