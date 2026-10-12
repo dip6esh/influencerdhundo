@@ -60,6 +60,39 @@ function Plans() {
   const lastQueued = queuedSubs.length > 0 ? queuedSubs[queuedSubs.length - 1] : undefined;
   const queueStartTime = lastQueued ? getSubscriptionExpiry(lastQueued) : currentExpiry;
 
+  const isProfileIncomplete = Boolean(!mine || mine.status === "Draft" || !mine.instagram);
+
+  const isCurrentPlanTrial = Boolean(
+    activeSub &&
+      (activeSub.isTrial ||
+        activeSub.planId === "trial-3d" ||
+        activeSub.duration?.toLowerCase().includes("3 day")),
+  );
+
+  const headerEyebrow = isProfileIncomplete
+    ? "Creator Membership"
+    : hasActivePlan
+      ? isCurrentPlanTrial
+        ? "3-Day Free Trial Active"
+        : "Membership Active"
+      : "Membership Renewal";
+
+  const headerTitle = isProfileIncomplete
+    ? "Activate your creator profile"
+    : hasActivePlan
+      ? isCurrentPlanTrial
+        ? "Keep your profile active & get discovered"
+        : "Extend your creator membership"
+      : "Reactivate your creator profile";
+
+  const headerSubtitle = isProfileIncomplete
+    ? "Complete your profile setup to launch your 3-day free trial and start getting discovered by local businesses."
+    : hasActivePlan
+      ? isCurrentPlanTrial
+        ? "You are currently live on your 3-day free trial. Choose a plan below to keep your profile permanently visible to brands and unlock your referral link."
+        : "Queue your next subscription period in advance. It will automatically activate the moment your current plan expires."
+      : "Renew your membership plan to put your profile back in front of brands and businesses looking for local creators.";
+
   // One-time trial enforcement: Strictly allowed only once per creator
   const trialAlreadyUsed = Boolean(
     mine?.trialStartedAt ||
@@ -70,9 +103,6 @@ function Plans() {
           (s.planId === "trial-3d" || s.isTrial === true || s.duration?.toLowerCase().includes("3 day")),
       ),
   );
-
-  // Profile completion check: creator must have a completed, active profile to upgrade/purchase plans
-  const isProfileIncomplete = Boolean(!mine || mine.status === "Draft" || !mine.instagram);
 
   const [selectedPlanId, setSelectedPlanId] = useState<string>("3m");
   const [promoCodeInput, setPromoCodeInput] = useState("");
@@ -380,13 +410,12 @@ function Plans() {
           </div>
 
           <div className="max-w-2xl">
-            <SectionEyebrow>Membership &amp; Payment</SectionEyebrow>
+            <SectionEyebrow>{headerEyebrow}</SectionEyebrow>
             <h1 className="mt-2 text-3xl font-display font-semibold tracking-tight text-balance md:text-5xl">
-              Make your profile visible
+              {headerTitle}
             </h1>
             <p className="mt-3 text-base text-pretty text-muted-foreground md:text-lg">
-              Once active, your profile appears immediately in the public directory so local
-              businesses can discover and contact you directly.
+              {headerSubtitle}
             </p>
           </div>
 
