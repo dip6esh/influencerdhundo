@@ -832,13 +832,37 @@ function Plans() {
                       </div>
                     )}
 
-                    <Link
-                      to="/creator/dashboard"
-                      className="inline-flex items-center justify-center gap-1.5 w-full text-center text-xs font-medium text-muted-foreground hover:text-foreground pt-1 transition-colors"
-                    >
-                      <ArrowLeft className="size-3 shrink-0" />
-                      <span>Back to Dashboard</span>
-                    </Link>
+                    {/* Terms & Policies Consent */}
+                    <p className="text-[11px] text-muted-foreground text-center pt-2 leading-relaxed">
+                      By proceeding to pay, you agree to our{" "}
+                      <Link
+                        to="/terms"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-foreground underline underline-offset-2 hover:text-primary transition-colors"
+                      >
+                        Terms &amp; Conditions
+                      </Link>
+                      ,{" "}
+                      <Link
+                        to="/privacy"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-foreground underline underline-offset-2 hover:text-primary transition-colors"
+                      >
+                        Privacy Policy
+                      </Link>
+                      , and{" "}
+                      <Link
+                        to="/refund-policy"
+                        target="_blank"
+                        rel="noreferrer"
+                        className="text-foreground underline underline-offset-2 hover:text-primary transition-colors"
+                      >
+                        Refund Policy
+                      </Link>
+                      .
+                    </p>
                   </div>
                 )}
 
