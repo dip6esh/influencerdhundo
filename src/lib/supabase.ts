@@ -389,6 +389,54 @@ export const supabaseDb = {
     }
   },
 
+  /** Record a 100% promo / free pass redemption invoice in the payments audit table. */
+  async recordPromoPayment(params: {
+    creatorId: string;
+    planId: string;
+    promoCode?: string;
+  }): Promise<PaymentRecord | null> {
+    try {
+      const codeUpper = (params.promoCode || "100OFF").trim().toUpperCase();
+      const randomSuffix = Math.random().toString(36).substring(2, 7).toUpperCase();
+      const orderRef = `PROMO-${codeUpper}-${randomSuffix}`;
+      const paymentRef = `PASS-${codeUpper}-${randomSuffix}`;
+      const payload = {
+        creator_id: params.creatorId,
+        razorpay_order_id: orderRef,
+        razorpay_payment_id: paymentRef,
+        razorpay_signature: "PROMO_DISCOUNT_100_VERIFIED",
+        amount: 0,
+        currency: "INR",
+        plan_id: params.planId,
+        status: "captured",
+        promo_code_used: codeUpper,
+        referral_code_used: codeUpper,
+      };
+      const { data, error } = await supabase.from("payments").insert([payload]).select().maybeSingle();
+      if (error || !data) {
+        console.warn("recordPromoPayment error:", error?.message);
+        return null;
+      }
+      return {
+        id: data.id as string,
+        creatorId: data.creator_id as string,
+        razorpayOrderId: data.razorpay_order_id as string,
+        razorpayPaymentId: data.razorpay_payment_id as string,
+        razorpaySignature: data.razorpay_signature as string,
+        amount: 0,
+        currency: "INR",
+        planId: data.plan_id as string,
+        status: "captured",
+        createdAt: data.created_at as string,
+        promoCodeUsed: codeUpper,
+        referralCodeUsed: codeUpper,
+      };
+    } catch (e) {
+      console.warn("recordPromoPayment exception:", e);
+      return null;
+    }
+  },
+
   async saveBusinessAccount(
     business: BusinessAccount,
     authUserId?: string | null,

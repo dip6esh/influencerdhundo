@@ -279,9 +279,14 @@ function Plans() {
           appliedDiscount?.code,
         );
 
-        // If a 100% discount code was used, increment usage count
+        // If a 100% discount code was used, increment usage count & record ₹0 invoice
         if (appliedDiscount?.code && !isTrialApplied) {
           await supabaseDb.incrementDiscountCodeUsage(appliedDiscount.code);
+          await supabaseDb.recordPromoPayment({
+            creatorId: mine.id,
+            planId: planIdToActivate,
+            promoCode: appliedDiscount.code,
+          });
         }
 
         setSuccess(true);

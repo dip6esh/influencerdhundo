@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useMemo } from "react";
 import { Button, Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
 import { InstagramIcon, WhatsAppIcon, FacebookIcon, YouTubeIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
@@ -74,6 +74,25 @@ const STATUS_NOTE: Record<string, string> = {
   Suspended: "Your profile has been temporarily removed by the platform.",
 };
 
+function getCachedPayments(creatorId?: string | null): PaymentRecord[] {
+  if (!creatorId || typeof window === "undefined") return [];
+  try {
+    const raw = localStorage.getItem(`influencer-dhundo-payments-${creatorId}`);
+    if (raw) {
+      const parsed = JSON.parse(raw);
+      if (Array.isArray(parsed) && parsed.length > 0) return parsed;
+    }
+  } catch {}
+  return [];
+}
+
+function setCachedPayments(creatorId: string, records: PaymentRecord[]) {
+  if (!creatorId || typeof window === "undefined") return;
+  try {
+    localStorage.setItem(`influencer-dhundo-payments-${creatorId}`, JSON.stringify(records));
+  } catch {}
+}
+
 function Dashboard() {
   const {
     creators,
@@ -91,7 +110,9 @@ function Dashboard() {
   const [loading, setLoading] = useState(!mine);
   const [copiedLink, setCopiedLink] = useState(false);
   const [copiedCode, setCopiedCode] = useState(false);
-  const [payments, setPayments] = useState<PaymentRecord[]>([]);
+  const [payments, setPayments] = useState<PaymentRecord[]>(() => {
+    return getCachedPayments(myCreatorId);
+  });
   const [loadingPayments, setLoadingPayments] = useState(false);
   const [copiedPaymentId, setCopiedPaymentId] = useState<string | null>(null);
   const [selectedReceipt, setSelectedReceipt] = useState<PaymentRecord | null>(null);
@@ -117,10 +138,19 @@ function Dashboard() {
     }
   }, [loading, myCreatorId, navigate]);
 
-  // Subscriptions & Queued plans calculation
-  const userSubs = subscriptions.filter((s) => s.creatorId === myCreatorId);
-  const activeSub = myCreatorId ? getActiveSubscription(subscriptions, myCreatorId) : undefined;
-  const queuedSubs = myCreatorId ? getQueuedSubscriptions(subscriptions, myCreatorId) : [];
+  // Subscriptions & Queued plans calculation (memoized to prevent render loops)
+  const userSubs = useMemo(
+    () => subscriptions.filter((s) => s.creatorId === myCreatorId),
+    [subscriptions, myCreatorId],
+  );
+  const activeSub = useMemo(
+    () => (myCreatorId ? getActiveSubscription(subscriptions, myCreatorId) : undefined),
+    [subscriptions, myCreatorId],
+  );
+  const queuedSubs = useMemo(
+    () => (myCreatorId ? getQueuedSubscriptions(subscriptions, myCreatorId) : []),
+    [subscriptions, myCreatorId],
+  );
   const latestSub = userSubs[0];
 
   // Auto-fetch profile from Supabase & sync latest data in background on mount
@@ -145,15 +175,61 @@ function Dashboard() {
     };
   }, []);
 
-  // Fetch payments records for this creator
+  // Fetch payments records for this creator with Instant Stale-While-Revalidate caching
   useEffect(() => {
     let isMounted = true;
-    async function loadPayments() {
-      if (!mine?.id) return;
+    if (!mine?.id) return;
+
+    // Immediately load from localStorage cache if state is empty for instant 0ms display
+    const cached = getCachedPayments(mine.id);
+    if (cached.length > 0) {
+      setPayments((prev) => (prev.length === 0 ? cached : prev));
+      setLoadingPayments(false);
+    } else {
+      // Only show spinner if there is no cached data to display
+      setPayments((prev) => (prev.length === 0 ? [] : prev));
       setLoadingPayments(true);
+    }
+
+    async function loadPayments() {
       try {
-        const records = await supabaseDb.fetchPaymentsForCreator(mine.id);
-        if (isMounted) setPayments(records);
+        const records = await supabaseDb.fetchPaymentsForCreator(mine!.id);
+
+        // Also synthesize any 100% promo activations from subscriptions so historical free passes have receipts
+        const promoSubs = subscriptions.filter(
+          (s) => s.creatorId === mine!.id && !s.isTrial && s.planId !== "trial-3d" && (s.price === 0 || s.price == null),
+        );
+        const mergedRecords: PaymentRecord[] = [...records];
+        for (const sub of promoSubs) {
+          const alreadyRecorded = records.some(
+            (r) =>
+              (r.planId === sub.planId && r.amount === 0) ||
+              (sub.referralCodeUsed && r.promoCodeUsed === sub.referralCodeUsed),
+          );
+          if (!alreadyRecorded) {
+            const codeUpper = (sub.referralCodeUsed || "PROMO").toUpperCase();
+            const cleanId = (sub.id || "PASS").replace(/[^a-zA-Z0-9]/g, "").slice(0, 6).toUpperCase();
+            mergedRecords.push({
+              id: `promo-${sub.id || sub.planId}`,
+              creatorId: mine!.id,
+              razorpayOrderId: `PROMO-${codeUpper}-${cleanId}`,
+              razorpayPaymentId: `PASS-${codeUpper}-${cleanId}`,
+              razorpaySignature: "PROMO_DISCOUNT_100_VERIFIED",
+              amount: 0,
+              currency: "INR",
+              planId: sub.planId,
+              status: "captured",
+              createdAt: sub.startedAt || new Date().toISOString(),
+              promoCodeUsed: sub.referralCodeUsed || undefined,
+              referralCodeUsed: sub.referralCodeUsed || undefined,
+            });
+          }
+        }
+        mergedRecords.sort((a, b) => new Date(b.createdAt).getTime() - new Date(a.createdAt).getTime());
+        if (isMounted) {
+          setPayments(mergedRecords);
+          setCachedPayments(mine!.id, mergedRecords);
+        }
       } finally {
         if (isMounted) setLoadingPayments(false);
       }
@@ -162,7 +238,7 @@ function Dashboard() {
     return () => {
       isMounted = false;
     };
-  }, [mine?.id]);
+  }, [mine?.id, subscriptions.length]);
 
   // Fetch referral events when creator ID is ready
   useEffect(() => {
@@ -173,15 +249,16 @@ function Dashboard() {
 
   // Only generate/save referral code for paid subscribers (not trial-only users)
   useEffect(() => {
+    if (!mine?.id) return;
     const hasPaidPlan = userSubs.some(
       (s) => s.planId !== "trial-3d" && !s.duration?.toLowerCase().includes("3 day"),
     );
-    if (mine && !mine.referralCode && hasPaidPlan) {
+    if (!mine.referralCode && hasPaidPlan) {
       const code = generateReferralCode(getCreatorDisplayName(mine));
       supabaseDb.setReferralCode(mine.id, code);
       upsertCreator({ ...mine, referralCode: code });
     }
-  }, [mine, userSubs, upsertCreator]);
+  }, [mine?.id, mine?.referralCode, userSubs, upsertCreator]);
 
   // Subscription expiration calculation (safeguards active trial vs queued plans)
   const currentSub = activeSub || latestSub;
@@ -1609,11 +1686,23 @@ function Dashboard() {
                               </div>
                             </div>
                             <div className="text-right">
-                              <p className="text-base font-bold text-saffrondeep">{formatPrice(p.amount)}</p>
-                              <span className="inline-flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-tealdeep">
-                                <Check className="size-2.5" />
-                                Paid
-                              </span>
+                              {p.amount === 0 ? (
+                                <>
+                                  <p className="text-base font-bold text-emerald-800 dark:text-emerald-300">₹0</p>
+                                  <span className="inline-flex items-center gap-1 rounded bg-purple-500/15 border border-purple-500/25 px-1.5 py-0.5 text-[10px] font-bold text-purple-700 dark:text-purple-300">
+                                    <Tag className="size-2.5" />
+                                    100% Free
+                                  </span>
+                                </>
+                              ) : (
+                                <>
+                                  <p className="text-base font-bold text-saffrondeep">{formatPrice(p.amount)}</p>
+                                  <span className="inline-flex items-center gap-1 rounded bg-accent/15 px-1.5 py-0.5 text-[10px] font-bold text-tealdeep">
+                                    <Check className="size-2.5" />
+                                    Paid
+                                  </span>
+                                </>
+                              )}
                             </div>
                           </div>
 
@@ -1717,8 +1806,17 @@ function Dashboard() {
                                   <span className="text-muted-foreground text-[11px]">Standard</span>
                                 )}
                               </td>
-                              <td className="px-4 py-3.5 font-bold text-saffrondeep whitespace-nowrap">
-                                {formatPrice(p.amount)}
+                              <td className="px-4 py-3.5 font-bold whitespace-nowrap">
+                                {p.amount === 0 ? (
+                                  <span className="inline-flex items-center gap-1.5 font-bold text-emerald-800 dark:text-emerald-300">
+                                    ₹0
+                                    <span className="text-[10px] font-bold px-1.5 py-0.5 rounded bg-emerald-500/15 border border-emerald-500/30 text-emerald-700 dark:text-emerald-300">
+                                      100% OFF
+                                    </span>
+                                  </span>
+                                ) : (
+                                  <span className="text-saffrondeep">{formatPrice(p.amount)}</span>
+                                )}
                               </td>
                               <td className="px-4 py-3.5">
                                 <div className="flex items-center gap-1.5">
@@ -1746,10 +1844,17 @@ function Dashboard() {
                                 </div>
                               </td>
                               <td className="px-4 py-3.5 whitespace-nowrap">
-                                <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep text-[11px]">
-                                  <Check className="size-3" />
-                                  Paid
-                                </span>
+                                {p.amount === 0 ? (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/15 border border-purple-500/30 px-2 py-0.5 font-bold text-purple-700 dark:text-purple-300 text-[11px]">
+                                    <Tag className="size-3" />
+                                    Free Pass
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-md bg-accent/15 px-2 py-0.5 font-bold text-tealdeep text-[11px]">
+                                    <Check className="size-3" />
+                                    Paid
+                                  </span>
+                                )}
                               </td>
                               <td className="px-4 py-3.5 text-right whitespace-nowrap">
                                 <button
@@ -2483,7 +2588,7 @@ function PaymentReceiptModal({
                 </div>
               </div>
               <div class="invoice-badge-wrap">
-                <span class="badge-paid">✓ PAID • RAZORPAY VERIFIED</span>
+                <span class="badge-paid">${receipt.amount === 0 ? "✓ 100% PROMO PASS • VERIFIED" : "✓ PAID • RAZORPAY VERIFIED"}</span>
                 <div class="inv-id">${invoiceNumber}</div>
                 <div class="inv-date">Date: ${formattedDate}</div>
               </div>
@@ -2501,10 +2606,10 @@ function PaymentReceiptModal({
               </div>
 
               <div class="info-card">
-                <div class="info-card-label">Merchant &amp; Gateway</div>
+                <div class="info-card-label">Merchant &amp; Platform</div>
                 <div class="info-card-name">Influencer Dhundo Platform</div>
-                <div class="info-card-line">Processor: Razorpay Software Pvt Ltd</div>
-                <div class="info-card-line">Mode: Live Production Gateway (INR)</div>
+                <div class="info-card-line">Issuer: Influencer Dhundo Marketplace</div>
+                <div class="info-card-line">Payment Method: ${receipt.amount === 0 ? "100% Discount Promotional Code" : "Razorpay Live Gateway (INR)"}</div>
                 <div class="info-card-line">Support: influencerdhundo@gmail.com</div>
               </div>
             </div>
@@ -2512,24 +2617,24 @@ function PaymentReceiptModal({
             <!-- AUDIT BOX -->
             <div class="audit-card">
               <div class="audit-header">
-                <span>🛡️ Razorpay Transaction Verification</span>
-                <span class="audit-pill">Captured &amp; Settled</span>
+                <span>🛡️ ${receipt.amount === 0 ? "100% Promotional Pass Verification" : "Razorpay Transaction Verification"}</span>
+                <span class="audit-pill">${receipt.amount === 0 ? "Fully Discounted (₹0 Paid)" : "Captured &amp; Settled"}</span>
               </div>
               <div class="audit-grid">
                 <div class="audit-item">
-                  <span class="audit-item-label">Payment ID:</span>
+                  <span class="audit-item-label">${receipt.amount === 0 ? "Pass ID:" : "Payment ID:"}</span>
                   <span class="audit-item-val">${receipt.razorpayPaymentId || "N/A"}</span>
                 </div>
                 <div class="audit-item">
-                  <span class="audit-item-label">Order ID:</span>
-                  <span class="audit-item-val">${receipt.razorpayOrderId}</span>
+                  <span class="audit-item-label">${receipt.amount === 0 ? "Promo Code / Ref:" : "Order ID:"}</span>
+                  <span class="audit-item-val">${receipt.amount === 0 ? (promoCode || receipt.razorpayOrderId) : receipt.razorpayOrderId}</span>
                 </div>
               </div>
               ${
                 receipt.razorpaySignature
                   ? `
                 <div style="font-size: 9px; color: #166534; margin-top: 6px; font-family: monospace;">
-                  Security Signature: HMAC SHA-256 Verified
+                  ${receipt.amount === 0 ? "Status: Platform Promotional Code Verified" : "Security Signature: HMAC SHA-256 Verified"}
                 </div>
               `
                   : ""
@@ -2761,7 +2866,7 @@ function PaymentReceiptModal({
               <div className="sm:text-right space-y-1">
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/20 px-3 py-1 text-xs font-bold text-tealdeep border border-accent/40">
                   <Check className="size-3.5 stroke-[2.5]" />
-                  PAID &bull; RAZORPAY VERIFIED
+                  {receipt.amount === 0 ? "100% PROMO PASS • VERIFIED" : "PAID • RAZORPAY VERIFIED"}
                 </span>
                 <p className="text-xs font-mono font-bold text-foreground mt-1.5">
                   {invoiceNumber}
@@ -2825,21 +2930,21 @@ function PaymentReceiptModal({
               </div>
             </div>
 
-            {/* RAZORPAY TRANSACTION AUDIT BOX */}
+            {/* TRANSACTION AUDIT BOX */}
             <div className="rounded-xl bg-accent/10 border border-accent/30 p-3.5 text-xs space-y-2">
               <div className="flex items-center justify-between">
                 <span className="font-semibold text-tealdeep flex items-center gap-1.5">
                   <ShieldCheck className="size-4" />
-                  Razorpay Transaction Verification
+                  {receipt.amount === 0 ? "100% Promotional Pass Verification" : "Razorpay Transaction Verification"}
                 </span>
                 <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-bold text-tealdeep">
-                  Captured &amp; Settled
+                  {receipt.amount === 0 ? "Fully Discounted (₹0 Paid)" : "Captured & Settled"}
                 </span>
               </div>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-2 font-mono text-[11px] pt-1 border-t border-accent/20">
                 <div className="flex items-center justify-between bg-background/60 rounded-lg px-2.5 py-1.5 border border-accent/20">
-                  <span className="text-muted-foreground">Payment ID:</span>
+                  <span className="text-muted-foreground">{receipt.amount === 0 ? "Pass ID:" : "Payment ID:"}</span>
                   <div className="flex items-center gap-1">
                     <span className="text-foreground font-bold truncate max-w-[130px]">
                       {receipt.razorpayPaymentId || "N/A"}
@@ -2864,10 +2969,10 @@ function PaymentReceiptModal({
                 </div>
 
                 <div className="flex items-center justify-between bg-background/60 rounded-lg px-2.5 py-1.5 border border-accent/20">
-                  <span className="text-muted-foreground">Order ID:</span>
+                  <span className="text-muted-foreground">{receipt.amount === 0 ? "Promo Code / Ref:" : "Order ID:"}</span>
                   <div className="flex items-center gap-1">
                     <span className="text-foreground font-bold truncate max-w-[130px]">
-                      {receipt.razorpayOrderId}
+                      {receipt.amount === 0 ? (promoCode || receipt.razorpayOrderId) : receipt.razorpayOrderId}
                     </span>
                     <button
                       type="button"
@@ -2875,7 +2980,7 @@ function PaymentReceiptModal({
                         copyToClipboard(receipt.razorpayOrderId, "orderId")
                       }
                       className="text-muted-foreground hover:text-foreground cursor-pointer print-hidden"
-                      title="Copy Order ID"
+                      title="Copy Reference"
                     >
                       {copiedField === "orderId" ? (
                         <CheckCheck className="size-3 text-tealdeep" />
@@ -2891,7 +2996,7 @@ function PaymentReceiptModal({
                 <div className="flex items-center justify-between text-[10px] text-muted-foreground pt-0.5">
                   <span>Security Signature:</span>
                   <span className="font-mono text-tealdeep font-semibold">
-                    HMAC SHA-256 Verified
+                    {receipt.amount === 0 ? "Platform Promotional Waiver Verified" : "HMAC SHA-256 Verified"}
                   </span>
                 </div>
               )}
