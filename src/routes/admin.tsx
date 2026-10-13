@@ -2045,7 +2045,7 @@ function AdminDashboard() {
             {(() => {
               const now = Date.now();
               const promo100Count = creators.filter((c) => {
-                if (c.status === "Draft" || c.id.startsWith("draft-")) return false;
+                if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
                 const hasRealPaid = subscriptions.some(
                   (s) =>
                     s.creatorId === c.id &&
@@ -2093,7 +2093,7 @@ function AdminDashboard() {
             {(() => {
               const now = Date.now();
               const trialCount = creators.filter((c) => {
-                if (c.status === "Draft" || c.id.startsWith("draft-")) return false;
+                if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
                 const hasPaidOrPromo = subscriptions.some(
                   (s) =>
                     s.creatorId === c.id &&
@@ -2133,7 +2133,7 @@ function AdminDashboard() {
             {/* 5. ABANDONED / INCOMPLETE DRAFTS */}
             {(() => {
               const draftCount = creators.filter(
-                (c) => c.status === "Draft" || c.id.startsWith("draft-"),
+                (c) => c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-")),
               ).length;
               return (
                 <button
@@ -2164,7 +2164,7 @@ function AdminDashboard() {
             {(() => {
               const now = Date.now();
               const expiredCount = creators.filter((c) => {
-                if (c.status === "Draft" || c.id.startsWith("draft-")) return false;
+                if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
                 const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
                 return c.status === "Expired" || (expTime > 0 && expTime <= now);
               }).length;
@@ -2322,7 +2322,7 @@ function AdminDashboard() {
                 }
               }
 
-              const isDraft = c.status === "Draft" || c.id.startsWith("draft-");
+              const isDraft = c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"));
               const creatorSubs = subscriptions.filter((s) => s.creatorId === c.id);
               const hasRealPaidSub = creatorSubs.some(
                 (s) =>
@@ -2373,7 +2373,7 @@ function AdminDashboard() {
             return (
               <div className="grid gap-4">
                 {filtered.map((c) => {
-                  const isDraft = c.status === "Draft" || c.id.startsWith("draft-");
+                  const isDraft = c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"));
                   // ── Comprehensive Subscriptions Inspection (Active + Queued) ──
                   const creatorSubs = subscriptions.filter((s) => s.creatorId === c.id);
                   const activeSub = creatorSubs.find((s) => {

@@ -268,7 +268,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       // 2. Automated Expiration Sweep for Creators whose passes ended
       let creatorsUpdated = false;
       const nextCreators = creators.map((c) => {
-        if (c.status === "Draft" || c.id.startsWith("draft-")) return c;
+        if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return c;
         const creatorExplicitExpTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
         let latestSubExpTime = 0;
         let hasActiveOrQueuedSub = false;

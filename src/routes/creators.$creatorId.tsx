@@ -104,12 +104,12 @@ function CreatorProfile() {
     };
 
     const activeMatch = creators.find(
-      (c) => matchesParam(c) && c.status === "Active" && !c.id.startsWith("draft-"),
+      (c) => matchesParam(c) && c.status === "Active",
     );
     if (activeMatch) return activeMatch;
 
     const nonDraftMatch = creators.find(
-      (c) => matchesParam(c) && !c.id.startsWith("draft-"),
+      (c) => matchesParam(c) && c.status !== "Draft",
     );
     if (nonDraftMatch) return nonDraftMatch;
 
