@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button, Card, Field, Select, Tag, TextArea } from "@/components/ui-kit";
-import { InstagramIcon } from "@/components/icons";
+import { InstagramIcon, FacebookIcon, YouTubeIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
 import { trackPageView } from "@/lib/analytics-tracker";
 import {
@@ -19,7 +19,6 @@ import {
   Briefcase,
   Calendar,
   Clock,
-  ExternalLink,
   Gift,
   Globe,
   IndianRupee,
@@ -65,35 +64,58 @@ function CreatorProfile() {
   const navigate = useNavigate();
   const { creatorId } = Route.useParams();
   const { preview } = Route.useSearch();
-  const { creators, business, addReport, myCreatorId } = useAppState();
+  const { creators, business, addReport, myCreatorId, subscriptions } = useAppState();
   const cleanParam = (creatorId || "").trim().toLowerCase();
   const cleanParamNorm = cleanParam.replace(/^-+|-+$/g, "");
 
-  const creator = creators.find((c) => {
-    if (!cleanParam) return false;
-    const cId = (c.id || "").toLowerCase().trim();
-    const cIdClean = cId.replace(/^-+|-+$/g, "");
-    const cSlug = getCreatorProfileSlug(c).toLowerCase();
-    const cDisplay = (c.displayName || "").toLowerCase().trim();
-    const cName = (c.name || "").toLowerCase().trim();
-    const cNameSlug = cName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    const cDisplaySlug = cDisplay.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
-    const cHandle = normalizeInstagramHandle(c.instagram).toLowerCase();
+  // Priority-based creator resolution:
+  // 1. Direct ID match
+  // 2. Active, non-draft profile matching slug / name / handle
+  // 3. Any non-draft profile matching slug / name / handle
+  // 4. Any profile matching slug / name / handle
+  const creator = (() => {
+    if (!cleanParam) return undefined;
 
-    return (
-      cId === cleanParam ||
-      cIdClean === cleanParamNorm ||
-      cSlug === cleanParam ||
-      cSlug === cleanParamNorm ||
-      cDisplay === cleanParam ||
-      cName === cleanParam ||
-      cNameSlug === cleanParam ||
-      cNameSlug === cleanParamNorm ||
-      cDisplaySlug === cleanParam ||
-      cDisplaySlug === cleanParamNorm ||
-      (cHandle && (cHandle === cleanParam || cHandle === cleanParamNorm))
+    const directMatch = creators.find((c) => {
+      const cId = (c.id || "").toLowerCase().trim();
+      return cId === cleanParam || cId.replace(/^-+|-+$/g, "") === cleanParamNorm;
+    });
+    if (directMatch) return directMatch;
+
+    const matchesParam = (c: typeof creators[number]) => {
+      const cSlug = getCreatorProfileSlug(c).toLowerCase();
+      const cDisplay = (c.displayName || "").toLowerCase().trim();
+      const cName = (c.name || "").toLowerCase().trim();
+      const cNameSlug = cName.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      const cDisplaySlug = cDisplay.replace(/[^a-z0-9]+/g, "-").replace(/^-+|-+$/g, "");
+      const cHandle = normalizeInstagramHandle(c.instagram).toLowerCase();
+
+      return (
+        cSlug === cleanParam ||
+        cSlug === cleanParamNorm ||
+        cDisplay === cleanParam ||
+        cName === cleanParam ||
+        cNameSlug === cleanParam ||
+        cNameSlug === cleanParamNorm ||
+        cDisplaySlug === cleanParam ||
+        cDisplaySlug === cleanParamNorm ||
+        (cHandle && (cHandle === cleanParam || cHandle === cleanParamNorm))
+      );
+    };
+
+    const activeMatch = creators.find(
+      (c) => matchesParam(c) && c.status === "Active" && !c.id.startsWith("draft-"),
     );
-  });
+    if (activeMatch) return activeMatch;
+
+    const nonDraftMatch = creators.find(
+      (c) => matchesParam(c) && !c.id.startsWith("draft-"),
+    );
+    if (nonDraftMatch) return nonDraftMatch;
+
+    return creators.find(matchesParam);
+  })();
+
   const [reportOpen, setReportOpen] = useState(false);
   const [reason, setReason] = useState<string>(REPORT_REASONS[0]);
   const [details, setDetails] = useState("");
@@ -132,14 +154,33 @@ function CreatorProfile() {
 
   const isOwner = !!(myCreatorId && creator && myCreatorId === creator.id);
 
-  const expTime = creator.subscriptionExpiresAt
+  // Check if creator has an active subscription in subscriptions table
+  const hasActiveSub = (subscriptions || []).some((s) => {
+    if (s.creatorId !== creator.id) return false;
+    const sExp = s.expiresAt ? new Date(s.expiresAt).getTime() : 0;
+    return s.isQueued || s.status === "queued" || sExp > Date.now();
+  });
+
+  const rawExpTime = creator.subscriptionExpiresAt
     ? new Date(creator.subscriptionExpiresAt).getTime()
     : 0;
+
+  let expTime = rawExpTime;
+  if (hasActiveSub) {
+    const subExp = Math.max(
+      0,
+      ...(subscriptions || [])
+        .filter((s) => s.creatorId === creator.id && s.expiresAt)
+        .map((s) => new Date(s.expiresAt!).getTime()),
+    );
+    if (subExp > expTime) expTime = subExp;
+  }
+
   const isExpired =
     creator.status === "Expired" ||
     creator.status === "Inactive" ||
-    creator.status === "Draft" ||
-    (expTime > 0 && expTime <= Date.now());
+    (creator.status === "Draft" && !preview) ||
+    (!hasActiveSub && expTime > 0 && expTime <= Date.now());
 
   if (!preview && isExpired) {
     if (isOwner) {
@@ -250,10 +291,10 @@ function CreatorProfile() {
         )}
 
         {/* UNIFIED CREATOR PROFILE CARD */}
-        <Card className="glass-card mt-6 rounded-2xl sm:rounded-3xl p-6 sm:p-8 shadow-xl border border-border/80 space-y-8">
+        <Card className="glass-card mt-6 rounded-2xl sm:rounded-3xl p-4 sm:p-7 md:p-8 shadow-xl border border-border/80 space-y-6 sm:space-y-8">
           {/* 1. IDENTITY & HEADER AREA */}
-          <div className="flex flex-col md:flex-row md:items-center justify-between gap-6 pb-6 border-b border-border/60">
-            <div className="flex flex-col sm:flex-row items-start sm:items-center gap-5">
+          <div className="flex flex-col md:flex-row md:items-center justify-between gap-5 sm:gap-6 pb-5 sm:pb-6 border-b border-border/60">
+            <div className="flex flex-row items-start gap-3.5 sm:gap-5">
               <div className="relative shrink-0">
                 {creator.photo ? (
                   <img
@@ -261,32 +302,32 @@ function CreatorProfile() {
                     alt={creator.name}
                     width={816}
                     height={816}
-                    className="size-24 sm:size-28 rounded-2xl object-cover ring-2 ring-border shadow-md bg-secondary"
+                    className="size-16 sm:size-24 md:size-28 rounded-2xl object-cover ring-2 ring-border shadow-md bg-secondary"
                   />
                 ) : (
-                  <div className="size-24 sm:size-28 rounded-2xl ring-2 ring-border shadow-md bg-secondary flex items-center justify-center text-muted-foreground/50">
-                    <User className="size-10" />
+                  <div className="size-16 sm:size-24 md:size-28 rounded-2xl ring-2 ring-border shadow-md bg-secondary flex items-center justify-center text-muted-foreground/50">
+                    <User className="size-7 sm:size-10" />
                   </div>
                 )}
                 <span
-                  className="absolute -bottom-1 -right-1 size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
+                  className="absolute -bottom-1 -right-1 size-3.5 sm:size-4 rounded-full bg-tealdeep ring-2 ring-background shadow-xs"
                   title="Active Profile"
                 />
               </div>
 
-              <div className="min-w-0">
-                <div className="flex flex-wrap items-center gap-2">
-                  <h1 className="text-2xl sm:text-3xl font-display font-bold tracking-tight text-foreground">
+              <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5 sm:gap-2">
+                  <h1 className="text-xl sm:text-2xl md:text-3xl font-display font-bold tracking-tight text-foreground">
                     {creator.name || creator.displayName}
                   </h1>
-                  <span className="inline-flex items-center rounded-full bg-accent/20 px-2.5 py-0.5 text-xs font-semibold text-tealdeep border border-accent/30">
+                  <span className="inline-flex items-center rounded-full bg-accent/20 px-2 sm:px-2.5 py-0.5 text-[11px] sm:text-xs font-semibold text-tealdeep border border-accent/30 whitespace-nowrap">
                     Active Creator
                   </span>
                 </div>
 
-                <p className="mt-1 text-sm text-muted-foreground flex flex-wrap items-center gap-1.5">
+                <p className="mt-1 text-xs sm:text-sm text-muted-foreground flex flex-wrap items-center gap-x-2 gap-y-1">
                   <span className="inline-flex items-center gap-1 text-foreground/80">
-                    <MapPin className="size-3.5 text-primary" />
+                    <MapPin className="size-3.5 text-primary shrink-0" />
                     {[creator.locality, creator.city, creator.state].filter(Boolean).length > 0
                       ? `${[creator.locality, creator.city, creator.state].filter(Boolean).join(", ")}${creator.pincode ? ` - ${creator.pincode}` : ""}`
                       : (creator.pincode ? `PIN: ${creator.pincode}` : "")}
@@ -297,57 +338,82 @@ function CreatorProfile() {
                   ]
                     .filter(Boolean)
                     .map((item, i) => (
-                      <span key={i} className="inline-flex items-center gap-1.5">
-                        <span className="text-muted-foreground/60">·</span>
+                      <span key={i} className="inline-flex items-center gap-1.5 whitespace-nowrap">
+                        <span className="text-muted-foreground/60 select-none">•</span>
                         <span>{item}</span>
                       </span>
                     ))}
                 </p>
 
                 {/* Social Channels Row */}
-                <div className="mt-3 flex flex-wrap items-center gap-2">
-                  <a
-                    href={getInstagramUrl(creator.instagram)}
-                    target="_blank"
-                    rel="noreferrer"
-                    className="inline-flex items-center gap-1.5 rounded-xl bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border/80 hover:bg-secondary hover:ring-border text-foreground transition-all shadow-xs group"
-                  >
-                    <InstagramIcon className="size-4 shrink-0 transition-transform group-hover:scale-110" />
-                    <span className="font-mono font-semibold">
-                      {formatInstagramHandle(creator.instagram) || creator.instagram}
-                    </span>
-                    <ExternalLink className="size-3 text-muted-foreground ml-0.5 group-hover:text-foreground transition-colors" />
-                  </a>
-
-                  {creator.otherSocials?.map((s) => (
-                    <span
-                      key={s.platform}
-                      className="inline-flex items-center gap-1.5 rounded-xl bg-background px-3 py-1.5 text-xs font-medium ring-1 ring-border text-foreground"
+                <div className="mt-2.5 sm:mt-3 flex flex-wrap items-center gap-2">
+                  {creator.instagram && (
+                    <a
+                      href={getInstagramUrl(creator.instagram)}
+                      target="_blank"
+                      rel="noreferrer"
+                      className="inline-flex items-center justify-center size-9 rounded-xl bg-background ring-1 ring-border/80 hover:bg-secondary hover:ring-border transition-all shadow-xs hover:scale-105 group"
+                      title={`Instagram: ${formatInstagramHandle(creator.instagram) || creator.instagram}`}
+                      aria-label="Open Instagram profile"
                     >
-                      <span className="font-semibold">{s.platform}:</span> {s.handle}
-                    </span>
-                  ))}
+                      <InstagramIcon className="size-4 shrink-0 transition-transform group-hover:scale-110" />
+                    </a>
+                  )}
+
+                  {creator.otherSocials?.map((s) => {
+                    if (!s.handle || !s.handle.trim()) return null;
+                    const platformLower = (s.platform || "").toLowerCase();
+                    const cleanHandle = s.handle.trim();
+                    const href =
+                      platformLower === "facebook" || platformLower === "fb"
+                        ? (cleanHandle.startsWith("http")
+                            ? cleanHandle
+                            : `https://www.facebook.com/${cleanHandle.replace(/^@/, "")}`)
+                        : platformLower === "youtube" || platformLower === "yt"
+                          ? (cleanHandle.startsWith("http")
+                              ? cleanHandle
+                              : `https://www.youtube.com/${cleanHandle.startsWith("@") ? cleanHandle : `@${cleanHandle}`}`)
+                          : null;
+                    if (!href) return null;
+                    const Icon =
+                      platformLower === "facebook" || platformLower === "fb"
+                        ? FacebookIcon
+                        : YouTubeIcon;
+                    return (
+                      <a
+                        key={s.platform}
+                        href={href}
+                        target="_blank"
+                        rel="noreferrer"
+                        className="inline-flex items-center justify-center size-9 rounded-xl bg-background ring-1 ring-border/80 hover:bg-secondary hover:ring-border transition-all shadow-xs hover:scale-105 group"
+                        title={`${s.platform}: ${cleanHandle}`}
+                        aria-label={`Open ${s.platform} profile`}
+                      >
+                        <Icon className="size-4 shrink-0 transition-transform group-hover:scale-110" />
+                      </a>
+                    );
+                  })}
                 </div>
               </div>
             </div>
 
             {/* Audience & Rate Highlight Tiles */}
-            <div className="flex flex-row items-center gap-3 shrink-0 w-full sm:w-auto">
-              <div className="flex-1 sm:flex-initial rounded-2xl bg-secondary/70 border border-border/80 px-4 py-3 sm:min-w-[145px] text-center shadow-xs">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-center gap-1.5">
-                  <Users className="size-3.5 text-tealdeep" /> Audience
+            <div className="grid grid-cols-2 gap-2 sm:gap-3 shrink-0 w-full md:w-auto">
+              <div className="rounded-2xl bg-secondary/70 border border-border/80 p-2.5 sm:px-4 sm:py-3 md:min-w-[145px] text-center shadow-xs flex flex-col justify-center">
+                <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-center gap-1">
+                  <Users className="size-3 sm:size-3.5 text-tealdeep" /> Audience
                 </span>
-                <p className="font-display text-xl sm:text-2xl font-bold text-foreground mt-1">
+                <p className="font-display text-lg sm:text-2xl font-bold text-foreground mt-0.5 sm:mt-1">
                   {formatFollowers(creator.followers)}
                 </p>
                 <span className="text-[10px] text-muted-foreground block mt-0.5">Instagram Followers</span>
               </div>
 
-              <div className="flex-1 sm:flex-initial rounded-2xl bg-secondary/70 border border-border/80 px-4 py-3 sm:min-w-[145px] text-center shadow-xs">
-                <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-center gap-1.5">
-                  <IndianRupee className="size-3.5 text-saffrondeep" /> Starting Rate
+              <div className="rounded-2xl bg-secondary/70 border border-border/80 p-2.5 sm:px-4 sm:py-3 md:min-w-[145px] text-center shadow-xs flex flex-col justify-center">
+                <span className="text-[10px] sm:text-[11px] uppercase tracking-wider text-muted-foreground font-semibold flex items-center justify-center gap-1">
+                  <IndianRupee className="size-3 sm:size-3.5 text-saffrondeep" /> Starting Rate
                 </span>
-                <p className="font-display text-xl sm:text-2xl font-bold text-saffrondeep mt-1">
+                <p className="font-display text-lg sm:text-2xl font-bold text-saffrondeep mt-0.5 sm:mt-1">
                   {formatPrice(creator.startingPrice)}
                 </p>
                 <span className="text-[10px] text-muted-foreground block mt-0.5">Base Collab Fee</span>

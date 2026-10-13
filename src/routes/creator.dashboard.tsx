@@ -1,7 +1,7 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button, Card, SectionEyebrow, StatusPill } from "@/components/ui-kit";
-import { InstagramIcon, WhatsAppIcon } from "@/components/icons";
+import { InstagramIcon, WhatsAppIcon, FacebookIcon, YouTubeIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
 import {
   PLANS,
@@ -528,8 +528,8 @@ function Dashboard() {
           {/* MAIN PROFILE & SUBSCRIPTION CARDS */}
           <div className="mt-8 grid gap-6 md:grid-cols-3 items-stretch">
             {/* CREATOR PROFILE HERO CARD */}
-            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-4.5 sm:p-7 shadow-xl border border-border/80 flex flex-col justify-between gap-5 sm:gap-6">
-              <div className="space-y-5 sm:space-y-6">
+            <Card className="glass-card md:col-span-2 rounded-2xl sm:rounded-3xl p-4 sm:p-6 md:p-7 shadow-xl border border-border/80 flex flex-col justify-between gap-5 sm:gap-6">
+              <div className="space-y-4 sm:space-y-6">
                 {/* 1. CLEAN IDENTITY HEADER */}
                 <div className="flex items-start gap-3.5 sm:gap-5">
                   {/* Avatar */}
@@ -600,37 +600,70 @@ function Dashboard() {
                         </span>
                       </span>
                       {calculateAge(mine.birthDate) !== null && (
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 text-muted-foreground whitespace-nowrap">
                           <span>•</span>
                           <span>{calculateAge(mine.birthDate)} yrs old</span>
                         </span>
                       )}
                       {mine.gender && (
-                        <span className="inline-flex items-center gap-1 text-muted-foreground">
+                        <span className="inline-flex items-center gap-1 text-muted-foreground whitespace-nowrap">
                           <span>•</span>
                           <span>{mine.gender}</span>
                         </span>
                       )}
                     </div>
 
-                    {/* Line 3: Actions & Social Handle */}
+                    {/* Line 3: Social Icons & Actions */}
                     <div className="flex items-center gap-2 pt-1 flex-wrap">
                       {mine.instagram && (
                         <a
                           href={getInstagramUrl(mine.instagram)}
                           target="_blank"
                           rel="noreferrer"
-                          className="inline-flex items-center justify-center size-7 rounded-lg bg-secondary/80 hover:bg-secondary text-foreground border border-border/70 transition-all hover:scale-105 shadow-2xs shrink-0"
-                          title="Open Instagram profile"
+                          className="inline-flex items-center justify-center size-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/70 transition-all hover:scale-105 shadow-2xs shrink-0"
+                          title={`Instagram: ${mine.instagram}`}
                           aria-label="Open Instagram profile"
                         >
                           <InstagramIcon className="size-4 shrink-0" />
                         </a>
                       )}
+                      {mine.otherSocials?.map((s) => {
+                        if (!s.handle || !s.handle.trim()) return null;
+                        const platformLower = (s.platform || "").toLowerCase();
+                        const cleanHandle = s.handle.trim();
+                        const href =
+                          platformLower === "facebook" || platformLower === "fb"
+                            ? (cleanHandle.startsWith("http")
+                                ? cleanHandle
+                                : `https://www.facebook.com/${cleanHandle.replace(/^@/, "")}`)
+                            : platformLower === "youtube" || platformLower === "yt"
+                              ? (cleanHandle.startsWith("http")
+                                  ? cleanHandle
+                                  : `https://www.youtube.com/${cleanHandle.startsWith("@") ? cleanHandle : `@${cleanHandle}`}`)
+                              : null;
+                        if (!href) return null;
+                        const Icon =
+                          platformLower === "facebook" || platformLower === "fb"
+                            ? FacebookIcon
+                            : YouTubeIcon;
+                        return (
+                          <a
+                            key={s.platform}
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center size-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/70 transition-all hover:scale-105 shadow-2xs shrink-0"
+                            title={`${s.platform}: ${cleanHandle}`}
+                            aria-label={`Open ${s.platform} profile`}
+                          >
+                            <Icon className="size-4 shrink-0" />
+                          </a>
+                        );
+                      })}
                       <button
                         type="button"
                         onClick={() => setShowPhotoModal(true)}
-                        className="inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-secondary/60 hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground border border-border/60 transition-all cursor-pointer shadow-2xs shrink-0"
+                        className="inline-flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-secondary/60 hover:bg-secondary text-xs font-medium text-muted-foreground hover:text-foreground border border-border/60 transition-all cursor-pointer shadow-2xs shrink-0 whitespace-nowrap"
                         title="Change or remove photo"
                       >
                         <Camera className="size-3 text-primary shrink-0" />
@@ -643,88 +676,77 @@ function Dashboard() {
                 {/* 2. BALANCED METRICS STRIP (4 Columns on Desktop, 2x2 on Mobile) */}
                 <div className="grid grid-cols-2 lg:grid-cols-4 gap-2 sm:gap-3 pt-3.5 border-t border-border/60">
                   {/* Metric 1: Starting Rate */}
-                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-center gap-0.5 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
                       <IndianRupee className="size-3 text-saffrondeep shrink-0" />
                       <span>Starting Rate</span>
                     </span>
-                    <div className="mt-0.5">
-                      <p className="text-base sm:text-xl font-display font-extrabold text-saffrondeep">
-                        {formatPrice(mine.startingPrice)}
-                      </p>
-                      <span className="text-[10px] text-muted-foreground block truncate">per collaboration</span>
-                    </div>
+                    <p className="text-base sm:text-xl font-display font-extrabold text-saffrondeep leading-tight mt-0.5">
+                      {formatPrice(mine.startingPrice)}
+                    </p>
+                    <span className="text-[10px] text-muted-foreground block truncate">per collaboration</span>
                   </div>
 
                   {/* Metric 2: Audience Size */}
-                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-center gap-0.5 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
                       <Users className="size-3 text-primary shrink-0" />
                       <span>Audience</span>
                     </span>
-                    <div className="mt-0.5">
-                      <p className="text-base sm:text-xl font-display font-extrabold text-foreground">
-                        {formatFollowers(mine.followers)}
-                      </p>
-                      <span className="text-[10px] text-muted-foreground block truncate">followers</span>
-                    </div>
+                    <p className="text-base sm:text-xl font-display font-extrabold text-foreground leading-tight mt-0.5">
+                      {formatFollowers(mine.followers)}
+                    </p>
+                    <span className="text-[10px] text-muted-foreground block truncate">followers</span>
                   </div>
 
                   {/* Metric 3: Categories */}
-                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-center gap-0.5 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
                       <Tag className="size-3 text-saffrondeep shrink-0" />
                       <span>Categories</span>
                     </span>
-                    <div className="mt-0.5">
-                      <div className="flex flex-wrap gap-1">
-                        {mine.categories && mine.categories.length > 0 ? (
-                          mine.categories.slice(0, 2).map((cat) => (
-                            <span
-                              key={cat}
-                              className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground border border-border/60 truncate max-w-[80px]"
-                            >
-                              {cat}
-                            </span>
-                          ))
-                        ) : (
-                          <span className="text-[11px] text-muted-foreground">None</span>
-                        )}
-                        {mine.categories && mine.categories.length > 2 && (
-                          <span className="text-[10px] font-semibold text-muted-foreground self-center">
-                            +{mine.categories.length - 2}
+                    <div className="flex items-center gap-1 my-0.5 min-h-[22px]">
+                      {mine.categories && mine.categories.length > 0 ? (
+                        <>
+                          <span className="inline-flex items-center rounded-md bg-secondary px-1.5 py-0.5 text-[10px] font-semibold text-foreground border border-border/60 truncate max-w-[90px]">
+                            {mine.categories[0]}
                           </span>
-                        )}
-                      </div>
-                      <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">niche focus</span>
+                          {mine.categories.length > 1 && (
+                            <span className="inline-flex items-center rounded-md bg-secondary/80 px-1 py-0.5 text-[10px] font-semibold text-muted-foreground border border-border/50 shrink-0">
+                              +{mine.categories.length - 1}
+                            </span>
+                          )}
+                        </>
+                      ) : (
+                        <span className="text-[11px] text-muted-foreground">None</span>
+                      )}
                     </div>
+                    <span className="text-[10px] text-muted-foreground block truncate">niche focus</span>
                   </div>
 
                   {/* Metric 4: Directory Listing */}
-                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-between gap-1 shadow-2xs">
+                  <div className="rounded-xl sm:rounded-2xl bg-secondary/30 border border-border/70 p-2.5 sm:p-3.5 flex flex-col justify-center gap-0.5 shadow-2xs">
                     <span className="text-[11px] font-semibold text-muted-foreground flex items-center gap-1">
                       <Globe className="size-3 text-tealdeep shrink-0" />
                       <span>Directory</span>
                     </span>
-                    <div className="mt-0.5">
-                      <p className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5 truncate">
-                        <span
-                          className={`size-2 shrink-0 rounded-full ${
-                            mine.status === "Active"
-                              ? "bg-tealdeep animate-pulse"
-                              : mine.status === "Expired"
-                                ? "bg-rose"
-                                : "bg-muted-foreground"
-                          }`}
-                        />
-                        <span className="truncate">
-                          {mine.status === "Active" ? "Public" : mine.status === "Expired" ? "Expired" : "Draft"}
-                        </span>
-                      </p>
-                      <span className="text-[10px] text-muted-foreground block mt-0.5 truncate">
-                        {mine.status === "Active" ? "Searchable" : "Hidden"}
+                    <p className="text-xs sm:text-sm font-bold text-foreground flex items-center gap-1.5 truncate my-0.5 min-h-[22px]">
+                      <span
+                        className={`size-2 shrink-0 rounded-full ${
+                          mine.status === "Active"
+                            ? "bg-tealdeep animate-pulse"
+                            : mine.status === "Expired"
+                              ? "bg-rose"
+                              : "bg-muted-foreground"
+                        }`}
+                      />
+                      <span className="truncate">
+                        {mine.status === "Active" ? "Public" : mine.status === "Expired" ? "Expired" : "Draft"}
                       </span>
-                    </div>
+                    </p>
+                    <span className="text-[10px] text-muted-foreground block truncate">
+                      {mine.status === "Active" ? "Searchable" : "Hidden"}
+                    </span>
                   </div>
                 </div>
               </div>

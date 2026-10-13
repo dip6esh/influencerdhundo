@@ -154,7 +154,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         supabaseDb.fetchAllSubscriptions(),
       ]);
       if (isMounted && remoteCreators && remoteCreators.length > 0) {
-        setCreators(remoteCreators);
+        const mergedCreators = remoteCreators.map((c) => {
+          if (!remoteSubs) return c;
+          let latestExp = c.subscriptionExpiresAt;
+          for (const s of remoteSubs) {
+            if (s.creatorId === c.id && s.expiresAt) {
+              if (!latestExp || new Date(s.expiresAt).getTime() > new Date(latestExp).getTime()) {
+                latestExp = s.expiresAt;
+              }
+            }
+          }
+          return latestExp && latestExp !== c.subscriptionExpiresAt
+            ? { ...c, subscriptionExpiresAt: latestExp }
+            : c;
+        });
+        setCreators(mergedCreators);
       }
       if (isMounted && remoteSubs && remoteSubs.length > 0) {
         setSubscriptions(remoteSubs);
@@ -308,7 +322,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         supabaseDb.fetchAllSubscriptions(),
       ]);
       if (remoteCreators && remoteCreators.length > 0) {
-        setCreators(remoteCreators);
+        const mergedCreators = remoteCreators.map((c) => {
+          if (!remoteSubs) return c;
+          let latestExp = c.subscriptionExpiresAt;
+          for (const s of remoteSubs) {
+            if (s.creatorId === c.id && s.expiresAt) {
+              if (!latestExp || new Date(s.expiresAt).getTime() > new Date(latestExp).getTime()) {
+                latestExp = s.expiresAt;
+              }
+            }
+          }
+          return latestExp && latestExp !== c.subscriptionExpiresAt
+            ? { ...c, subscriptionExpiresAt: latestExp }
+            : c;
+        });
+        setCreators(mergedCreators);
       }
       if (remoteSubs && remoteSubs.length > 0) {
         setSubscriptions(remoteSubs);

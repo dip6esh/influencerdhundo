@@ -30,12 +30,14 @@ import {
   formatFollowers,
   formatInstagramHandle,
   formatPrice,
+  getInstagramUrl,
   normalizeInstagramHandle,
   validateTrustedEmail,
   type Creator,
 } from "@/lib/directory-data";
 import { Camera, Eye, EyeOff, Gift, Loader2, Save, Sparkles, Trash2, Upload, User } from "lucide-react";
 import { GoogleAuthButton } from "@/components/google-auth-button";
+import { InstagramIcon, FacebookIcon, YouTubeIcon } from "@/components/icons";
 
 export const Route = createFileRoute("/creator/register")({
   validateSearch: (
@@ -310,6 +312,9 @@ function Register() {
         about: existing.about,
         instagram: existing.instagram,
         followers: String(existing.followers),
+        facebook: existing.otherSocials?.find((s) => s.platform.toLowerCase() === "facebook")?.handle ?? "",
+        youtube: existing.otherSocials?.find((s) => s.platform.toLowerCase() === "youtube")?.handle ?? "",
+        otherPlatform: existing.otherSocials?.find((s) => s.platform.toLowerCase() === "other")?.handle ?? "",
         categories: existing.categories,
         contentTypes: existing.contentTypes,
         languages: existing.languages,
@@ -332,6 +337,47 @@ function Register() {
     }
     return initialForm;
   });
+
+  // When an existing profile loads, ensure the form is prefilled and Step 0 is skipped
+  useEffect(() => {
+    if (existing) {
+      if (step === 0) setStep(1);
+      setForm((prev) => {
+        // Only update if form was still unpopulated or matches initial
+        if (prev.name && prev.instagram) return prev;
+        return {
+          ...initialForm,
+          name: existing.name || "",
+          displayName: existing.displayName || "",
+          birthDate: existing.birthDate ?? "",
+          gender: existing.gender ?? "",
+          email: existing.contact?.email || "",
+          mobile: existing.contact?.phone || "",
+          city: existing.city || "",
+          locality: existing.locality || "",
+          state: existing.state || "",
+          pincode: existing.pincode || "",
+          photo: existing.photo || "",
+          about: existing.about || "",
+          instagram: existing.instagram || "",
+          followers: String(existing.followers || ""),
+          facebook: existing.otherSocials?.find((s) => s.platform.toLowerCase() === "facebook")?.handle ?? "",
+          youtube: existing.otherSocials?.find((s) => s.platform.toLowerCase() === "youtube")?.handle ?? "",
+          otherPlatform: existing.otherSocials?.find((s) => s.platform.toLowerCase() === "other")?.handle ?? "",
+          categories: existing.categories || [],
+          contentTypes: existing.contentTypes || [],
+          languages: existing.languages || [],
+          collabType: existing.collabType || "Paid",
+          startingPrice: String(existing.startingPrice || ""),
+          travels: existing.travels ? "Yes" : "No",
+          travelRange: existing.travelRange ?? "",
+          acceptsProducts: existing.acceptsProducts || "Depends",
+          acceptsProductsDetails: existing.acceptsProductsDetails ?? "",
+          turnaround: existing.turnaround || "3–5 days",
+        };
+      });
+    }
+  }, [existing]);
 
   // Save form draft to localStorage and auto-sync in-progress lead to Supabase so Admin can track abandoned registrations
   useEffect(() => {
@@ -362,6 +408,7 @@ function Register() {
           : "New Creator";
         const resolvedName = form.name.trim() || form.displayName.trim() || fallbackDraftName;
         const resolvedDisplayName = form.displayName.trim() || form.name.trim() || fallbackDraftName;
+        const currentStepName = STEPS[step] || `Step ${step + 1}`;
 
         const draftLead: Creator = {
           id: draftId,
@@ -2029,9 +2076,54 @@ function Register() {
                         </dd>
                       </div>
                     </dl>
-                    <p className="mt-4 text-sm font-medium text-muted-foreground">
-                      {draft.instagram}
-                    </p>
+                    {/* Social icon links */}
+                    <div className="mt-4 flex items-center gap-2">
+                      {draft.instagram && (
+                        <a
+                          href={getInstagramUrl(draft.instagram)}
+                          target="_blank"
+                          rel="noreferrer"
+                          className="inline-flex items-center justify-center size-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/70 transition-all hover:scale-105 shadow-2xs"
+                          title={`Instagram: ${draft.instagram}`}
+                          aria-label="Open Instagram profile"
+                        >
+                          <InstagramIcon className="size-4 shrink-0" />
+                        </a>
+                      )}
+                      {draft.otherSocials?.map((s) => {
+                        if (!s.handle || !s.handle.trim()) return null;
+                        const platformLower = (s.platform || "").toLowerCase();
+                        const cleanHandle = s.handle.trim();
+                        const href =
+                          platformLower === "facebook" || platformLower === "fb"
+                            ? (cleanHandle.startsWith("http")
+                                ? cleanHandle
+                                : `https://www.facebook.com/${cleanHandle.replace(/^@/, "")}`)
+                            : platformLower === "youtube" || platformLower === "yt"
+                              ? (cleanHandle.startsWith("http")
+                                  ? cleanHandle
+                                  : `https://www.youtube.com/${cleanHandle.startsWith("@") ? cleanHandle : `@${cleanHandle}`}`)
+                              : null;
+                        if (!href) return null;
+                        const Icon =
+                          platformLower === "facebook" || platformLower === "fb"
+                            ? FacebookIcon
+                            : YouTubeIcon;
+                        return (
+                          <a
+                            key={s.platform}
+                            href={href}
+                            target="_blank"
+                            rel="noreferrer"
+                            className="inline-flex items-center justify-center size-8 rounded-lg bg-secondary/80 hover:bg-secondary border border-border/70 transition-all hover:scale-105 shadow-2xs"
+                            title={`${s.platform}: ${cleanHandle}`}
+                            aria-label={`Open ${s.platform} profile`}
+                          >
+                            <Icon className="size-4 shrink-0" />
+                          </a>
+                        );
+                      })}
+                    </div>
                   </div>
 
                   {existing ? (
