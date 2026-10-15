@@ -1401,7 +1401,15 @@ function Dashboard() {
 
                       {/* Contextual Payout CTA */}
                       <div>
-                        {walletBalance >= 200 ? (
+                        {!isReferralUnlocked ? (
+                          <Link
+                            to={isDraft ? "/creator/register" : "/creator/plans"}
+                            className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-bold hover:bg-primary/90 transition-all shadow-xs shrink-0"
+                          >
+                            <span>{isDraft ? "Complete Profile" : "Upgrade to Unlock Payouts"}</span>
+                            <ArrowUpRight className="size-3.5" />
+                          </Link>
+                        ) : walletBalance >= 200 ? (
                           <Button
                             onClick={handleOpenWithdrawModal}
                             disabled={hasPendingWithdrawal || monthlyWithdrawalCount >= 2}
@@ -1505,21 +1513,37 @@ function Dashboard() {
                           <h3 className="font-display font-bold text-base text-foreground">
                             Earn Real Cash Commissions 💸
                           </h3>
-                          <span className="text-[11px] text-saffrondeep font-bold">
-                            Available to Apply
-                          </span>
+                          {isReferralUnlocked ? (
+                            <span className="text-[11px] text-saffrondeep font-bold">
+                              Available to Apply
+                            </span>
+                          ) : (
+                            <span className="text-[11px] text-muted-foreground font-semibold flex items-center gap-1">
+                              <Lock className="size-3" /> Paid Plan Required
+                            </span>
+                          )}
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
                         Earn <strong>10% cash commission</strong> on the net amount paid by each referral on their first plan purchase (deposited directly to your UPI/Bank). Renewals are not eligible. Minimum withdrawal ₹200.
                       </p>
-                      <Button
-                        onClick={handleOpenApplyModal}
-                        className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs py-2.5 shadow-xs"
-                      >
-                        <Wallet className="size-3.5 mr-1.5" />
-                        <span>Apply for Cash Referrals</span>
-                      </Button>
+                      {isReferralUnlocked ? (
+                        <Button
+                          onClick={handleOpenApplyModal}
+                          className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs py-2.5 shadow-xs"
+                        >
+                          <Wallet className="size-3.5 mr-1.5" />
+                          <span>Apply for Cash Referrals</span>
+                        </Button>
+                      ) : (
+                        <Link
+                          to={isDraft ? "/creator/register" : "/creator/plans"}
+                          className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-bold hover:bg-primary/90 transition-all shadow-xs shrink-0"
+                        >
+                          <span>{isDraft ? "Complete Profile to Unlock" : "Upgrade to Unlock Cash Referrals"}</span>
+                          <ArrowUpRight className="size-3.5" />
+                        </Link>
+                      )}
                     </div>
                   )}
                 </div>
@@ -1540,10 +1564,17 @@ function Dashboard() {
                           <span className="text-[11px] text-muted-foreground">Keep profile active for free</span>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-foreground border border-border/80">
-                        <Sparkles className="size-3 text-primary" />
-                        +7 Days / Referral
-                      </span>
+                      {isReferralUnlocked ? (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-foreground border border-border/80">
+                          <Sparkles className="size-3 text-primary" />
+                          +7 Days / Referral
+                        </span>
+                      ) : (
+                        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground border border-border/80">
+                          <Lock className="size-3" />
+                          Paid Plan Required
+                        </span>
+                      )}
                     </div>
 
                     {/* Prominent Days Display */}
@@ -1570,14 +1601,26 @@ function Dashboard() {
                     </p>
                   </div>
 
-                  {/* Highlights */}
-                  <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5 font-medium text-foreground">
-                      <Sparkles className="size-3.5 text-primary" />
-                      <span>Never let your profile expire</span>
-                    </span>
-                    <span className="font-semibold text-foreground">Automatic Extension</span>
-                  </div>
+                  {/* Highlights or Upgrade Prompt */}
+                  {!isReferralUnlocked ? (
+                    <div className="mt-4 pt-3 border-t border-border/60">
+                      <Link
+                        to={isDraft ? "/creator/register" : "/creator/plans"}
+                        className="w-full inline-flex items-center justify-center gap-1.5 rounded-xl bg-secondary hover:bg-secondary/80 border border-border/80 text-foreground px-4 py-2 text-xs font-bold transition-all shadow-xs shrink-0"
+                      >
+                        <span>{isDraft ? "Complete Profile" : "Upgrade to Unlock Extra Days"}</span>
+                        <ArrowUpRight className="size-3.5" />
+                      </Link>
+                    </div>
+                  ) : (
+                    <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                      <span className="flex items-center gap-1.5 font-medium text-foreground">
+                        <Sparkles className="size-3.5 text-primary" />
+                        <span>Never let your profile expire</span>
+                      </span>
+                      <span className="font-semibold text-foreground">Automatic Extension</span>
+                    </div>
+                  )}
                 </div>
               </div>
 

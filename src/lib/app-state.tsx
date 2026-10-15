@@ -784,7 +784,23 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               );
               const alreadyRewarded = alreadyRewardedInDb || alreadyRewardedInMemory || hasPriorPaidSub;
 
-              if (!alreadyRewarded) {
+              // Check if referrer is eligible: must have a paid plan active or queued (trial-only users are ineligible)
+              const refRec = fullReferrer || referrer;
+              const referrerExpiry = refRec.subscriptionExpiresAt
+                ? new Date(refRec.subscriptionExpiresAt)
+                : null;
+              const isReferrerActive = referrerExpiry ? referrerExpiry > now : false;
+              const hasReferrerPaidPlanOrQueue = subscriptions.some(
+                (sub) =>
+                  sub.creatorId === referrer.id &&
+                  sub.planId !== "trial-3d" &&
+                  !sub.isTrial &&
+                  (sub.price ?? 0) > 0 &&
+                  (sub.status === "active" || sub.isQueued || (sub.expiresAt && new Date(sub.expiresAt) > now)),
+              );
+              const isReferrerEligibleForRewards = isReferrerActive && hasReferrerPaidPlanOrQueue;
+
+              if (!alreadyRewarded && isReferrerEligibleForRewards) {
                 if (isSpecialActive) {
                   // Creator enrolled in Special Referral Program -> 10% Cash Reward of net paid price, NO extra days
                   const netPaid = s.price ?? 0;
@@ -819,52 +835,42 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   }
                 } else {
                   // Standard Program -> 7 Extra Days Added
-                  const refRec = fullReferrer || referrer;
-                  const referrerExpiry = refRec.subscriptionExpiresAt
+                  const baseExpiry = refRec.subscriptionExpiresAt
                     ? new Date(refRec.subscriptionExpiresAt)
-                    : null;
-                  const referrerActive = referrerExpiry ? referrerExpiry > now : false;
-                  const referrerSub = subscriptions.find(
-                    (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d" && !sub.isTrial,
+                    : now;
+                  const newExpiry = new Date(baseExpiry.getTime() + 7 * 24 * 60 * 60 * 1000);
+                  const newBonus = (refRec.referralBonusDays ?? 0) + 7;
+                  await supabaseDb.updateSubscriptionExpiry(referrer.id, newExpiry, newBonus);
+                  await supabaseDb.addReferralEvent({
+                    referrerId: referrer.id,
+                    referredCreatorId: s.creatorId,
+                    referredSubId: item.id,
+                    daysDelta: 7,
+                    cashDelta: 0,
+                    eventType: "earned",
+                    note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
+                  });
+                  setCreators((prev) =>
+                    prev.map((c) =>
+                      c.id === referrer.id
+                        ? {
+                            ...c,
+                            subscriptionExpiresAt: newExpiry.toISOString(),
+                            referralBonusDays: newBonus,
+                          }
+                        : c,
+                    ),
                   );
-                  if (referrerActive || referrerSub) {
-                    const baseExpiry = refRec.subscriptionExpiresAt
-                      ? new Date(refRec.subscriptionExpiresAt)
-                      : now;
-                    const newExpiry = new Date(baseExpiry.getTime() + 7 * 24 * 60 * 60 * 1000);
-                    const newBonus = (refRec.referralBonusDays ?? 0) + 7;
-                    await supabaseDb.updateSubscriptionExpiry(referrer.id, newExpiry, newBonus);
-                    await supabaseDb.addReferralEvent({
-                      referrerId: referrer.id,
-                      referredCreatorId: s.creatorId,
-                      referredSubId: item.id,
-                      daysDelta: 7,
-                      cashDelta: 0,
-                      eventType: "earned",
-                      note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
-                    });
-                    setCreators((prev) =>
-                      prev.map((c) =>
-                        c.id === referrer.id
-                          ? {
-                              ...c,
-                              subscriptionExpiresAt: newExpiry.toISOString(),
-                              referralBonusDays: newBonus,
-                            }
-                          : c,
-                      ),
-                    );
-                    setSubscriptions((prev) =>
-                      prev.map((sub) =>
-                        sub.creatorId === referrer.id && (sub.status === "active" || !sub.isQueued)
-                          ? { ...sub, expiresAt: newExpiry.toISOString() }
-                          : sub,
-                      ),
-                    );
-                    if (myCreatorId === referrer.id) {
-                      const events = await supabaseDb.fetchReferralEvents(referrer.id);
-                      setReferralEvents(events);
-                    }
+                  setSubscriptions((prev) =>
+                    prev.map((sub) =>
+                      sub.creatorId === referrer.id && (sub.status === "active" || !sub.isQueued)
+                        ? { ...sub, expiresAt: newExpiry.toISOString() }
+                        : sub,
+                    ),
+                  );
+                  if (myCreatorId === referrer.id) {
+                    const events = await supabaseDb.fetchReferralEvents(referrer.id);
+                    setReferralEvents(events);
                   }
                 }
               }
