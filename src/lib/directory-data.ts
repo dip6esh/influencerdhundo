@@ -516,8 +516,63 @@ export type Creator = {
   trialStartedAt?: string | undefined;
   subscriptionExpiresAt?: string | undefined;
   referralBonusDays?: number | undefined;
+  specialReferralProgram?: SpecialReferralProgram | undefined;
   createdAt?: string | undefined;
 };
+
+// ── Special Monetized Referral Program Types ──────────────────────────────────
+export interface PayoutDetails {
+  upiId: string;
+  accountHolderName: string;
+  accountNumber: string;
+  bankAccountNumber?: string | undefined; // alias for accountNumber
+  bankName: string;
+  ifscCode: string;
+}
+
+export type SpecialReferralStatus = "none" | "pending" | "active" | "rejected" | "closed";
+
+export interface SpecialReferralProgram {
+  status: SpecialReferralStatus;
+  appliedAt?: string | undefined;
+  approvedAt?: string | undefined;
+  rejectedAt?: string | undefined;
+  reviewedAt?: string | undefined;
+  closedAt?: string | undefined;
+  rejectionReason?: string | undefined;
+  payoutDetails: PayoutDetails;
+  walletBalance: number; // Current withdrawable balance (INR)
+  totalEarned: number; // Lifetime cash earned (INR)
+  totalWithdrawn: number; // Lifetime cash paid out (INR)
+}
+
+export interface ReferralWithdrawalRequest {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  creatorHandle?: string | undefined;
+  creatorEmail?: string | undefined;
+  amount: number;
+  status: "pending" | "paid" | "rejected";
+  payoutDetails: PayoutDetails;
+  requestedAt: string;
+  processedAt?: string | undefined;
+  utrNumber?: string | undefined;
+  transactionReference?: string | undefined; // alias for utrNumber
+  adminNote?: string | undefined;
+  adminNotes?: string | undefined; // alias for adminNote
+}
+
+/**
+ * Calculates cash commission for referrers enrolled in the special program.
+ * Base = ₹100 for 0% discount.
+ * If invitee received D% discount, referrer earning reduces by D%.
+ */
+export function calculateReferralCashCommission(discountPercent: number): number {
+  if (discountPercent >= 100) return 0;
+  const clampedDiscount = Math.max(0, Math.min(100, discountPercent));
+  return Math.round(100 * (1 - clampedDiscount / 100));
+}
 
 export const CREATORS: Creator[] = [
   {

@@ -344,6 +344,7 @@ function Plans() {
             isTrial: isTrialApplied,
           },
           appliedDiscount?.code,
+          appliedDiscount?.percent ?? (isTrialApplied ? 100 : 0),
         );
 
         // If a 100% discount code was used, increment usage count & record ₹0 invoice
@@ -435,6 +436,7 @@ function Plans() {
                 razorpayPaymentId: response.razorpay_payment_id,
               },
               appliedDiscount?.code,
+              appliedDiscount?.percent,
             );
 
             setSuccess(true);

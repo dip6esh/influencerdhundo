@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, type ReactNode
 import {
   CREATORS,
   EMPTY_FILTERS,
+  PLANS,
+  calculateReferralCashCommission,
   generateReferralCode,
   getSubscriptionDurationMs,
   getSubscriptionExpiry,
@@ -10,6 +12,10 @@ import {
   type Creator,
   type CreatorStatus,
   type Filters,
+  type PayoutDetails,
+  type ReferralWithdrawalRequest,
+  type SpecialReferralProgram,
+  type SpecialReferralStatus,
 } from "./directory-data";
 import { supabaseDb, type ReferralEvent } from "./supabase";
 
@@ -57,6 +63,7 @@ type AppState = {
   reports: Report[];
   subscriptions: Subscription[];
   referralEvents: ReferralEvent[];
+  withdrawalRequests: ReferralWithdrawalRequest[];
   /** Returns true if the creator has ever used the free 3-day trial */
   hasUsedTrial: (creatorId: string) => boolean;
   signUpBusiness: (b: BusinessAccount, authUserId?: string | null) => void;
@@ -80,6 +87,7 @@ type AppState = {
   activateSubscription: (
     s: Omit<Subscription, "startedAt">,
     referralCode?: string | undefined,
+    discountPercent?: number,
   ) => Promise<void>;
   startFreeTrial: (creatorId: string) => Promise<boolean>;
   reverseReferralReward: (
@@ -89,6 +97,23 @@ type AppState = {
     reason?: string,
   ) => Promise<void>;
   fetchReferralEvents: (creatorId: string) => Promise<void>;
+  applySpecialReferralProgram: (
+    creatorId: string,
+    payoutDetails: PayoutDetails,
+  ) => Promise<{ success: boolean; error?: string }>;
+  updateSpecialReferralStatus: (
+    creatorId: string,
+    status: SpecialReferralStatus,
+    rejectionReason?: string,
+  ) => Promise<{ success: boolean; error?: string }>;
+  fetchWithdrawalRequests: () => Promise<void>;
+  submitWithdrawalRequest: (
+    req: Omit<ReferralWithdrawalRequest, "id" | "requestedAt" | "status">,
+  ) => Promise<{ success: boolean; error?: string }>;
+  updateWithdrawalRequest: (
+    id: string,
+    updates: Partial<ReferralWithdrawalRequest>,
+  ) => Promise<{ success: boolean; error?: string }>;
   refreshFromSupabase: () => Promise<void>;
   discoverFilters: Filters;
   setDiscoverFilters: React.Dispatch<React.SetStateAction<Filters>>;
@@ -108,6 +133,7 @@ type Persisted = {
   reports: Report[];
   subscriptions: Subscription[];
   referralEvents: ReferralEvent[];
+  withdrawalRequests?: ReferralWithdrawalRequest[];
 };
 
 export function AppStateProvider({ children }: { children: ReactNode }) {
@@ -117,6 +143,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   const [reports, setReports] = useState<Report[]>([]);
   const [subscriptions, setSubscriptions] = useState<Subscription[]>([]);
   const [referralEvents, setReferralEvents] = useState<ReferralEvent[]>([]);
+  const [withdrawalRequests, setWithdrawalRequests] = useState<ReferralWithdrawalRequest[]>([]);
   const [discoverFilters, setDiscoverFilters] = useState<Filters>(EMPTY_FILTERS);
   const [discoverHasSearched, setDiscoverHasSearched] = useState(false);
   const [hydrated, setHydrated] = useState(false);
@@ -138,6 +165,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setReports(p.reports ?? []);
         setSubscriptions(p.subscriptions ?? []);
         setReferralEvents(p.referralEvents ?? []);
+        setWithdrawalRequests(p.withdrawalRequests ?? []);
       }
     } catch {
       /* ignore corrupt storage */
@@ -149,9 +177,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     async function loadFromSupabase() {
-      const [remoteCreators, remoteSubs] = await Promise.all([
+      const [remoteCreators, remoteSubs, remoteWithdrawals] = await Promise.all([
         supabaseDb.fetchCreators(),
         supabaseDb.fetchAllSubscriptions(),
+        supabaseDb.fetchWithdrawalRequests(),
       ]);
       if (isMounted && remoteCreators && remoteCreators.length > 0) {
         const mergedCreators = remoteCreators.map((c) => {
@@ -172,6 +201,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       if (isMounted && remoteSubs && remoteSubs.length > 0) {
         setSubscriptions(remoteSubs);
+      }
+      if (isMounted && remoteWithdrawals && remoteWithdrawals.length > 0) {
+        setWithdrawalRequests(remoteWithdrawals);
       }
 
       // If user has active Supabase session, look up their creator or business profile
@@ -308,18 +340,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     try {
       localStorage.setItem(
         STORAGE_KEY,
-        JSON.stringify({ creators, business, myCreatorId, reports, subscriptions, referralEvents }),
+        JSON.stringify({
+          creators,
+          business,
+          myCreatorId,
+          reports,
+          subscriptions,
+          referralEvents,
+          withdrawalRequests,
+        }),
       );
     } catch {
       /* storage full or unavailable */
     }
-  }, [hydrated, creators, business, myCreatorId, reports, subscriptions, referralEvents]);
+  }, [hydrated, creators, business, myCreatorId, reports, subscriptions, referralEvents, withdrawalRequests]);
 
   const refreshFromSupabase = async () => {
     try {
-      const [remoteCreators, remoteSubs] = await Promise.all([
+      const [remoteCreators, remoteSubs, remoteWithdrawals] = await Promise.all([
         supabaseDb.fetchCreators(),
         supabaseDb.fetchAllSubscriptions(),
+        supabaseDb.fetchWithdrawalRequests(),
       ]);
       if (remoteCreators && remoteCreators.length > 0) {
         const mergedCreators = remoteCreators.map((c) => {
@@ -341,8 +382,11 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       if (remoteSubs && remoteSubs.length > 0) {
         setSubscriptions(remoteSubs);
       }
-    } catch {
-      // ignore
+      if (remoteWithdrawals && remoteWithdrawals.length > 0) {
+        setWithdrawalRequests(remoteWithdrawals);
+      }
+    } catch (e) {
+      console.error("Failed to refresh from Supabase:", e);
     }
   };
 
@@ -535,7 +579,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         supabaseDb.addReport(item);
       },
 
-      activateSubscription: async (s, referralCode) => {
+      activateSubscription: async (s, referralCode, discountPercent) => {
         const now = new Date();
         const creator = creators.find((c) => c.id === s.creatorId);
         const creatorExistingSubs = subscriptions.filter((sub) => sub.creatorId === s.creatorId);
@@ -654,52 +698,101 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 (ev) =>
                   ev.referrerId === referrer.id &&
                   ev.referredCreatorId === s.creatorId &&
-                  ev.eventType === "earned" &&
-                  ev.daysDelta > 0,
+                  (ev.eventType === "earned" || ev.eventType === "cash_earned"),
               );
-              const referrerExpiry = referrer.subscriptionExpiresAt
-                ? new Date(referrer.subscriptionExpiresAt)
-                : null;
-              const referrerActive = referrerExpiry ? referrerExpiry > now : false;
-              const referrerSub = subscriptions.find(
-                (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d" && !sub.isTrial,
-              );
-              if (!alreadyRewarded && (referrerActive || referrerSub)) {
-                const baseExpiry = referrer.subscriptionExpiresAt
-                  ? new Date(referrer.subscriptionExpiresAt)
-                  : now;
-                const newExpiry = new Date(baseExpiry.getTime() + 7 * 24 * 60 * 60 * 1000);
-                const newBonus = (referrer.referralBonusDays ?? 0) + 7;
-                await supabaseDb.updateSubscriptionExpiry(referrer.id, newExpiry, newBonus);
-                await supabaseDb.addReferralEvent({
-                  referrerId: referrer.id,
-                  referredCreatorId: s.creatorId,
-                  referredSubId: item.id,
-                  daysDelta: 7,
-                  eventType: "earned",
-                  note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
-                });
-                setCreators((prev) =>
-                  prev.map((c) =>
-                    c.id === referrer.id
-                      ? {
-                          ...c,
-                          subscriptionExpiresAt: newExpiry.toISOString(),
-                          referralBonusDays: newBonus,
-                        }
-                      : c,
-                  ),
-                );
-                setSubscriptions((prev) =>
-                  prev.map((sub) =>
-                    sub.creatorId === referrer.id && (sub.status === "active" || !sub.isQueued)
-                      ? { ...sub, expiresAt: newExpiry.toISOString() }
-                      : sub,
-                  ),
-                );
-                if (myCreatorId === referrer.id) {
-                  const events = await supabaseDb.fetchReferralEvents(referrer.id);
-                  setReferralEvents(events);
+
+              const isSpecialActive = referrer.specialReferralProgram?.status === "active";
+
+              if (!alreadyRewarded) {
+                if (isSpecialActive) {
+                  // Creator enrolled in Special Referral Program -> Cash Reward, NO extra days
+                  const basePlan = PLANS.find((p) => p.id === s.planId);
+                  const basePrice = basePlan ? basePlan.price : (s.price || 0);
+                  let effDiscount = discountPercent;
+                  if (effDiscount === undefined && basePrice > 0 && s.price !== undefined) {
+                    effDiscount = Math.max(
+                      0,
+                      Math.min(100, Math.round(((basePrice - s.price) / basePrice) * 100)),
+                    );
+                  }
+                  const cashCommission = calculateReferralCashCommission(effDiscount ?? 0);
+
+                  if (cashCommission > 0) {
+                    const currentProg = referrer.specialReferralProgram!;
+                    const updatedProg: SpecialReferralProgram = {
+                      ...currentProg,
+                      walletBalance: (currentProg.walletBalance || 0) + cashCommission,
+                      totalEarned: (currentProg.totalEarned || 0) + cashCommission,
+                    };
+                    await supabaseDb.updateSpecialReferralProgram(referrer.id, updatedProg);
+                    await supabaseDb.addReferralEvent({
+                      referrerId: referrer.id,
+                      referredCreatorId: s.creatorId,
+                      referredSubId: item.id,
+                      daysDelta: 0,
+                      cashDelta: cashCommission,
+                      eventType: "cash_earned",
+                      note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (₹${cashCommission} cash commission earned)`,
+                    });
+
+                    setCreators((prev) =>
+                      prev.map((c) =>
+                        c.id === referrer.id ? { ...c, specialReferralProgram: updatedProg } : c,
+                      ),
+                    );
+
+                    if (myCreatorId === referrer.id) {
+                      const events = await supabaseDb.fetchReferralEvents(referrer.id);
+                      setReferralEvents(events);
+                    }
+                  }
+                } else {
+                  // Standard Program -> 7 Extra Days Added
+                  const referrerExpiry = referrer.subscriptionExpiresAt
+                    ? new Date(referrer.subscriptionExpiresAt)
+                    : null;
+                  const referrerActive = referrerExpiry ? referrerExpiry > now : false;
+                  const referrerSub = subscriptions.find(
+                    (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d" && !sub.isTrial,
+                  );
+                  if (referrerActive || referrerSub) {
+                    const baseExpiry = referrer.subscriptionExpiresAt
+                      ? new Date(referrer.subscriptionExpiresAt)
+                      : now;
+                    const newExpiry = new Date(baseExpiry.getTime() + 7 * 24 * 60 * 60 * 1000);
+                    const newBonus = (referrer.referralBonusDays ?? 0) + 7;
+                    await supabaseDb.updateSubscriptionExpiry(referrer.id, newExpiry, newBonus);
+                    await supabaseDb.addReferralEvent({
+                      referrerId: referrer.id,
+                      referredCreatorId: s.creatorId,
+                      referredSubId: item.id,
+                      daysDelta: 7,
+                      eventType: "earned",
+                      note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
+                    });
+                    setCreators((prev) =>
+                      prev.map((c) =>
+                        c.id === referrer.id
+                          ? {
+                              ...c,
+                              subscriptionExpiresAt: newExpiry.toISOString(),
+                              referralBonusDays: newBonus,
+                            }
+                          : c,
+                      ),
+                    );
+                    setSubscriptions((prev) =>
+                      prev.map((sub) =>
+                        sub.creatorId === referrer.id && (sub.status === "active" || !sub.isQueued)
+                          ? { ...sub, expiresAt: newExpiry.toISOString() }
+                          : sub,
+                      ),
+                    );
+                    if (myCreatorId === referrer.id) {
+                      const events = await supabaseDb.fetchReferralEvents(referrer.id);
+                      setReferralEvents(events);
+                    }
+                  }
                 }
               }
             }
@@ -799,6 +892,195 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         setReferralEvents(events);
       },
 
+      applySpecialReferralProgram: async (creatorId: string, payoutDetails: PayoutDetails) => {
+        const creator = creators.find((c) => c.id === creatorId);
+        if (!creator) return { success: false, error: "Creator not found" };
+
+        const currentProg = creator.specialReferralProgram;
+        const newProgram: SpecialReferralProgram = {
+          status: "pending",
+          appliedAt: new Date().toISOString(),
+          payoutDetails,
+          walletBalance: currentProg?.walletBalance ?? 0,
+          totalEarned: currentProg?.totalEarned ?? 0,
+          totalWithdrawn: currentProg?.totalWithdrawn ?? 0,
+        };
+
+        const ok = await supabaseDb.updateSpecialReferralProgram(creatorId, newProgram);
+        if (ok) {
+          setCreators((prev) =>
+            prev.map((c) => (c.id === creatorId ? { ...c, specialReferralProgram: newProgram } : c)),
+          );
+          return { success: true };
+        }
+        return { success: false, error: "Failed to submit application. Please try again." };
+      },
+
+      updateSpecialReferralStatus: async (
+        creatorId: string,
+        status: SpecialReferralStatus,
+        rejectionReason?: string,
+      ) => {
+        const creator = creators.find((c) => c.id === creatorId);
+        if (!creator) return { success: false, error: "Creator not found" };
+
+        const currentProg = creator.specialReferralProgram;
+        const nowIso = new Date().toISOString();
+        const updatedProgram: SpecialReferralProgram = {
+          status,
+          appliedAt: currentProg?.appliedAt || nowIso,
+          reviewedAt: nowIso,
+          payoutDetails: currentProg?.payoutDetails || {
+            upiId: "",
+            accountHolderName: "",
+            accountNumber: "",
+            bankName: "",
+            ifscCode: "",
+          },
+          walletBalance: currentProg?.walletBalance ?? 0,
+          totalEarned: currentProg?.totalEarned ?? 0,
+          totalWithdrawn: currentProg?.totalWithdrawn ?? 0,
+          rejectionReason: status === "rejected" ? rejectionReason : undefined,
+          approvedAt: status === "active" ? (currentProg?.approvedAt || nowIso) : currentProg?.approvedAt,
+          closedAt: status === "closed" ? nowIso : currentProg?.closedAt,
+        };
+
+        const ok = await supabaseDb.updateSpecialReferralProgram(creatorId, updatedProgram);
+        if (ok) {
+          setCreators((prev) =>
+            prev.map((c) => (c.id === creatorId ? { ...c, specialReferralProgram: updatedProgram } : c)),
+          );
+          return { success: true };
+        }
+        return { success: false, error: "Failed to update status." };
+      },
+
+      fetchWithdrawalRequests: async () => {
+        const reqs = await supabaseDb.fetchWithdrawalRequests();
+        setWithdrawalRequests(reqs);
+      },
+
+      submitWithdrawalRequest: async (
+        req: Omit<ReferralWithdrawalRequest, "id" | "requestedAt" | "status">,
+      ) => {
+        const creator = creators.find((c) => c.id === req.creatorId);
+        if (!creator) return { success: false, error: "Creator not found" };
+
+        const balance = creator.specialReferralProgram?.walletBalance ?? 0;
+        if (req.amount < 200) {
+          return { success: false, error: "Minimum withdrawal amount is ₹200." };
+        }
+        if (req.amount > balance) {
+          return { success: false, error: `Insufficient wallet balance. You have ₹${balance}.` };
+        }
+
+        // Check if there is already an active pending request
+        const hasPending = withdrawalRequests.some(
+          (r) => r.creatorId === req.creatorId && r.status === "pending",
+        );
+        if (hasPending) {
+          return {
+            success: false,
+            error: "You already have a pending withdrawal request under review. Only 1 pending request is permitted at a time.",
+          };
+        }
+
+        // Check monthly limit: max 2 requests per calendar month (excluding rejected)
+        const now = new Date();
+        const currentYear = now.getFullYear();
+        const currentMonth = now.getMonth();
+        const monthlyCount = withdrawalRequests.filter((r) => {
+          if (r.creatorId !== req.creatorId) return false;
+          if (r.status === "rejected") return false;
+          const d = new Date(r.requestedAt);
+          return d.getFullYear() === currentYear && d.getMonth() === currentMonth;
+        }).length;
+
+        if (monthlyCount >= 2) {
+          return {
+            success: false,
+            error: "You have reached your limit of 2 withdrawal requests for this calendar month.",
+          };
+        }
+
+        // Deduct from wallet balance
+        const currentProg = creator.specialReferralProgram!;
+        const updatedProg: SpecialReferralProgram = {
+          ...currentProg,
+          walletBalance: Math.max(0, balance - req.amount),
+        };
+        await supabaseDb.updateSpecialReferralProgram(req.creatorId, updatedProg);
+        setCreators((prev) =>
+          prev.map((c) => (c.id === req.creatorId ? { ...c, specialReferralProgram: updatedProg } : c)),
+        );
+
+        // Submit request to DB
+        const created = await supabaseDb.submitWithdrawalRequest({
+          creatorId: req.creatorId,
+          creatorName: req.creatorName || creator.name || creator.displayName,
+          creatorHandle: req.creatorHandle || creator.instagram,
+          amount: req.amount,
+          payoutDetails: req.payoutDetails,
+        });
+
+        setWithdrawalRequests((prev) => [created, ...prev]);
+        return { success: true };
+      },
+
+      updateWithdrawalRequest: async (
+        id: string,
+        updates: Partial<ReferralWithdrawalRequest>,
+      ) => {
+        const existing = withdrawalRequests.find((r) => r.id === id);
+        if (!existing) return { success: false, error: "Withdrawal request not found" };
+
+        if (updates.status === "rejected" && !updates.adminNotes?.trim()) {
+          return { success: false, error: "A rejection note is required explaining why the request was rejected." };
+        }
+
+        // If rejecting: refund the amount back to creator's wallet balance!
+        if (updates.status === "rejected" && existing.status !== "rejected") {
+          const creator = creators.find((c) => c.id === existing.creatorId);
+          if (creator && creator.specialReferralProgram) {
+            const currentProg = creator.specialReferralProgram;
+            const updatedProg: SpecialReferralProgram = {
+              ...currentProg,
+              walletBalance: (currentProg.walletBalance || 0) + existing.amount,
+            };
+            await supabaseDb.updateSpecialReferralProgram(creator.id, updatedProg);
+            setCreators((prev) =>
+              prev.map((c) => (c.id === creator.id ? { ...c, specialReferralProgram: updatedProg } : c)),
+            );
+          }
+        }
+
+        // If marking paid: increment totalWithdrawn
+        if (updates.status === "paid" && existing.status !== "paid") {
+          const creator = creators.find((c) => c.id === existing.creatorId);
+          if (creator && creator.specialReferralProgram) {
+            const currentProg = creator.specialReferralProgram;
+            const updatedProg: SpecialReferralProgram = {
+              ...currentProg,
+              totalWithdrawn: (currentProg.totalWithdrawn || 0) + existing.amount,
+            };
+            await supabaseDb.updateSpecialReferralProgram(creator.id, updatedProg);
+            setCreators((prev) =>
+              prev.map((c) => (c.id === creator.id ? { ...c, specialReferralProgram: updatedProg } : c)),
+            );
+          }
+        }
+
+        const ok = await supabaseDb.updateWithdrawalRequest(id, updates);
+        if (ok) {
+          setWithdrawalRequests((prev) =>
+            prev.map((r) => (r.id === id ? { ...r, ...updates } : r)),
+          );
+          return { success: true };
+        }
+        return { success: false, error: "Failed to update withdrawal request" };
+      },
+
+      withdrawalRequests,
       discoverFilters,
       setDiscoverFilters,
       discoverHasSearched,
@@ -814,6 +1096,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       reports,
       subscriptions,
       referralEvents,
+      withdrawalRequests,
       discoverFilters,
       discoverHasSearched,
     ],

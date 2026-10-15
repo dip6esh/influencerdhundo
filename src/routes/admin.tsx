@@ -19,6 +19,9 @@ import {
   TURNAROUNDS,
   type Creator,
   type CreatorStatus,
+  type ReferralWithdrawalRequest,
+  type SpecialReferralProgram,
+  type SpecialReferralStatus,
 } from "@/lib/directory-data";
 import {
   ShieldCheck,
@@ -70,6 +73,7 @@ import {
   AlertTriangle,
   TrendingUp,
   Building2,
+  Wallet,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -92,6 +96,7 @@ const TABS = [
   "Creators",
   "Discount Codes",
   "Subscriptions",
+  "Special Referrals",
   "Businesses",
   "Reports",
   "Taxonomy",
@@ -1418,6 +1423,7 @@ function AdminDashboard() {
     business,
     reports,
     subscriptions,
+    withdrawalRequests,
     setCreatorStatus,
     removeCreator,
     toggleFeatured,
@@ -1425,8 +1431,30 @@ function AdminDashboard() {
     activateSubscription,
     startFreeTrial,
     refreshFromSupabase,
+    updateSpecialReferralStatus,
+    updateWithdrawalRequest,
   } = useAppState();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Analytics");
+
+  // Special Referrals Admin State
+  const [specialSubTab, setSpecialSubTab] = useState<"withdrawals" | "applications">("withdrawals");
+  const [withdrawalFilter, setWithdrawalFilter] = useState<"all" | "pending" | "paid" | "rejected">("all");
+  const [appFilter, setAppFilter] = useState<"all" | "pending" | "active" | "rejected" | "closed">("all");
+  const [specialSearch, setSpecialSearch] = useState("");
+
+  // Modals for Special Referrals Admin
+  const [payingWithdrawal, setPayingWithdrawal] = useState<ReferralWithdrawalRequest | null>(null);
+  const [payoutUtrInput, setPayoutUtrInput] = useState("");
+  const [rejectingWithdrawal, setRejectingWithdrawal] = useState<ReferralWithdrawalRequest | null>(null);
+  const [rejectWithdrawalReason, setRejectWithdrawalReason] = useState("");
+  const [rejectingAppCreatorId, setRejectingAppCreatorId] = useState<string | null>(null);
+  const [rejectAppReason, setRejectAppReason] = useState("");
+  const [specialActionLoading, setSpecialActionLoading] = useState(false);
+  const [specialFeedback, setSpecialFeedback] = useState<{
+    id: string;
+    msg: string;
+    type: "success" | "error";
+  } | null>(null);
 
   // Analytics state
   const [analyticsRange, setAnalyticsRange] = useState<"today" | "7d" | "30d" | "all">("7d");
@@ -1931,6 +1959,17 @@ function AdminDashboard() {
               ? "📊 Traffic & Footprints"
               : t === "Discount Codes"
               ? "🏷️ Discount & Referral Codes"
+              : t === "Special Referrals"
+              ? `💸 Special Referrals & Payouts${
+                  withdrawalRequests.filter((r) => r.status === "pending").length +
+                    creators.filter((c) => c.specialReferralProgram?.status === "pending").length >
+                  0
+                    ? ` (${
+                        withdrawalRequests.filter((r) => r.status === "pending").length +
+                        creators.filter((c) => c.specialReferralProgram?.status === "pending").length
+                      })`
+                    : ""
+                }`
               : t === "Businesses"
               ? `🏢 Businesses (${businessAccounts.length})`
               : t}
@@ -4560,6 +4599,656 @@ function AdminDashboard() {
         </div>
       ) : null}
 
+      {/* ── TAB: SPECIAL REFERRALS & PAYOUTS ────────────────────────────── */}
+      {tab === "Special Referrals" ? (
+        <div className="mt-5 space-y-6">
+          {/* Header Stats & Quick Overview */}
+          {(() => {
+            const pendingReqs = withdrawalRequests.filter((r) => r.status === "pending");
+            const paidReqs = withdrawalRequests.filter((r) => r.status === "paid");
+            const rejectedReqs = withdrawalRequests.filter((r) => r.status === "rejected");
+            const pendingApps = creators.filter((c) => c.specialReferralProgram?.status === "pending");
+            const activeCreators = creators.filter((c) => c.specialReferralProgram?.status === "active");
+
+            const pendingTotalAmt = pendingReqs.reduce((acc, r) => acc + (r.amount || 0), 0);
+            const paidTotalAmt = paidReqs.reduce((acc, r) => acc + (r.amount || 0), 0);
+
+            return (
+              <div className="space-y-6">
+                {/* Metrics Cards */}
+                <div className="grid grid-cols-2 md:grid-cols-4 gap-3 sm:gap-4">
+                  <div className="rounded-2xl border border-amber-500/30 bg-amber-500/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-amber-700 dark:text-amber-300">
+                        Pending Payouts
+                      </span>
+                      <span className="rounded-full bg-amber-500/20 px-2 py-0.5 text-[10px] font-bold text-amber-700 dark:text-amber-300">
+                        {pendingReqs.length} reqs
+                      </span>
+                    </div>
+                    <p className="text-2xl font-display font-extrabold text-foreground mt-2">
+                      ₹{pendingTotalAmt.toLocaleString("en-IN")}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Awaiting bank/UPI transfer</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-emerald-500/30 bg-emerald-500/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                        Total Paid Out
+                      </span>
+                      <span className="rounded-full bg-emerald-500/20 px-2 py-0.5 text-[10px] font-bold text-emerald-700 dark:text-emerald-300">
+                        {paidReqs.length} paid
+                      </span>
+                    </div>
+                    <p className="text-2xl font-display font-extrabold text-foreground mt-2">
+                      ₹{paidTotalAmt.toLocaleString("en-IN")}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Successfully settled</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-primary/30 bg-primary/10 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-primary">Pending Applications</span>
+                      <span className="rounded-full bg-primary/20 px-2 py-0.5 text-[10px] font-bold text-primary">
+                        Review
+                      </span>
+                    </div>
+                    <p className="text-2xl font-display font-extrabold text-foreground mt-2">
+                      {pendingApps.length}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Creators applied for cash</p>
+                  </div>
+
+                  <div className="rounded-2xl border border-border/80 bg-background/60 p-4">
+                    <div className="flex items-center justify-between">
+                      <span className="text-xs font-semibold text-muted-foreground">Active Enrolled</span>
+                      <span className="rounded-full bg-accent/20 px-2 py-0.5 text-[10px] font-bold text-tealdeep">
+                        Cash Mode
+                      </span>
+                    </div>
+                    <p className="text-2xl font-display font-extrabold text-foreground mt-2">
+                      {activeCreators.length}
+                    </p>
+                    <p className="text-[11px] text-muted-foreground mt-0.5">Earning cash per referral</p>
+                  </div>
+                </div>
+
+                {specialFeedback && (
+                  <div
+                    className={`rounded-2xl border p-4 text-xs font-medium flex items-center justify-between ${
+                      specialFeedback.type === "success"
+                        ? "bg-emerald-500/15 border-emerald-500/30 text-emerald-700 dark:text-emerald-300"
+                        : "bg-rose-500/15 border-rose-500/30 text-rose-700 dark:text-rose-300"
+                    }`}
+                  >
+                    <span>{specialFeedback.msg}</span>
+                    <button
+                      type="button"
+                      onClick={() => setSpecialFeedback(null)}
+                      className="text-muted-foreground hover:text-foreground"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                )}
+
+                {/* Sub-Tabs Selector */}
+                <div className="flex flex-col sm:flex-row items-stretch sm:items-center justify-between gap-3 border-b border-border/80 pb-3">
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      onClick={() => setSpecialSubTab("withdrawals")}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                        specialSubTab === "withdrawals"
+                          ? "bg-foreground text-background shadow-xs"
+                          : "bg-secondary/60 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      💸 Withdrawal Requests &amp; Payouts ({withdrawalRequests.length})
+                      {pendingReqs.length > 0 && (
+                        <span className="ml-1.5 rounded-full bg-amber-500 px-1.5 py-0.2 text-[10px] text-white font-bold">
+                          {pendingReqs.length}
+                        </span>
+                      )}
+                    </button>
+
+                    <button
+                      type="button"
+                      onClick={() => setSpecialSubTab("applications")}
+                      className={`rounded-full px-4 py-2 text-xs font-semibold transition-all cursor-pointer ${
+                        specialSubTab === "applications"
+                          ? "bg-foreground text-background shadow-xs"
+                          : "bg-secondary/60 text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      👥 Applications &amp; Enrolled Creators (
+                      {creators.filter((c) => c.specialReferralProgram).length})
+                      {pendingApps.length > 0 && (
+                        <span className="ml-1.5 rounded-full bg-primary px-1.5 py-0.2 text-[10px] text-white font-bold">
+                          {pendingApps.length}
+                        </span>
+                      )}
+                    </button>
+                  </div>
+
+                  <div className="relative">
+                    <input
+                      type="text"
+                      placeholder="Search by creator name, UPI, handle..."
+                      value={specialSearch}
+                      onChange={(e) => setSpecialSearch(e.target.value)}
+                      className="rounded-full border border-input bg-background/80 px-4 py-1.5 text-xs text-foreground placeholder:text-muted-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 w-full sm:w-64"
+                    />
+                    {specialSearch && (
+                      <button
+                        type="button"
+                        onClick={() => setSpecialSearch("")}
+                        className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                      >
+                        <X className="size-3" />
+                      </button>
+                    )}
+                  </div>
+                </div>
+
+                {/* ── SUB-TAB 1: WITHDRAWAL REQUESTS & PAYOUTS ─────────────────── */}
+                {specialSubTab === "withdrawals" && (
+                  <div className="space-y-4">
+                    {/* Status Filters */}
+                    <div className="flex flex-wrap gap-2">
+                      {(["all", "pending", "paid", "rejected"] as const).map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setWithdrawalFilter(st)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-all cursor-pointer ${
+                            withdrawalFilter === st
+                              ? "bg-primary text-primary-foreground font-semibold"
+                              : "bg-secondary/50 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {st === "all"
+                            ? `All Requests (${withdrawalRequests.length})`
+                            : st === "pending"
+                            ? `Pending (${pendingReqs.length})`
+                            : st === "paid"
+                            ? `Paid (${paidReqs.length})`
+                            : `Rejected (${rejectedReqs.length})`}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Table */}
+                    {(() => {
+                      const q = specialSearch.trim().toLowerCase();
+                      const filtered = withdrawalRequests.filter((r) => {
+                        if (withdrawalFilter !== "all" && r.status !== withdrawalFilter) return false;
+                        if (!q) return true;
+                        return (
+                          r.creatorName?.toLowerCase().includes(q) ||
+                          r.creatorHandle?.toLowerCase().includes(q) ||
+                          r.payoutDetails.upiId?.toLowerCase().includes(q) ||
+                          r.payoutDetails.accountNumber?.includes(q) ||
+                          r.payoutDetails.bankName?.toLowerCase().includes(q)
+                        );
+                      });
+
+                      if (filtered.length === 0) {
+                        return (
+                          <div className="rounded-2xl border border-dashed border-border/80 p-8 text-center bg-background/50">
+                            <p className="text-sm font-semibold text-muted-foreground">
+                              No withdrawal requests found.
+                            </p>
+                            <p className="text-xs text-muted-foreground mt-1">
+                              When creators request payouts, they will appear here with full banking and UPI details for disbursement.
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="overflow-x-auto rounded-2xl border border-border/80 bg-background/60 shadow-sm">
+                          <table className="w-full text-left text-xs">
+                            <thead className="border-b border-border bg-secondary/80 font-semibold text-muted-foreground uppercase tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3">Creator</th>
+                                <th className="px-4 py-3">Amount</th>
+                                <th className="px-4 py-3">Payout Details (UPI &amp; Bank)</th>
+                                <th className="px-4 py-3">Requested At</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">Ref / Reason</th>
+                                <th className="px-4 py-3 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                              {filtered.map((req) => {
+                                const creator = creators.find((c) => c.id === req.creatorId);
+                                const phone = creator?.contact?.whatsapp || creator?.contact?.phone || "";
+
+                                return (
+                                  <tr key={req.id} className="hover:bg-secondary/20 transition-colors">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-2.5">
+                                        {creator?.photo ? (
+                                          <img
+                                            src={creator.photo}
+                                            alt={req.creatorName}
+                                            className="size-8 rounded-lg object-cover ring-1 ring-border shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                            {(req.creatorName || "C").slice(0, 2).toUpperCase()}
+                                          </div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-foreground truncate">
+                                            {req.creatorName || creator?.displayName || "Unknown Creator"}
+                                          </p>
+                                          <p className="text-[11px] text-muted-foreground font-mono truncate">
+                                            @{req.creatorHandle || creator?.instagram || req.creatorId}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      <span className="font-display font-extrabold text-sm text-foreground">
+                                        ₹{req.amount.toLocaleString("en-IN")}
+                                      </span>
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                      <div className="space-y-1 font-mono text-[11px]">
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-muted-foreground">UPI:</span>
+                                          <strong className="text-foreground">{req.payoutDetails.upiId}</strong>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(req.payoutDetails.upiId);
+                                              setSpecialFeedback({
+                                                id: req.id,
+                                                msg: `Copied UPI ID: ${req.payoutDetails.upiId}`,
+                                                type: "success",
+                                              });
+                                            }}
+                                            className="text-muted-foreground hover:text-foreground cursor-pointer"
+                                            title="Copy UPI ID"
+                                          >
+                                            <Copy className="size-3" />
+                                          </button>
+                                        </div>
+                                        <div className="flex items-center gap-1.5">
+                                          <span className="text-muted-foreground">A/C:</span>
+                                          <span className="text-foreground">
+                                            {req.payoutDetails.accountNumber} ({req.payoutDetails.bankName})
+                                          </span>
+                                          <button
+                                            type="button"
+                                            onClick={() => {
+                                              navigator.clipboard.writeText(req.payoutDetails.accountNumber);
+                                              setSpecialFeedback({
+                                                id: req.id,
+                                                msg: `Copied Bank A/C: ${req.payoutDetails.accountNumber}`,
+                                                type: "success",
+                                              });
+                                            }}
+                                            className="text-muted-foreground hover:text-foreground cursor-pointer"
+                                            title="Copy A/C Number"
+                                          >
+                                            <Copy className="size-3" />
+                                          </button>
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground">
+                                          Holder: {req.payoutDetails.accountHolderName} • IFSC:{" "}
+                                          <strong className="text-foreground">{req.payoutDetails.ifscCode}</strong>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                                      {new Date(req.requestedAt).toLocaleDateString("en-IN", {
+                                        month: "short",
+                                        day: "numeric",
+                                        year: "numeric",
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
+                                    </td>
+
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      {req.status === "paid" ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                          <Check className="size-3" />
+                                          Paid
+                                        </span>
+                                      ) : req.status === "rejected" ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-0.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                          <X className="size-3" />
+                                          Rejected (Refunded)
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                          <Clock className="size-3" />
+                                          Pending
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                      {req.status === "paid" ? (
+                                        <div className="text-xs font-mono text-emerald-600 dark:text-emerald-400">
+                                          {req.transactionReference ? `UTR: ${req.transactionReference}` : "Paid"}
+                                        </div>
+                                      ) : req.status === "rejected" ? (
+                                        <div className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                                          {req.adminNotes || "Details mismatched"}
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">—</span>
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                                      {req.status === "pending" ? (
+                                        <div className="flex items-center justify-end gap-2">
+                                          <Button
+                                            onClick={() => {
+                                              setPayingWithdrawal(req);
+                                              setPayoutUtrInput("");
+                                            }}
+                                            className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-3 py-1 shadow-xs"
+                                          >
+                                            <Check className="size-3" />
+                                            <span>Mark Paid</span>
+                                          </Button>
+                                          <Button
+                                            variant="outline"
+                                            onClick={() => {
+                                              setRejectingWithdrawal(req);
+                                              setRejectWithdrawalReason("");
+                                            }}
+                                            className="rounded-xl text-rose-600 hover:bg-rose-500/10 border-rose-500/30 font-semibold text-[11px] px-2.5 py-1"
+                                          >
+                                            <X className="size-3" />
+                                            <span>Reject</span>
+                                          </Button>
+                                        </div>
+                                      ) : (
+                                        <span className="text-xs text-muted-foreground">Processed</span>
+                                      )}
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+
+                {/* ── SUB-TAB 2: APPLICATIONS & ENROLLED CREATORS ────────────────── */}
+                {specialSubTab === "applications" && (
+                  <div className="space-y-4">
+                    {/* Status Filters */}
+                    <div className="flex flex-wrap gap-2">
+                      {(["all", "pending", "active", "rejected", "closed"] as const).map((st) => (
+                        <button
+                          key={st}
+                          type="button"
+                          onClick={() => setAppFilter(st)}
+                          className={`rounded-full px-3 py-1 text-xs font-medium capitalize transition-all cursor-pointer ${
+                            appFilter === st
+                              ? "bg-primary text-primary-foreground font-semibold"
+                              : "bg-secondary/50 text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {st === "all"
+                            ? `All Creators (${creators.filter((c) => c.specialReferralProgram).length})`
+                            : st === "pending"
+                            ? `Pending Applications (${creators.filter((c) => c.specialReferralProgram?.status === "pending").length})`
+                            : st === "active"
+                            ? `Active Enrolled (${creators.filter((c) => c.specialReferralProgram?.status === "active").length})`
+                            : st === "rejected"
+                            ? `Rejected (${creators.filter((c) => c.specialReferralProgram?.status === "rejected").length})`
+                            : `Closed (${creators.filter((c) => c.specialReferralProgram?.status === "closed").length})`}
+                        </button>
+                      ))}
+                    </div>
+
+                    {/* Table */}
+                    {(() => {
+                      const q = specialSearch.trim().toLowerCase();
+                      const enrolledCreators = creators.filter((c) => {
+                        if (!c.specialReferralProgram) return false;
+                        if (appFilter !== "all" && c.specialReferralProgram.status !== appFilter) return false;
+                        if (!q) return true;
+                        return (
+                          (c.name || c.displayName || "").toLowerCase().includes(q) ||
+                          (c.instagram || "").toLowerCase().includes(q) ||
+                          c.specialReferralProgram.payoutDetails?.upiId?.toLowerCase().includes(q) ||
+                          c.specialReferralProgram.payoutDetails?.bankName?.toLowerCase().includes(q)
+                        );
+                      });
+
+                      if (enrolledCreators.length === 0) {
+                        return (
+                          <div className="rounded-2xl border border-dashed border-border/80 p-8 text-center bg-background/50">
+                            <p className="text-sm font-semibold text-muted-foreground">
+                              No creators found for this status.
+                            </p>
+                          </div>
+                        );
+                      }
+
+                      return (
+                        <div className="overflow-x-auto rounded-2xl border border-border/80 bg-background/60 shadow-sm">
+                          <table className="w-full text-left text-xs">
+                            <thead className="border-b border-border bg-secondary/80 font-semibold text-muted-foreground uppercase tracking-wider">
+                              <tr>
+                                <th className="px-4 py-3">Creator</th>
+                                <th className="px-4 py-3">Applied At</th>
+                                <th className="px-4 py-3">Payout Details (UPI &amp; Bank)</th>
+                                <th className="px-4 py-3">Status</th>
+                                <th className="px-4 py-3">Wallet Balance</th>
+                                <th className="px-4 py-3">Total Earned</th>
+                                <th className="px-4 py-3 text-right">Actions</th>
+                              </tr>
+                            </thead>
+                            <tbody className="divide-y divide-border/60">
+                              {enrolledCreators.map((c) => {
+                                const prog = c.specialReferralProgram!;
+                                const p = prog.payoutDetails;
+
+                                return (
+                                  <tr key={c.id} className="hover:bg-secondary/20 transition-colors">
+                                    <td className="px-4 py-3">
+                                      <div className="flex items-center gap-2.5">
+                                        {c.photo ? (
+                                          <img
+                                            src={c.photo}
+                                            alt={c.name}
+                                            className="size-8 rounded-lg object-cover ring-1 ring-border shrink-0"
+                                          />
+                                        ) : (
+                                          <div className="size-8 rounded-lg bg-primary/10 text-primary flex items-center justify-center font-bold text-xs shrink-0">
+                                            {(c.name || c.displayName || "C").slice(0, 2).toUpperCase()}
+                                          </div>
+                                        )}
+                                        <div className="min-w-0">
+                                          <p className="font-bold text-foreground truncate">
+                                            {c.name || c.displayName}
+                                          </p>
+                                          <p className="text-[11px] text-muted-foreground font-mono truncate">
+                                            @{c.instagram || c.id}
+                                          </p>
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                                      {prog.appliedAt
+                                        ? new Date(prog.appliedAt).toLocaleDateString("en-IN", {
+                                            month: "short",
+                                            day: "numeric",
+                                            year: "numeric",
+                                          })
+                                        : "N/A"}
+                                    </td>
+
+                                    <td className="px-4 py-3">
+                                      <div className="space-y-0.5 font-mono text-[11px]">
+                                        <div>
+                                          <span className="text-muted-foreground">UPI:</span>{" "}
+                                          <strong className="text-foreground">{p?.upiId || "N/A"}</strong>
+                                        </div>
+                                        <div>
+                                          <span className="text-muted-foreground">Bank:</span>{" "}
+                                          <span className="text-foreground">
+                                            {p?.bankName} ({p?.accountNumber})
+                                          </span>
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground">
+                                          Holder: {p?.accountHolderName} • IFSC: {p?.ifscCode}
+                                        </div>
+                                      </div>
+                                    </td>
+
+                                    <td className="px-4 py-3 whitespace-nowrap">
+                                      {prog.status === "active" ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                          <Check className="size-3" />
+                                          Active (Earning Cash)
+                                        </span>
+                                      ) : prog.status === "pending" ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                          <Clock className="size-3" />
+                                          Pending Review
+                                        </span>
+                                      ) : prog.status === "rejected" ? (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-0.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                          <X className="size-3" />
+                                          Rejected
+                                        </span>
+                                      ) : (
+                                        <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-medium text-muted-foreground border border-border">
+                                          Closed
+                                        </span>
+                                      )}
+                                    </td>
+
+                                    <td className="px-4 py-3 whitespace-nowrap font-bold text-foreground">
+                                      ₹{(prog.walletBalance || 0).toLocaleString("en-IN")}
+                                    </td>
+
+                                    <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                                      ₹{(prog.totalEarned || 0).toLocaleString("en-IN")}
+                                    </td>
+
+                                    <td className="px-4 py-3 text-right whitespace-nowrap">
+                                      <div className="flex items-center justify-end gap-2">
+                                        {prog.status === "pending" ? (
+                                          <>
+                                            <Button
+                                              onClick={async () => {
+                                                setSpecialActionLoading(true);
+                                                const res = await updateSpecialReferralStatus(c.id, "active");
+                                                setSpecialActionLoading(false);
+                                                if (res.success) {
+                                                  setSpecialFeedback({
+                                                    id: c.id,
+                                                    msg: `Approved special referral program for ${c.name || c.displayName}!`,
+                                                    type: "success",
+                                                  });
+                                                }
+                                              }}
+                                              disabled={specialActionLoading}
+                                              className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-[11px] px-3 py-1 shadow-xs"
+                                            >
+                                              <Check className="size-3" />
+                                              <span>Approve</span>
+                                            </Button>
+
+                                            <Button
+                                              variant="outline"
+                                              onClick={() => {
+                                                setRejectingAppCreatorId(c.id);
+                                                setRejectAppReason("");
+                                              }}
+                                              className="rounded-xl text-rose-600 hover:bg-rose-500/10 border-rose-500/30 font-semibold text-[11px] px-2.5 py-1"
+                                            >
+                                              <X className="size-3" />
+                                              <span>Reject</span>
+                                            </Button>
+                                          </>
+                                        ) : prog.status === "active" ? (
+                                          <Button
+                                            variant="outline"
+                                            onClick={async () => {
+                                              if (
+                                                confirm(
+                                                  `Are you sure you want to close the Special Referral Program for ${c.name || c.displayName}? They will immediately revert to receiving +7 bonus subscription days for referrals.`,
+                                                )
+                                              ) {
+                                                setSpecialActionLoading(true);
+                                                const res = await updateSpecialReferralStatus(c.id, "closed");
+                                                setSpecialActionLoading(false);
+                                                if (res.success) {
+                                                  setSpecialFeedback({
+                                                    id: c.id,
+                                                    msg: `Closed special program for ${c.name || c.displayName}. Creator will receive +7 bonus days henceforth.`,
+                                                    type: "success",
+                                                  });
+                                                }
+                                              }
+                                            }}
+                                            disabled={specialActionLoading}
+                                            className="rounded-xl text-amber-600 hover:bg-amber-500/10 border-amber-500/30 font-semibold text-[11px] px-2.5 py-1"
+                                          >
+                                            <span>Close Program</span>
+                                          </Button>
+                                        ) : (
+                                          <Button
+                                            variant="outline"
+                                            onClick={async () => {
+                                              setSpecialActionLoading(true);
+                                              const res = await updateSpecialReferralStatus(c.id, "active");
+                                              setSpecialActionLoading(false);
+                                              if (res.success) {
+                                                setSpecialFeedback({
+                                                  id: c.id,
+                                                  msg: `Re-activated special referral program for ${c.name || c.displayName}!`,
+                                                  type: "success",
+                                                });
+                                              }
+                                            }}
+                                            disabled={specialActionLoading}
+                                            className="rounded-xl text-primary hover:bg-primary/10 border-primary/30 font-semibold text-[11px] px-2.5 py-1"
+                                          >
+                                            <span>Reactivate</span>
+                                          </Button>
+                                        )}
+                                      </div>
+                                    </td>
+                                  </tr>
+                                );
+                              })}
+                            </tbody>
+                          </table>
+                        </div>
+                      );
+                    })()}
+                  </div>
+                )}
+              </div>
+            );
+          })()}
+        </div>
+      ) : null}
+
       {/* ── TAB 4: BUSINESSES ───────────────────────────────────────────── */}
       {tab === "Businesses" ? (
         <div className="mt-5 space-y-5">
@@ -4860,6 +5549,363 @@ function AdminDashboard() {
             return await updateCreator(updated);
           }}
         />
+      )}
+
+      {/* ── MARK AS PAID MODAL ── */}
+      {payingWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                  <CheckCircle2 className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">Mark Payout as Paid</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Record settlement and notify creator
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setPayingWithdrawal(null);
+                  setPayoutUtrInput("");
+                }}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Payout Summary Box */}
+            <div className="rounded-xl border border-border bg-background p-4 space-y-3">
+              <div className="flex items-baseline justify-between border-b border-border/60 pb-3">
+                <span className="text-xs text-muted-foreground">Amount to Disburse</span>
+                <span className="text-2xl font-black text-emerald-600 dark:text-emerald-400">
+                  ₹{payingWithdrawal.amount.toLocaleString("en-IN")}
+                </span>
+              </div>
+
+              {/* Creator details */}
+              {(() => {
+                const c = creators.find((x) => x.id === payingWithdrawal.creatorId);
+                const p = payingWithdrawal.payoutDetails;
+                return (
+                  <div className="space-y-2 text-xs">
+                    <div className="flex justify-between">
+                      <span className="text-muted-foreground">Creator:</span>
+                      <span className="font-semibold text-foreground">
+                        {c?.name || c?.displayName || payingWithdrawal.creatorId}
+                      </span>
+                    </div>
+                    {p.upiId && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">UPI ID:</span>
+                        <span className="font-mono font-medium text-foreground">{p.upiId}</span>
+                      </div>
+                    )}
+                    {(p.accountNumber || p.bankAccountNumber) && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">Bank Account:</span>
+                        <span className="font-mono text-foreground">
+                          {p.accountNumber || p.bankAccountNumber} ({p.ifscCode})
+                        </span>
+                      </div>
+                    )}
+                    {p.accountHolderName && (
+                      <div className="flex justify-between">
+                        <span className="text-muted-foreground">A/C Holder:</span>
+                        <span className="text-foreground">{p.accountHolderName}</span>
+                      </div>
+                    )}
+                  </div>
+                );
+              })()}
+            </div>
+
+            {/* Transaction / UTR Input */}
+            <div>
+              <Field
+                label="Bank UTR / Transaction Reference ID (Recommended)"
+                hint="Input the bank/UPI reference number so creator can cross-verify in their bank statement."
+              >
+                <TextInput
+                  value={payoutUtrInput}
+                  onChange={(e) => setPayoutUtrInput(e.target.value)}
+                  placeholder="e.g. 412389123891 or UPI/IMPS Ref"
+                  className="font-mono text-xs"
+                />
+              </Field>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setPayingWithdrawal(null);
+                  setPayoutUtrInput("");
+                }}
+                disabled={specialActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  setSpecialActionLoading(true);
+                  const res = await updateWithdrawalRequest(payingWithdrawal.id, {
+                    status: "paid",
+                    transactionReference: payoutUtrInput.trim() || undefined,
+                    processedAt: new Date().toISOString(),
+                  });
+                  setSpecialActionLoading(false);
+                  if (res.success) {
+                    setSpecialFeedback({
+                      id: payingWithdrawal.id,
+                      msg: `Marked withdrawal of ₹${payingWithdrawal.amount.toLocaleString("en-IN")} as paid successfully!`,
+                      type: "success",
+                    });
+                    setPayingWithdrawal(null);
+                    setPayoutUtrInput("");
+                  } else {
+                    alert(res.error || "Failed to update withdrawal status");
+                  }
+                }}
+                disabled={specialActionLoading}
+                className="bg-emerald-600 hover:bg-emerald-700 text-white font-bold"
+              >
+                {specialActionLoading ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Updating...
+                  </>
+                ) : (
+                  <>
+                    <Check className="mr-1.5 size-4" />
+                    Confirm Payout Paid
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REJECT WITHDRAWAL MODAL ── */}
+      {rejectingWithdrawal && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-2xl border border-rose-500/30 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                  <AlertCircle className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">Reject Withdrawal Request</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Refunds balance to creator's wallet
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRejectingWithdrawal(null);
+                  setRejectWithdrawalReason("");
+                }}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {/* Refund Alert Banner */}
+            <div className="rounded-xl border border-amber-500/30 bg-amber-500/10 p-4 text-xs text-amber-700 dark:text-amber-300 space-y-1">
+              <div className="font-semibold flex items-center gap-1.5">
+                <Sparkles className="size-3.5" />
+                Automatic Balance Refund
+              </div>
+              <p>
+                Rejecting this request will immediately refund{" "}
+                <span className="font-bold">₹{rejectingWithdrawal.amount.toLocaleString("en-IN")}</span> back into the
+                creator's wallet balance so they can update details and request again.
+              </p>
+            </div>
+
+            {/* Mandatory Reason */}
+            <div>
+              <Field
+                label="Rejection Reason (Required)"
+                hint="This reason will be visible to the creator in their dashboard."
+              >
+                <TextArea
+                  value={rejectWithdrawalReason}
+                  onChange={(e) => setRejectWithdrawalReason(e.target.value)}
+                  placeholder="e.g. Invalid IFSC code or UPI ID not receiving payments. Please verify in your settings and re-apply."
+                  rows={3}
+                  className="text-xs"
+                />
+              </Field>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRejectingWithdrawal(null);
+                  setRejectWithdrawalReason("");
+                }}
+                disabled={specialActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!rejectWithdrawalReason.trim()) return;
+                  setSpecialActionLoading(true);
+                  const res = await updateWithdrawalRequest(rejectingWithdrawal.id, {
+                    status: "rejected",
+                    adminNotes: rejectWithdrawalReason.trim(),
+                    processedAt: new Date().toISOString(),
+                  });
+                  setSpecialActionLoading(false);
+                  if (res.success) {
+                    setSpecialFeedback({
+                      id: rejectingWithdrawal.id,
+                      msg: `Rejected withdrawal request. ₹${rejectingWithdrawal.amount.toLocaleString("en-IN")} refunded to creator's wallet.`,
+                      type: "success",
+                    });
+                    setRejectingWithdrawal(null);
+                    setRejectWithdrawalReason("");
+                  } else {
+                    alert(res.error || "Failed to reject withdrawal request");
+                  }
+                }}
+                disabled={!rejectWithdrawalReason.trim() || specialActionLoading}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              >
+                {specialActionLoading ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Rejecting & Refunding...
+                  </>
+                ) : (
+                  <>
+                    <X className="mr-1.5 size-4" />
+                    Reject & Refund to Wallet
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
+      )}
+
+      {/* ── REJECT APPLICATION MODAL ── */}
+      {rejectingAppCreatorId && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 animate-in fade-in duration-150">
+          <div className="w-full max-w-lg rounded-2xl border border-rose-500/30 bg-card p-6 shadow-2xl space-y-5 animate-in zoom-in-95 duration-200">
+            <div className="flex items-start justify-between">
+              <div className="flex items-center gap-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-rose-500/15 text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                  <AlertCircle className="size-6" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-bold text-foreground">Reject Special Referral Application</h3>
+                  <p className="text-xs text-muted-foreground">
+                    Creator will continue receiving standard +7 bonus days
+                  </p>
+                </div>
+              </div>
+              <button
+                onClick={() => {
+                  setRejectingAppCreatorId(null);
+                  setRejectAppReason("");
+                }}
+                className="rounded-lg p-1.5 text-muted-foreground hover:bg-muted hover:text-foreground transition-colors"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            {(() => {
+              const c = creators.find((x) => x.id === rejectingAppCreatorId);
+              return (
+                <div className="rounded-xl border border-border bg-background p-3 text-xs flex justify-between items-center">
+                  <span className="text-muted-foreground">Applying Creator:</span>
+                  <span className="font-bold text-foreground">
+                    {c?.name || c?.displayName || rejectingAppCreatorId}
+                  </span>
+                </div>
+              );
+            })()}
+
+            {/* Mandatory Reason */}
+            <div>
+              <Field
+                label="Rejection Reason (Required)"
+                hint="Let the creator know why their application was not accepted at this time."
+              >
+                <TextArea
+                  value={rejectAppReason}
+                  onChange={(e) => setRejectAppReason(e.target.value)}
+                  placeholder="e.g. Account does not meet minimum follower / profile verification requirements yet. Feel free to re-apply once your profile is completed."
+                  rows={3}
+                  className="text-xs"
+                />
+              </Field>
+            </div>
+
+            <div className="flex items-center justify-end gap-3 pt-2 border-t border-border">
+              <Button
+                variant="outline"
+                onClick={() => {
+                  setRejectingAppCreatorId(null);
+                  setRejectAppReason("");
+                }}
+                disabled={specialActionLoading}
+              >
+                Cancel
+              </Button>
+              <Button
+                onClick={async () => {
+                  if (!rejectingAppCreatorId || !rejectAppReason.trim()) return;
+                  setSpecialActionLoading(true);
+                  const res = await updateSpecialReferralStatus(
+                    rejectingAppCreatorId,
+                    "rejected",
+                    rejectAppReason.trim(),
+                  );
+                  setSpecialActionLoading(false);
+                  if (res.success) {
+                    setSpecialFeedback({
+                      id: rejectingAppCreatorId,
+                      msg: `Application rejected with feedback.`,
+                      type: "success",
+                    });
+                    setRejectingAppCreatorId(null);
+                    setRejectAppReason("");
+                  } else {
+                    alert(res.error || "Failed to reject application");
+                  }
+                }}
+                disabled={!rejectAppReason.trim() || specialActionLoading}
+                className="bg-rose-600 hover:bg-rose-700 text-white font-bold"
+              >
+                {specialActionLoading ? (
+                  <>
+                    <Loader2 className="mr-2 size-4 animate-spin" />
+                    Rejecting...
+                  </>
+                ) : (
+                  <>
+                    <X className="mr-1.5 size-4" />
+                    Reject Application
+                  </>
+                )}
+              </Button>
+            </div>
+          </div>
+        </div>
       )}
     </div>
   );

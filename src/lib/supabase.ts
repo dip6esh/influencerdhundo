@@ -1,5 +1,5 @@
 import { createClient, type SupabaseClient } from "@supabase/supabase-js";
-import type { Creator, CreatorStatus } from "./directory-data";
+import type { Creator, CreatorStatus, SpecialReferralProgram, ReferralWithdrawalRequest } from "./directory-data";
 import type { BusinessAccount, Report, Subscription } from "./app-state";
 import { compressImage } from "./image-compression";
 
@@ -72,6 +72,7 @@ export interface CreatorRow {
   trial_started_at?: string | null;
   subscription_expires_at?: string | null;
   referral_bonus_days?: number | null;
+  special_referral_program?: SpecialReferralProgram | null;
   created_at?: string;
   updated_at?: string;
 }
@@ -116,6 +117,7 @@ export function creatorToRow(c: Creator, authUserId?: string): CreatorRow {
     trial_started_at: c.trialStartedAt ?? null,
     subscription_expires_at: c.subscriptionExpiresAt ?? null,
     referral_bonus_days: c.referralBonusDays ?? 0,
+    special_referral_program: c.specialReferralProgram ?? null,
   };
 }
 
@@ -153,6 +155,7 @@ export function rowToCreator(row: CreatorRow): Creator {
     trialStartedAt: row.trial_started_at ?? undefined,
     subscriptionExpiresAt: row.subscription_expires_at ?? undefined,
     referralBonusDays: row.referral_bonus_days ?? 0,
+    specialReferralProgram: (row as any).special_referral_program ?? undefined,
   };
 }
 
@@ -1833,6 +1836,141 @@ export const supabaseDb = {
       return [];
     }
   },
+
+  /** Update creator's Special Monetized Referral Program */
+  async updateSpecialReferralProgram(
+    creatorId: string,
+    program: SpecialReferralProgram,
+  ): Promise<boolean> {
+    try {
+      const { error } = await supabase
+        .from("creators")
+        .update({ special_referral_program: program, updated_at: new Date().toISOString() })
+        .eq("id", creatorId);
+
+      if (error) {
+        console.warn("Supabase updateSpecialReferralProgram error:", error.message);
+      }
+      // Always cache in localStorage as reliable fallback
+      try {
+        localStorage.setItem(`dhundo_special_prog_${creatorId}`, JSON.stringify(program));
+      } catch {}
+      return true;
+    } catch {
+      try {
+        localStorage.setItem(`dhundo_special_prog_${creatorId}`, JSON.stringify(program));
+        return true;
+      } catch {
+        return false;
+      }
+    }
+  },
+
+  /** Fetch all referral withdrawal requests */
+  async fetchWithdrawalRequests(): Promise<ReferralWithdrawalRequest[]> {
+    try {
+      const { data, error } = await supabase
+        .from("referral_withdrawal_requests")
+        .select("*")
+        .order("requested_at", { ascending: false });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map((row: any) => ({
+          id: row.id,
+          creatorId: row.creator_id,
+          creatorName: row.creator_name,
+          creatorEmail: row.creator_email || undefined,
+          amount: Number(row.amount),
+          status: row.status,
+          payoutDetails: row.payout_details,
+          requestedAt: row.requested_at,
+          processedAt: row.processed_at || undefined,
+          utrNumber: row.utr_number || undefined,
+          adminNote: row.admin_note || undefined,
+        }));
+      }
+    } catch {}
+
+    // Fallback: localStorage
+    try {
+      const local = localStorage.getItem("dhundo_withdrawal_requests");
+      if (local) return JSON.parse(local);
+    } catch {}
+    return [];
+  },
+
+  /** Submit a new referral withdrawal request */
+  async submitWithdrawalRequest(
+    req: Omit<ReferralWithdrawalRequest, "id" | "status" | "requestedAt">,
+  ): Promise<ReferralWithdrawalRequest> {
+    const newRequest: ReferralWithdrawalRequest = {
+      ...req,
+      id: `wdr-${Date.now()}-${Math.random().toString(36).substring(2, 6)}`,
+      status: "pending",
+      requestedAt: new Date().toISOString(),
+    };
+
+    try {
+      const { error } = await supabase
+        .from("referral_withdrawal_requests")
+        .insert({
+          id: newRequest.id,
+          creator_id: newRequest.creatorId,
+          creator_name: newRequest.creatorName,
+          creator_email: newRequest.creatorEmail || null,
+          amount: newRequest.amount,
+          status: newRequest.status,
+          payout_details: newRequest.payoutDetails,
+          requested_at: newRequest.requestedAt,
+        });
+      if (error) {
+        console.warn("submitWithdrawalRequest DB error:", error.message);
+      }
+    } catch {}
+
+    // Fallback sync to localStorage
+    try {
+      const existing = await this.fetchWithdrawalRequests();
+      const updated = [newRequest, ...existing.filter((r) => r.id !== newRequest.id)];
+      localStorage.setItem("dhundo_withdrawal_requests", JSON.stringify(updated));
+    } catch {}
+
+    return newRequest;
+  },
+
+  /** Update status, UTR, or admin note of a withdrawal request */
+  async updateWithdrawalRequest(
+    id: string,
+    updates: Partial<ReferralWithdrawalRequest>,
+  ): Promise<boolean> {
+    try {
+      const payload: Record<string, unknown> = {};
+      if (updates.status !== undefined) payload["status"] = updates.status;
+      if (updates.processedAt !== undefined) payload["processed_at"] = updates.processedAt;
+      const utr = updates.utrNumber || updates.transactionReference;
+      if (utr !== undefined) payload["utr_number"] = utr;
+      const note = updates.adminNote || updates.adminNotes;
+      if (note !== undefined) payload["admin_note"] = note;
+
+      const { error } = await supabase
+        .from("referral_withdrawal_requests")
+        .update(payload)
+        .eq("id", id);
+      if (error) {
+        console.warn("updateWithdrawalRequest DB error:", error.message);
+      }
+    } catch {}
+
+    // Fallback sync to localStorage
+    try {
+      const existing = await this.fetchWithdrawalRequests();
+      const updated = existing.map((r) => (r.id === id ? { ...r, ...updates } : r));
+      localStorage.setItem("dhundo_withdrawal_requests", JSON.stringify(updated));
+      return true;
+    } catch {}
+
+    return false;
+  },
 };
 
 // ── Referral Event type ────────────────────────────────────────────────────
@@ -1841,8 +1979,9 @@ export type ReferralEvent = {
   referrerId: string;
   referredCreatorId: string;
   referredSubId?: string | undefined;
-  daysDelta: number; // +3 or -3
-  eventType: "earned" | "reversed";
+  daysDelta: number; // +7 or -7
+  cashDelta?: number | undefined; // INR earned
+  eventType: "earned" | "reversed" | "cash_earned";
   note: string;
   createdAt: string;
 };

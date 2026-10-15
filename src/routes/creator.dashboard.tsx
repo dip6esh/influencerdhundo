@@ -18,17 +18,22 @@ import {
   getSubscriptionExpiry,
   isSubscriptionActive,
   isSubscriptionQueued,
+  type PayoutDetails,
+  type ReferralWithdrawalRequest,
 } from "@/lib/directory-data";
 import { supabaseDb, type PaymentRecord } from "@/lib/supabase";
 import {
   AlertCircle,
+  AlertTriangle,
   ArrowUpRight,
+  Building2,
   CalendarClock,
   Camera,
   Check,
   CheckCheck,
   Clock,
   Copy,
+  CreditCard,
   Eye,
   Gift,
   Globe,
@@ -39,6 +44,7 @@ import {
   MapPin,
   Printer,
   ReceiptText,
+  Send,
   Share2,
   ShieldCheck,
   Sparkles,
@@ -47,6 +53,7 @@ import {
   Upload,
   User,
   Users,
+  Wallet,
   X,
   Zap,
 } from "lucide-react";
@@ -99,7 +106,10 @@ function Dashboard() {
     myCreatorId,
     subscriptions,
     referralEvents,
+    withdrawalRequests,
     fetchReferralEvents,
+    applySpecialReferralProgram,
+    submitWithdrawalRequest,
     upsertCreator,
     updateCreator,
     updateCreatorPhoto,
@@ -123,6 +133,23 @@ function Dashboard() {
     type: "success" | "error";
     message: string;
   } | null>(null);
+
+  // Special Referral Program states
+  const [showApplyModal, setShowApplyModal] = useState(false);
+  const [applyUpiId, setApplyUpiId] = useState("");
+  const [applyAccountHolder, setApplyAccountHolder] = useState("");
+  const [applyAccountNumber, setApplyAccountNumber] = useState("");
+  const [applyBankName, setApplyBankName] = useState("");
+  const [applyIfsc, setApplyIfsc] = useState("");
+  const [applyingSpecial, setApplyingSpecial] = useState(false);
+  const [applyError, setApplyError] = useState<string | null>(null);
+
+  // Withdrawal states
+  const [showWithdrawModal, setShowWithdrawModal] = useState(false);
+  const [withdrawAmount, setWithdrawAmount] = useState<number>(200);
+  const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
+  const [withdrawError, setWithdrawError] = useState<string | null>(null);
+  const [withdrawSuccess, setWithdrawSuccess] = useState<string | null>(null);
 
   // If mine is found in state or hydrated from storage, dismiss loading spinner immediately
   useEffect(() => {
@@ -385,6 +412,135 @@ function Dashboard() {
   const whatsappMessage = encodeURIComponent(
     `Hey! Join Influencer Dhundo using my invite link to get a 3-day free trial and connect with local businesses looking for creators:\n${referralLink}`,
   );
+
+  const specialProg = mine?.specialReferralProgram;
+  const isSpecialActive = specialProg?.status === "active";
+  const isSpecialPending = specialProg?.status === "pending";
+  const isSpecialRejected = specialProg?.status === "rejected";
+  const isSpecialClosed = specialProg?.status === "closed";
+  const walletBalance = specialProg?.walletBalance || 0;
+  const totalEarned = specialProg?.totalEarned || 0;
+  const totalWithdrawn = specialProg?.totalWithdrawn || 0;
+
+  const myWithdrawals = useMemo(() => {
+    return withdrawalRequests.filter((r) => r.creatorId === mine?.id);
+  }, [withdrawalRequests, mine?.id]);
+
+  const hasPendingWithdrawal = myWithdrawals.some((r) => r.status === "pending");
+
+  const monthlyWithdrawalCount = useMemo(() => {
+    const now = new Date();
+    const curYear = now.getFullYear();
+    const curMonth = now.getMonth();
+    return myWithdrawals.filter((r) => {
+      if (r.status === "rejected") return false;
+      const d = new Date(r.requestedAt);
+      return d.getFullYear() === curYear && d.getMonth() === curMonth;
+    }).length;
+  }, [myWithdrawals]);
+
+  const handleOpenApplyModal = () => {
+    const p = mine?.specialReferralProgram?.payoutDetails;
+    setApplyUpiId(p?.upiId || "");
+    setApplyAccountHolder(p?.accountHolderName || mine?.name || mine?.displayName || "");
+    setApplyAccountNumber(p?.accountNumber || "");
+    setApplyBankName(p?.bankName || "");
+    setApplyIfsc(p?.ifscCode || "");
+    setApplyError(null);
+    setShowApplyModal(true);
+  };
+
+  const handleApplySpecial = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setApplyError(null);
+    if (!mine) return;
+    if (!applyUpiId.trim()) {
+      setApplyError("Please enter your UPI ID.");
+      return;
+    }
+    if (
+      !applyAccountHolder.trim() ||
+      !applyAccountNumber.trim() ||
+      !applyBankName.trim() ||
+      !applyIfsc.trim()
+    ) {
+      setApplyError("Please fill in all bank account details.");
+      return;
+    }
+
+    setApplyingSpecial(true);
+    const res = await applySpecialReferralProgram(mine.id, {
+      upiId: applyUpiId.trim(),
+      accountHolderName: applyAccountHolder.trim(),
+      accountNumber: applyAccountNumber.trim(),
+      bankName: applyBankName.trim(),
+      ifscCode: applyIfsc.trim().toUpperCase(),
+    });
+    setApplyingSpecial(false);
+    if (res.success) {
+      setShowApplyModal(false);
+    } else {
+      setApplyError(res.error || "Failed to submit application");
+    }
+  };
+
+  const handleOpenWithdrawModal = () => {
+    setWithdrawAmount(Math.min(walletBalance, Math.max(200, walletBalance)));
+    setWithdrawError(null);
+    setWithdrawSuccess(null);
+    setShowWithdrawModal(true);
+  };
+
+  const handleWithdrawSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setWithdrawError(null);
+    setWithdrawSuccess(null);
+    if (!mine || !mine.specialReferralProgram) return;
+
+    if (withdrawAmount < 200) {
+      setWithdrawError("Minimum withdrawal amount is ₹200.");
+      return;
+    }
+    if (withdrawAmount > walletBalance) {
+      setWithdrawError(
+        `Requested amount ₹${withdrawAmount} exceeds your wallet balance of ₹${walletBalance}.`,
+      );
+      return;
+    }
+    if (hasPendingWithdrawal) {
+      setWithdrawError(
+        "You already have a pending withdrawal request in review. Please wait until it is processed.",
+      );
+      return;
+    }
+    if (monthlyWithdrawalCount >= 2) {
+      setWithdrawError(
+        "You have reached your limit of 2 withdrawal requests for this calendar month.",
+      );
+      return;
+    }
+
+    setSubmittingWithdrawal(true);
+    const res = await submitWithdrawalRequest({
+      creatorId: mine.id,
+      creatorName: mine.name || mine.displayName,
+      creatorHandle: mine.instagram,
+      amount: withdrawAmount,
+      payoutDetails: mine.specialReferralProgram.payoutDetails,
+    });
+    setSubmittingWithdrawal(false);
+    if (res.success) {
+      setWithdrawSuccess(
+        "Withdrawal request submitted successfully! Funds will be deposited within 7–10 working days.",
+      );
+      setTimeout(() => {
+        setShowWithdrawModal(false);
+        setWithdrawSuccess(null);
+      }, 2500);
+    } else {
+      setWithdrawError(res.error || "Failed to submit withdrawal request");
+    }
+  };
 
   if (loading) {
     return (
@@ -1004,23 +1160,43 @@ function Dashboard() {
 
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 sm:pb-6 border-b border-border/60">
                 <div>
-                  <div className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1 text-xs font-bold text-tealdeep border border-accent/25 mb-2">
-                    <Gift className="size-3.5 text-tealdeep shrink-0" />
-                    <span>Referral Program — Earn +7 Days Free</span>
+                  <div
+                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border mb-2 ${
+                      isSpecialActive
+                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
+                        : "bg-accent/15 text-tealdeep border-accent/25"
+                    }`}
+                  >
+                    {isSpecialActive ? (
+                      <>
+                        <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                        <span>Special Referral Program — Cash Earnings 💸</span>
+                      </>
+                    ) : (
+                      <>
+                        <Gift className="size-3.5 text-tealdeep shrink-0" />
+                        <span>Referral Program — Earn +7 Days Free</span>
+                      </>
+                    )}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-display font-semibold tracking-tight text-foreground">
-                    Never Let Your Plan Expire! ⚡
+                    {isSpecialActive ? "Invite Creators & Earn Cash! 💰" : "Never Let Your Plan Expire! ⚡"}
                   </h2>
                   <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-xl">
-                    Share your link or referral code with creator friends. Every time someone joins, you
-                    get <strong>+7 extra days added directly to your active plan</strong> — the more you
-                    invite, the longer your membership plan stays active!
+                    {isSpecialActive
+                      ? "Share your link or referral code with creator friends. When they subscribe, you earn real cash commission (up to ₹100 each) directly into your wallet!"
+                      : "Share your link or referral code with creator friends. Every time someone joins, you get +7 extra days added directly to your active plan — the more you invite, the longer your membership plan stays active!"}
                   </p>
                 </div>
 
                 {/* Referral Link Active Status Badge */}
                 <div className="shrink-0 flex items-center gap-2">
-                  {isReferralUnlocked ? (
+                  {isSpecialActive ? (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                      Special Referral Active (Cash Mode)
+                    </span>
+                  ) : isReferralUnlocked ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-semibold text-tealdeep border border-accent/30">
                       <span className="size-2 rounded-full bg-tealdeep animate-pulse" />
                       Referral Code Active
@@ -1042,6 +1218,203 @@ function Dashboard() {
                     </span>
                   )}
                 </div>
+              </div>
+
+              {/* SPECIAL REFERRAL PROGRAM BANNER / WALLET SECTION */}
+              <div className="mt-5 rounded-2xl sm:rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-background to-teal-500/5 p-4 sm:p-5 relative overflow-hidden">
+                {isSpecialActive ? (
+                  <div>
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-border/60">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <Wallet className="size-5" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-2">
+                            <h3 className="font-display font-bold text-base sm:text-lg text-foreground">
+                              Special Referral Cash Wallet
+                            </h3>
+                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                              Active
+                            </span>
+                          </div>
+                          <p className="text-xs text-muted-foreground mt-0.5">
+                            You earn real cash for referrals instead of extra days. Min. withdrawal ₹200.
+                          </p>
+                        </div>
+                      </div>
+
+                      <Button
+                        onClick={handleOpenWithdrawModal}
+                        disabled={walletBalance < 200 || hasPendingWithdrawal || monthlyWithdrawalCount >= 2}
+                        className="shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 shadow-sm disabled:opacity-50"
+                      >
+                        <IndianRupee className="size-4" />
+                        <span>Request Payout</span>
+                      </Button>
+                    </div>
+
+                    <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
+                      <div className="rounded-xl bg-background/80 border border-border/60 p-3 sm:p-3.5">
+                        <span className="text-xs text-muted-foreground font-medium">Available Balance</span>
+                        <p className="text-2xl font-display font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
+                          ₹{walletBalance.toLocaleString("en-IN")}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          {walletBalance >= 200
+                            ? "Eligible for withdrawal"
+                            : `Need ₹${200 - walletBalance} more to reach min. ₹200`}
+                        </p>
+                      </div>
+
+                      <div className="rounded-xl bg-background/80 border border-border/60 p-3 sm:p-3.5">
+                        <span className="text-xs text-muted-foreground font-medium">Total Cash Earned</span>
+                        <p className="text-2xl font-display font-bold text-foreground mt-0.5">
+                          ₹{totalEarned.toLocaleString("en-IN")}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Cumulative referral rewards</p>
+                      </div>
+
+                      <div className="rounded-xl bg-background/80 border border-border/60 p-3 sm:p-3.5">
+                        <span className="text-xs text-muted-foreground font-medium">Total Withdrawn</span>
+                        <p className="text-2xl font-display font-bold text-foreground mt-0.5">
+                          ₹{totalWithdrawn.toLocaleString("en-IN")}
+                        </p>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">Transferred to UPI / Bank</p>
+                      </div>
+                    </div>
+
+                    <div className="mt-3 flex flex-wrap items-center justify-between text-[11px] text-muted-foreground gap-y-1">
+                      <span>• SLA: Deposited to your account within 7–10 working days</span>
+                      <span>• Max 2 requests/month ({monthlyWithdrawalCount}/2 used)</span>
+                      <span>
+                        • Payout to: UPI (<strong>{specialProg?.payoutDetails?.upiId}</strong>) •{" "}
+                        {specialProg?.payoutDetails?.bankName}
+                      </span>
+                    </div>
+                  </div>
+                ) : isSpecialPending ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="size-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <Clock className="size-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display font-bold text-base text-foreground">
+                            Special Referral Program Application Under Review
+                          </h3>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                            Pending
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+                          Your application was submitted on{" "}
+                          {new Date(specialProg?.appliedAt || Date.now()).toLocaleDateString("en-IN")}. Once
+                          approved, your referral code will earn cash commissions up to ₹100 per paid subscriber!
+                        </p>
+                        <div className="mt-2 text-xs font-mono text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
+                          <span>
+                            UPI: <strong className="text-foreground">{specialProg?.payoutDetails?.upiId}</strong>
+                          </span>
+                          <span>
+                            Bank:{" "}
+                            <strong className="text-foreground">
+                              {specialProg?.payoutDetails?.bankName}{" "}
+                              {specialProg?.payoutDetails?.accountNumber?.slice(-4)
+                                ? `(••••${specialProg.payoutDetails.accountNumber.slice(-4)})`
+                                : ""}
+                            </strong>
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                ) : isSpecialRejected ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="size-10 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
+                        <AlertCircle className="size-5" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display font-bold text-base text-foreground">
+                            Special Referral Application Not Approved
+                          </h3>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                            Declined
+                          </span>
+                        </div>
+                        <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 font-medium">
+                          Reason: {specialProg?.rejectionReason || "Details could not be verified."}
+                        </p>
+                        <p className="text-xs text-muted-foreground mt-0.5">
+                          You can review your payout details and reapply at any time.
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleOpenApplyModal}
+                      className="shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 py-2"
+                    >
+                      <span>Re-apply Now</span>
+                    </Button>
+                  </div>
+                ) : isSpecialClosed ? (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="size-10 rounded-xl bg-secondary text-muted-foreground flex items-center justify-center shrink-0 mt-0.5">
+                        <ShieldCheck className="size-5" />
+                      </div>
+                      <div>
+                        <h3 className="font-display font-bold text-base text-foreground">
+                          Special Referral Program Closed
+                        </h3>
+                        <p className="text-xs text-muted-foreground mt-1">
+                          The special referral program was closed by admin. You currently receive standard +7 bonus subscription days for referrals.
+                          {walletBalance > 0 && ` You have ₹${walletBalance} remaining in your wallet balance which can still be withdrawn.`}
+                        </p>
+                      </div>
+                    </div>
+                    {walletBalance >= 200 && (
+                      <Button
+                        onClick={handleOpenWithdrawModal}
+                        className="shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2"
+                      >
+                        <span>Withdraw ₹{walletBalance}</span>
+                      </Button>
+                    )}
+                  </div>
+                ) : (
+                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                    <div className="flex items-start gap-3">
+                      <div className="size-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
+                        <Sparkles className="size-5 text-saffrondeep" />
+                      </div>
+                      <div>
+                        <div className="flex items-center gap-2">
+                          <h3 className="font-display font-bold text-base text-foreground">
+                            Earn Real Cash with Special Referral Program 💸
+                          </h3>
+                          <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-tealdeep border border-accent/40">
+                            Available Now
+                          </span>
+                        </div>
+                        <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+                          Want to earn money instead of subscription days? Apply now with your UPI &amp; Bank details to earn up to <strong>₹100 real cash commission</strong> per paying referral, withdrawable directly to your account (min. ₹200).
+                        </p>
+                      </div>
+                    </div>
+                    <Button
+                      onClick={handleOpenApplyModal}
+                      className="shrink-0 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs sm:text-sm px-4.5 py-2.5 shadow-sm"
+                    >
+                      <Wallet className="size-4" />
+                      <span>Apply to Earn Cash</span>
+                    </Button>
+                  </div>
+                )}
               </div>
 
               {/* STATS TILES */}
@@ -1070,13 +1443,21 @@ function Dashboard() {
 
                 <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
                   <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Gift className="size-3.5 text-saffrondeep shrink-0" />
-                    <span>Bonus Days</span>
+                    {isSpecialActive ? (
+                      <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                    ) : (
+                      <Gift className="size-3.5 text-saffrondeep shrink-0" />
+                    )}
+                    <span>{isSpecialActive ? "Cash Wallet" : "Bonus Days"}</span>
                   </span>
-                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-saffrondeep">
-                    +{netBonusDays} Days
+                  <p className={`mt-1 text-xl sm:text-2xl font-display font-bold ${
+                    isSpecialActive ? "text-emerald-600 dark:text-emerald-400" : "text-saffrondeep"
+                  }`}>
+                    {isSpecialActive ? `₹${walletBalance}` : `+${netBonusDays} Days`}
                   </p>
-                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">+7 days per referral</p>
+                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
+                    {isSpecialActive ? `₹${totalEarned} total earned` : "+7 days per referral"}
+                  </p>
                 </div>
 
                 <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4 relative group">
@@ -1369,7 +1750,12 @@ function Dashboard() {
                             </div>
 
                             <div className="flex items-center justify-end pt-2 border-t border-border/60">
-                              {hasEarnedReward ? (
+                              {refEvent?.eventType === "cash_earned" || (refEvent?.cashDelta ?? 0) > 0 ? (
+                                <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[10px]">
+                                  <Check className="size-2.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                                  <span>+₹{refEvent?.cashDelta || 0} Cash</span>
+                                </span>
+                              ) : hasEarnedReward ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 font-bold text-tealdeep border border-accent/40 text-[10px]">
                                   <Check className="size-2.5 text-tealdeep stroke-[2.5]" />
                                   <span>+7 Days Earned</span>
@@ -1395,7 +1781,7 @@ function Dashboard() {
                                     className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 px-2 py-0.5 text-[10px] font-bold transition-colors cursor-pointer"
                                   >
                                     <WhatsAppIcon className="size-2.5 fill-current" />
-                                    <span>Nudge (+7 Days)</span>
+                                    <span>Nudge ({isSpecialActive ? "Cash" : "+7 Days"})</span>
                                   </a>
                                 </div>
                               ) : (
@@ -1422,8 +1808,10 @@ function Dashboard() {
                                 {ev.note || "Bonus Reward"}
                               </span>
                             </div>
-                            <span className="inline-flex items-center gap-1 font-bold text-saffrondeep text-xs shrink-0">
-                              +{ev.daysDelta} Days
+                            <span className={`inline-flex items-center gap-1 font-bold text-xs shrink-0 ${
+                              ev.eventType === "cash_earned" ? "text-emerald-600 dark:text-emerald-400" : "text-saffrondeep"
+                            }`}>
+                              {ev.eventType === "cash_earned" ? `+₹${ev.cashDelta || 0} Cash` : `+${ev.daysDelta} Days`}
                             </span>
                           </div>
                         ))}
@@ -1449,7 +1837,10 @@ function Dashboard() {
                                 ev.note?.toLowerCase().includes(refCreator.id.toLowerCase()),
                             );
                             const hasEarnedReward =
-                              Boolean(refEvent && refEvent.daysDelta > 0) ||
+                              Boolean(
+                                refEvent &&
+                                  (refEvent.daysDelta > 0 || (refEvent.cashDelta && refEvent.cashDelta > 0)),
+                              ) ||
                               refSubs.some((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
                             const hasFreePass =
                               !hasEarnedReward &&
@@ -1516,7 +1907,12 @@ function Dashboard() {
                                 </td>
 
                                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                                  {hasEarnedReward ? (
+                                  {refEvent?.eventType === "cash_earned" || (refEvent?.cashDelta ?? 0) > 0 ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[11px] shadow-2xs">
+                                      <Check className="size-3 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
+                                      +₹{refEvent?.cashDelta || 0} Cash
+                                    </span>
+                                  ) : hasEarnedReward ? (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-3 py-1 font-bold text-tealdeep border border-accent/40 text-[11px] shadow-2xs">
                                       <Check className="size-3 text-tealdeep stroke-[2.5]" />
                                       +7 Days Earned
@@ -1540,7 +1936,7 @@ function Dashboard() {
                                         target="_blank"
                                         rel="noreferrer"
                                         className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 hover:bg-emerald-500/25 border border-emerald-500/30 px-2.5 py-1 text-[11px] font-bold transition-colors shadow-2xs cursor-pointer"
-                                        title="Nudge on WhatsApp to upgrade and earn +7 days"
+                                        title="Nudge on WhatsApp to upgrade and earn rewards"
                                       >
                                         <WhatsAppIcon className="size-3 fill-current" />
                                         <span>Nudge on WhatsApp</span>
@@ -1577,8 +1973,10 @@ function Dashboard() {
                                   })}
                                 </td>
                                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                                  <span className="inline-flex items-center gap-1 font-bold text-saffrondeep">
-                                    +{ev.daysDelta} Days
+                                  <span className={`inline-flex items-center gap-1 font-bold ${
+                                    ev.eventType === "cash_earned" ? "text-emerald-600 dark:text-emerald-400" : "text-saffrondeep"
+                                  }`}>
+                                    {ev.eventType === "cash_earned" ? `+₹${ev.cashDelta || 0} Cash` : `+${ev.daysDelta} Days`}
                                   </span>
                                 </td>
                               </tr>
@@ -1593,8 +1991,105 @@ function Dashboard() {
                       No referral activity yet.
                     </p>
                     <p className="text-xs text-muted-foreground mt-1">
-                      Share your personal invite link above. When creators sign up and activate passes, they will appear here with +7 day rewards!
+                      Share your personal invite link above. When creators sign up and activate passes, they will appear here with your rewards!
                     </p>
+                  </div>
+                )}
+
+                {/* ── WITHDRAWAL REQUESTS HISTORY ──────────────────────── */}
+                {myWithdrawals.length > 0 && (
+                  <div className="mt-8 pt-6 border-t border-border/60">
+                    <div className="flex items-center justify-between mb-3.5">
+                      <div className="flex items-center gap-2">
+                        <History className="size-4 text-emerald-600 dark:text-emerald-400" />
+                        <h3 className="text-sm font-semibold text-foreground">
+                          Your Withdrawal Requests
+                        </h3>
+                      </div>
+                      <span className="text-xs text-muted-foreground">
+                        {myWithdrawals.length} request{myWithdrawals.length > 1 ? "s" : ""}
+                      </span>
+                    </div>
+
+                    <div className="overflow-x-auto rounded-2xl border border-border/80 bg-background/60">
+                      <table className="w-full text-left text-xs">
+                        <thead className="border-b border-border bg-secondary/80 font-semibold text-muted-foreground uppercase tracking-wider">
+                          <tr>
+                            <th className="px-4 py-3">Requested At</th>
+                            <th className="px-4 py-3">Amount</th>
+                            <th className="px-4 py-3">Destination</th>
+                            <th className="px-4 py-3">Status</th>
+                            <th className="px-4 py-3 text-right">Reference / Admin Note</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-border/60">
+                          {myWithdrawals.map((w) => (
+                            <tr key={w.id} className="hover:bg-secondary/20 transition-colors">
+                              <td className="px-4 py-3 whitespace-nowrap text-muted-foreground">
+                                {new Date(w.requestedAt).toLocaleDateString("en-IN", {
+                                  month: "short",
+                                  day: "numeric",
+                                  year: "numeric",
+                                  hour: "2-digit",
+                                  minute: "2-digit",
+                                })}
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap font-bold text-foreground">
+                                ₹{w.amount.toLocaleString("en-IN")}
+                              </td>
+                              <td className="px-4 py-3 text-muted-foreground">
+                                <div>
+                                  <span className="font-mono text-foreground font-medium">
+                                    {w.payoutDetails.upiId}
+                                  </span>
+                                  <span className="text-[11px] block text-muted-foreground">
+                                    {w.payoutDetails.bankName} (••••{w.payoutDetails.accountNumber.slice(-4)})
+                                  </span>
+                                </div>
+                              </td>
+                              <td className="px-4 py-3 whitespace-nowrap">
+                                {w.status === "paid" ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                                    <Check className="size-3" />
+                                    Paid
+                                  </span>
+                                ) : w.status === "rejected" ? (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2.5 py-0.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 border border-rose-500/30">
+                                    <X className="size-3" />
+                                    Rejected (Refunded)
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2.5 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/30">
+                                    <Clock className="size-3" />
+                                    Under Review (7–10 days)
+                                  </span>
+                                )}
+                              </td>
+                              <td className="px-4 py-3 text-right">
+                                {w.status === "paid" ? (
+                                  <span className="font-mono text-xs text-emerald-600 dark:text-emerald-400 font-semibold">
+                                    UTR: {w.transactionReference || "Completed"}
+                                  </span>
+                                ) : w.status === "rejected" ? (
+                                  <div className="text-right">
+                                    <span className="text-xs text-rose-600 dark:text-rose-400 font-medium block">
+                                      {w.adminNotes || "Details rejected"}
+                                    </span>
+                                    <span className="text-[10px] text-muted-foreground">
+                                      Amount refunded to balance
+                                    </span>
+                                  </div>
+                                ) : (
+                                  <span className="text-xs text-muted-foreground">
+                                    Processing payout
+                                  </span>
+                                )}
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
+                    </div>
                   </div>
                 )}
               </div>
@@ -1933,6 +2428,304 @@ function Dashboard() {
             return await updateCreatorPhoto(mine.id, "");
           }}
         />
+      )}
+
+      {/* ── APPLY FOR SPECIAL REFERRAL PROGRAM MODAL ── */}
+      {showApplyModal && mine && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative w-full max-w-lg rounded-3xl bg-background border border-border p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="size-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <Wallet className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-display font-bold text-foreground">
+                    Apply for Special Referral Program 💸
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Earn real cash commissions instead of subscription days
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowApplyModal(false)}
+                className="size-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleApplySpecial} className="space-y-4">
+              <div className="rounded-xl bg-accent/10 border border-accent/25 p-3 text-xs space-y-1">
+                <p className="font-semibold text-tealdeep flex items-center gap-1.5">
+                  <Sparkles className="size-3.5" />
+                  How Cash Referrals Work
+                </p>
+                <p className="text-muted-foreground">
+                  Earn up to <strong>₹100 cash</strong> per referral when an invited creator buys a plan. When your application is approved, extra subscription days will be paused and all earnings will go directly to your cash wallet (minimum withdrawal ₹200).
+                </p>
+              </div>
+
+              {applyError && (
+                <div className="rounded-xl bg-rose-500/15 border border-rose-500/30 p-3 text-xs text-rose-600 dark:text-rose-400 font-medium flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{applyError}</span>
+                </div>
+              )}
+
+              {/* UPI ID */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  UPI ID <span className="text-rose-500">*</span>
+                </label>
+                <input
+                  type="text"
+                  required
+                  placeholder="e.g. username@okhdfcbank or 9876543210@paytm"
+                  value={applyUpiId}
+                  onChange={(e) => setApplyUpiId(e.target.value)}
+                  className="w-full rounded-xl border border-input bg-background px-3.5 py-2.5 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono"
+                />
+                <span className="text-[11px] text-muted-foreground mt-0.5 block">
+                  Quick payouts will be directed to this UPI address
+                </span>
+              </div>
+
+              {/* Bank Details section */}
+              <div className="pt-2 border-t border-border/60 space-y-3">
+                <p className="text-xs font-semibold text-foreground flex items-center gap-1.5">
+                  <Building2 className="size-3.5 text-primary" />
+                  <span>Bank Account Details (Required for Verification)</span>
+                </p>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                      Account Holder Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="As per bank passbook"
+                      value={applyAccountHolder}
+                      onChange={(e) => setApplyAccountHolder(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                      Bank Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. HDFC Bank, SBI, ICICI"
+                      value={applyBankName}
+                      onChange={(e) => setApplyBankName(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                  </div>
+                </div>
+
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                      Account Number <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="Account number"
+                      value={applyAccountNumber}
+                      onChange={(e) => setApplyAccountNumber(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono"
+                    />
+                  </div>
+
+                  <div>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                      IFSC Code <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. HDFC0001234"
+                      value={applyIfsc}
+                      onChange={(e) => setApplyIfsc(e.target.value.toUpperCase())}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono uppercase"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-3 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowApplyModal(false)}
+                  className="rounded-xl text-xs px-4 py-2"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={applyingSpecial}
+                  className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold px-5 py-2"
+                >
+                  {applyingSpecial ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                      Submitting...
+                    </>
+                  ) : (
+                    "Submit Application"
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
+      )}
+
+      {/* ── REQUEST CASH WITHDRAWAL MODAL ── */}
+      {showWithdrawModal && mine && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md overflow-y-auto"
+          role="dialog"
+          aria-modal="true"
+        >
+          <div className="relative w-full max-w-md rounded-3xl bg-background border border-border p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+            <div className="flex items-center justify-between pb-3 border-b border-border">
+              <div className="flex items-center gap-2.5">
+                <div className="size-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                  <IndianRupee className="size-5" />
+                </div>
+                <div>
+                  <h3 className="text-lg font-display font-bold text-foreground">
+                    Request Cash Payout 💳
+                  </h3>
+                  <p className="text-xs text-muted-foreground">
+                    Available balance: <strong className="text-emerald-600 dark:text-emerald-400">₹{walletBalance}</strong>
+                  </p>
+                </div>
+              </div>
+              <button
+                type="button"
+                onClick={() => setShowWithdrawModal(false)}
+                className="size-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+              >
+                <X className="size-4" />
+              </button>
+            </div>
+
+            <form onSubmit={handleWithdrawSubmit} className="space-y-4">
+              {withdrawError && (
+                <div className="rounded-xl bg-rose-500/15 border border-rose-500/30 p-3 text-xs text-rose-600 dark:text-rose-400 font-medium flex items-center gap-2">
+                  <AlertCircle className="size-4 shrink-0" />
+                  <span>{withdrawError}</span>
+                </div>
+              )}
+
+              {withdrawSuccess && (
+                <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-3 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2">
+                  <Check className="size-4 shrink-0" />
+                  <span>{withdrawSuccess}</span>
+                </div>
+              )}
+
+              {/* Amount input */}
+              <div>
+                <label className="block text-xs font-semibold text-foreground mb-1">
+                  Withdrawal Amount (₹) <span className="text-rose-500">*</span>
+                </label>
+                <div className="relative">
+                  <IndianRupee className="absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                  <input
+                    type="number"
+                    min={200}
+                    max={walletBalance}
+                    required
+                    value={withdrawAmount}
+                    onChange={(e) => setWithdrawAmount(Number(e.target.value))}
+                    className="w-full rounded-xl border border-input bg-background pl-9 pr-3.5 py-2.5 text-base font-bold text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40 font-mono"
+                  />
+                </div>
+                <div className="flex items-center justify-between text-[11px] text-muted-foreground mt-1">
+                  <span>Minimum ₹200</span>
+                  <div className="flex gap-1.5">
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawAmount(Math.min(walletBalance, 200))}
+                      className="text-primary hover:underline font-semibold cursor-pointer"
+                    >
+                      Min ₹200
+                    </button>
+                    <span>•</span>
+                    <button
+                      type="button"
+                      onClick={() => setWithdrawAmount(walletBalance)}
+                      className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer"
+                    >
+                      Max (₹{walletBalance})
+                    </button>
+                  </div>
+                </div>
+              </div>
+
+              {/* Destination Summary */}
+              <div className="rounded-xl bg-secondary/40 border border-border/80 p-3.5 text-xs space-y-1.5">
+                <span className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Building2 className="size-3.5 text-primary" />
+                  Payout Destination
+                </span>
+                <div className="font-mono text-[11px] text-muted-foreground space-y-0.5 pt-1">
+                  <p>UPI: <strong className="text-foreground">{specialProg?.payoutDetails?.upiId}</strong></p>
+                  <p>Bank: <strong className="text-foreground">{specialProg?.payoutDetails?.bankName} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})</strong></p>
+                  <p>Holder: <strong className="text-foreground">{specialProg?.payoutDetails?.accountHolderName}</strong></p>
+                </div>
+              </div>
+
+              {/* Terms / SLA */}
+              <div className="rounded-xl bg-background border border-border/60 p-3 text-[11px] text-muted-foreground space-y-1">
+                <p>• Payouts are reviewed and deposited within <strong>7–10 working days</strong>.</p>
+                <p>• Maximum <strong>2 withdrawal requests per calendar month</strong> (used: {monthlyWithdrawalCount}/2).</p>
+                <p>• Only 1 active pending withdrawal is permitted at a time.</p>
+              </div>
+
+              <div className="flex items-center justify-end gap-2.5 pt-2 border-t border-border">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setShowWithdrawModal(false)}
+                  className="rounded-xl text-xs px-4 py-2"
+                >
+                  Cancel
+                </Button>
+                <Button
+                  type="submit"
+                  disabled={submittingWithdrawal || withdrawAmount < 200 || withdrawAmount > walletBalance || Boolean(withdrawSuccess)}
+                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2 disabled:opacity-50"
+                >
+                  {submittingWithdrawal ? (
+                    <>
+                      <Loader2 className="size-3.5 animate-spin mr-1.5" />
+                      Submitting...
+                    </>
+                  ) : (
+                    `Confirm Payout (₹${withdrawAmount})`
+                  )}
+                </Button>
+              </div>
+            </form>
+          </div>
+        </div>
       )}
     </div>
   );
