@@ -1204,13 +1204,13 @@ function Dashboard() {
                 {/* Status Badge */}
                 <div className="shrink-0 flex items-center gap-2">
                   {isSpecialActive ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                      <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1.5 text-xs font-semibold text-saffrondeep border border-primary/30">
+                      <span className="size-2 rounded-full bg-primary animate-pulse" />
                       Cash Rewards Active
                     </span>
                   ) : isReferralUnlocked ? (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-semibold text-tealdeep border border-accent/30">
-                      <span className="size-2 rounded-full bg-tealdeep animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/15 px-3 py-1.5 text-xs font-semibold text-saffrondeep border border-primary/30">
+                      <span className="size-2 rounded-full bg-primary animate-pulse" />
                       Referral Code Active
                     </span>
                   ) : isDraft ? (
@@ -1330,15 +1330,15 @@ function Dashboard() {
 
               {/* 3. TWO DISTINCT REWARD CARDS (Cash Wallet & Bonus Days) */}
               <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
-                {/* ── CARD A: CASH COMMISSION WALLET ── */}
-                <div className="rounded-2xl sm:rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-background to-teal-500/5 p-4 sm:p-5 flex flex-col justify-between">
+                {/* ── CARD A: CASH COMMISSION WALLET (Warm Saffron / Ink Brand Palette) ── */}
+                <div className="rounded-2xl sm:rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-background p-4 sm:p-5 flex flex-col justify-between shadow-xs">
                   {isSpecialActive ? (
                     <div className="space-y-4">
                       {/* Top Header */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
-                          <div className="size-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                            <Wallet className="size-4.5" />
+                          <div className="size-9 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center shrink-0">
+                            <Wallet className="size-4.5 text-saffrondeep" />
                           </div>
                           <div>
                             <h3 className="font-display font-bold text-base text-foreground">
@@ -1347,20 +1347,20 @@ function Dashboard() {
                             <span className="text-[11px] text-muted-foreground">Direct bank / UPI transfers</span>
                           </div>
                         </div>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-saffrondeep border border-primary/30">
+                          <span className="size-1.5 rounded-full bg-saffron animate-pulse" />
                           Enrolled
                         </span>
                       </div>
 
                       {/* Primary Focus: Available Balance (Shown ONCE here!) */}
-                      <div className="rounded-xl bg-background/80 border border-border/60 p-3.5 space-y-2.5">
+                      <div className="rounded-xl bg-background/80 border border-border/80 p-3.5 space-y-2.5">
                         <div className="flex items-baseline justify-between">
                           <div>
                             <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                               Available Balance
                             </span>
-                            <div className="text-3xl sm:text-4xl font-display font-extrabold text-emerald-600 dark:text-emerald-400">
+                            <div className="text-3xl sm:text-4xl font-display font-extrabold text-saffrondeep">
                               ₹{walletBalance.toLocaleString("en-IN")}
                             </div>
                           </div>
@@ -1371,20 +1371,20 @@ function Dashboard() {
 
                         {/* Progress Indicator toward ₹200 */}
                         <div className="space-y-1.5">
-                          <div className="h-2 w-full rounded-full bg-emerald-500/15 overflow-hidden">
+                          <div className="h-2 w-full rounded-full bg-secondary overflow-hidden">
                             <div
-                              className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+                              className="h-full bg-gradient-to-r from-saffron to-saffrondeep rounded-full transition-all duration-500"
                               style={{ width: `${Math.min(100, Math.round((walletBalance / 200) * 100))}%` }}
                             />
                           </div>
                           <div className="flex items-center justify-between text-[11px]">
                             {walletBalance < 200 ? (
                               <span className="text-muted-foreground font-medium">
-                                Earn <strong className="text-emerald-600 dark:text-emerald-400 font-bold">₹{200 - walletBalance} more</strong> to unlock withdrawals
+                                Earn <strong className="text-saffrondeep font-bold">₹{200 - walletBalance} more</strong> to unlock withdrawals
                               </span>
                             ) : (
-                              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
-                                <Check className="size-3" /> Threshold reached — Ready for payout!
+                              <span className="text-saffrondeep font-bold flex items-center gap-1">
+                                <Check className="size-3 text-saffrondeep" /> Threshold reached — Ready for payout!
                               </span>
                             )}
                             <span className="text-muted-foreground font-mono">
@@ -1405,7 +1405,7 @@ function Dashboard() {
                           <Button
                             onClick={handleOpenWithdrawModal}
                             disabled={hasPendingWithdrawal || monthlyWithdrawalCount >= 2}
-                            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm py-2.5 shadow-sm disabled:opacity-50"
+                            className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs sm:text-sm py-2.5 shadow-xs disabled:opacity-50"
                           >
                             <IndianRupee className="size-4" />
                             <span>{hasPendingWithdrawal ? "Withdrawal Under Review" : `Request Payout (₹${walletBalance})`}</span>
@@ -1429,7 +1429,7 @@ function Dashboard() {
                           className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground font-medium py-1 transition-colors cursor-pointer"
                         >
                           <span className="flex items-center gap-1.5">
-                            <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <ShieldCheck className="size-3.5 text-saffrondeep" />
                             <span>Payout Rules &amp; Destination Details</span>
                           </span>
                           <ChevronDown className={`size-3.5 transition-transform duration-200 ${showPayoutDetails ? "rotate-180" : ""}`} />
@@ -1449,12 +1449,12 @@ function Dashboard() {
                   ) : isSpecialPending ? (
                     <div className="space-y-3.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="size-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                        <div className="size-9 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center shrink-0">
                           <Clock className="size-4.5" />
                         </div>
                         <div>
                           <h3 className="font-display font-bold text-base text-foreground">Cash Referral Under Review</h3>
-                          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">Application Pending</span>
+                          <span className="text-[11px] text-saffrondeep font-bold">Application Pending</span>
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
@@ -1464,18 +1464,18 @@ function Dashboard() {
                   ) : isSpecialRejected ? (
                     <div className="space-y-3.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="size-9 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                        <div className="size-9 rounded-xl bg-destructive/15 text-destructive flex items-center justify-center shrink-0">
                           <AlertCircle className="size-4.5" />
                         </div>
                         <div>
                           <h3 className="font-display font-bold text-base text-foreground">Application Not Approved</h3>
-                          <span className="text-[11px] text-rose-600 dark:text-rose-400 font-bold">Declined</span>
+                          <span className="text-[11px] text-destructive font-bold">Declined</span>
                         </div>
                       </div>
-                      <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                      <p className="text-xs text-destructive font-medium">
                         Reason: {specialProg?.rejectionReason || "Details could not be verified."}
                       </p>
-                      <Button onClick={handleOpenApplyModal} className="w-full rounded-xl bg-primary text-primary-foreground text-xs py-2 font-bold">
+                      <Button onClick={handleOpenApplyModal} className="w-full rounded-xl bg-primary text-primary-foreground text-xs py-2 font-bold shadow-xs">
                         <span>Review &amp; Re-apply</span>
                       </Button>
                     </div>
@@ -1498,14 +1498,14 @@ function Dashboard() {
                   ) : (
                     <div className="space-y-3.5">
                       <div className="flex items-center gap-2.5">
-                        <div className="size-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                          <Wallet className="size-4.5" />
+                        <div className="size-9 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center shrink-0">
+                          <Wallet className="size-4.5 text-saffrondeep" />
                         </div>
                         <div>
                           <h3 className="font-display font-bold text-base text-foreground">
                             Earn Real Cash Commissions 💸
                           </h3>
-                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
+                          <span className="text-[11px] text-saffrondeep font-bold">
                             Available to Apply
                           </span>
                         </div>
@@ -1515,7 +1515,7 @@ function Dashboard() {
                       </p>
                       <Button
                         onClick={handleOpenApplyModal}
-                        className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs py-2.5 shadow-sm"
+                        className="w-full rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-bold text-xs py-2.5 shadow-xs"
                       >
                         <Wallet className="size-3.5 mr-1.5" />
                         <span>Apply for Cash Referrals</span>
@@ -1524,14 +1524,14 @@ function Dashboard() {
                   )}
                 </div>
 
-                {/* ── CARD B: PROMINENT BONUS DAYS REWARD CARD ── */}
-                <div className="rounded-2xl sm:rounded-3xl border border-accent/40 bg-gradient-to-br from-accent/15 via-background to-secondary/60 p-4 sm:p-5 flex flex-col justify-between">
+                {/* ── CARD B: PROMINENT BONUS DAYS REWARD CARD (Warm Sand & Paper Brand Palette) ── */}
+                <div className="rounded-2xl sm:rounded-3xl border border-border/80 bg-gradient-to-br from-secondary/50 via-card to-background p-4 sm:p-5 flex flex-col justify-between shadow-xs">
                   <div className="space-y-4">
                     {/* Top Header */}
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2.5">
-                        <div className="size-9 rounded-xl bg-accent/25 text-tealdeep flex items-center justify-center shrink-0">
-                          <Gift className="size-4.5" />
+                        <div className="size-9 rounded-xl bg-secondary text-foreground flex items-center justify-center shrink-0 border border-border/60">
+                          <Gift className="size-4.5 text-primary" />
                         </div>
                         <div>
                           <h3 className="font-display font-bold text-base text-foreground">
@@ -1540,21 +1540,22 @@ function Dashboard() {
                           <span className="text-[11px] text-muted-foreground">Keep profile active for free</span>
                         </div>
                       </div>
-                      <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-tealdeep border border-accent/30">
+                      <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-foreground border border-border/80">
+                        <Sparkles className="size-3 text-primary" />
                         +7 Days / Referral
                       </span>
                     </div>
 
                     {/* Prominent Days Display */}
-                    <div className="rounded-xl bg-background/80 border border-border/60 p-3.5 space-y-1">
+                    <div className="rounded-xl bg-background/80 border border-border/80 p-3.5 space-y-1">
                       <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
                         Accumulated Bonus Days
                       </span>
                       <div className="flex items-baseline gap-2">
-                        <span className="text-3xl sm:text-4xl font-display font-extrabold text-saffrondeep">
+                        <span className="text-3xl sm:text-4xl font-display font-extrabold text-foreground">
                           +{netBonusDays}
                         </span>
-                        <span className="text-sm font-bold text-foreground">Days Added to Plan</span>
+                        <span className="text-sm font-bold text-muted-foreground">Days Added to Plan</span>
                       </div>
                       <p className="text-[11px] text-muted-foreground">
                         {netBonusDays > 0
@@ -1571,11 +1572,11 @@ function Dashboard() {
 
                   {/* Highlights */}
                   <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
-                    <span className="flex items-center gap-1.5 font-medium">
-                      <Sparkles className="size-3.5 text-saffrondeep" />
+                    <span className="flex items-center gap-1.5 font-medium text-foreground">
+                      <Sparkles className="size-3.5 text-primary" />
                       <span>Never let your profile expire</span>
                     </span>
-                    <span className="font-semibold text-tealdeep">Automatic Extension</span>
+                    <span className="font-semibold text-foreground">Automatic Extension</span>
                   </div>
                 </div>
               </div>
@@ -1604,7 +1605,7 @@ function Dashboard() {
                       <Zap className="size-3.5 text-primary shrink-0" />
                       <span>Paid Conversions</span>
                     </span>
-                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-tealdeep">
+                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-foreground">
                       {paidReferredCount}
                     </p>
                     <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Subscribed creators</p>
@@ -1612,10 +1613,10 @@ function Dashboard() {
 
                   <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
                     <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <Wallet className="size-3.5 text-primary shrink-0" />
                       <span>Lifetime Cash</span>
                     </span>
-                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400">
+                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-foreground">
                       ₹{totalEarned}
                     </p>
                     <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
@@ -1625,10 +1626,10 @@ function Dashboard() {
 
                   <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
                     <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <Gift className="size-3.5 text-saffrondeep shrink-0" />
+                      <Gift className="size-3.5 text-primary shrink-0" />
                       <span>Bonus Days</span>
                     </span>
-                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-saffrondeep">
+                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-foreground">
                       +{netBonusDays} Days
                     </p>
                     <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
