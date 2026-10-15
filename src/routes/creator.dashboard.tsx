@@ -343,15 +343,13 @@ function Dashboard() {
 
   const isSpecialActiveCreator = mine?.specialReferralProgram?.status === "active";
   const totalBonusDaysEarned = referralEvents.reduce((acc, ev) => acc + (ev.daysDelta || 0), 0);
-  const totalBonusDaysFromReferrals = isSpecialActiveCreator ? 0 : paidReferredCount * 7;
-  const netBonusDays = isSpecialActiveCreator
-    ? 0
-    : Math.max(
-        0,
-        mine?.referralBonusDays && mine.referralBonusDays > 0 ? mine.referralBonusDays : 0,
-        totalBonusDaysEarned,
-        totalBonusDaysFromReferrals,
-      );
+  const totalBonusDaysFromReferrals = paidReferredCount * 7;
+  const netBonusDays = Math.max(
+    0,
+    mine?.referralBonusDays && mine.referralBonusDays > 0 ? mine.referralBonusDays : 0,
+    totalBonusDaysEarned,
+    totalBonusDaysFromReferrals,
+  );
 
   const handleCopyLink = () => {
     if (!referralLink) return;
@@ -1165,31 +1163,31 @@ function Dashboard() {
 
               <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 sm:pb-6 border-b border-border/60">
                 <div>
-                  <div
-                    className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border mb-2 ${
-                      isSpecialActive
-                        ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25"
-                        : "bg-accent/15 text-tealdeep border-accent/25"
-                    }`}
-                  >
+                  <div className="flex flex-wrap items-center gap-2 mb-2">
                     {isSpecialActive ? (
                       <>
-                        <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                        <span>Special Referral Program — Cash Earnings 💸</span>
+                        <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25">
+                          <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                          <span>Special Referral Active — Cash Rewards 💸</span>
+                        </div>
+                        <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border bg-accent/15 text-tealdeep border-accent/25">
+                          <Gift className="size-3.5 text-tealdeep shrink-0" />
+                          <span>Earn Extra Days &amp; Cash</span>
+                        </div>
                       </>
                     ) : (
-                      <>
+                      <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border bg-accent/15 text-tealdeep border-accent/25">
                         <Gift className="size-3.5 text-tealdeep shrink-0" />
                         <span>Referral Program — Earn +7 Days Free</span>
-                      </>
+                      </div>
                     )}
                   </div>
                   <h2 className="text-xl sm:text-2xl font-display font-semibold tracking-tight text-foreground">
-                    {isSpecialActive ? "Invite Creators & Earn Cash! 💰" : "Never Let Your Plan Expire! ⚡"}
+                    {isSpecialActive ? "Invite Creators, Earn Cash & Extra Days! 💰⚡" : "Never Let Your Plan Expire! ⚡"}
                   </h2>
                   <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-xl">
                     {isSpecialActive
-                      ? "Share your link or referral code with creator friends. When they subscribe, you earn real cash commission (up to ₹100 each) directly into your wallet!"
+                      ? "Share your link or referral code with creator friends. When they subscribe, you earn real cash commission (up to ₹100 each) directly into your wallet, while also accumulating bonus days to extend your membership plan!"
                       : "Share your link or referral code with creator friends. Every time someone joins, you get +7 extra days added directly to your active plan — the more you invite, the longer your membership plan stays active!"}
                   </p>
                 </div>
@@ -1245,7 +1243,7 @@ function Dashboard() {
                             </span>
                           </div>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            You earn real cash for referrals instead of extra days. Min. withdrawal ₹200.
+                            You earn real cash commission per paying subscriber directly into your wallet. Min. withdrawal ₹200.
                           </p>
                         </div>
                       </div>
@@ -1297,6 +1295,34 @@ function Dashboard() {
                         • Payout to: UPI (<strong>{specialProg?.payoutDetails?.upiId}</strong>) •{" "}
                         {specialProg?.payoutDetails?.bankName}
                       </span>
+                    </div>
+
+                    {/* EARN EXTRA DAYS & PLAN EXTENSION PERK CARD */}
+                    <div className="mt-3.5 pt-3.5 border-t border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
+                      <div className="flex items-start gap-2.5">
+                        <div className="size-8 rounded-lg bg-accent/20 text-tealdeep flex items-center justify-center shrink-0 mt-0.5">
+                          <Gift className="size-4" />
+                        </div>
+                        <div>
+                          <div className="flex items-center gap-1.5">
+                            <h4 className="text-xs sm:text-sm font-bold text-foreground">
+                              Earn Extra Days &amp; Plan Extension
+                            </h4>
+                            <span className="inline-flex items-center rounded-md bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-tealdeep border border-accent/25">
+                              +7 Days / Referral
+                            </span>
+                          </div>
+                          <p className="text-[11px] text-muted-foreground mt-0.5 max-w-xl">
+                            Each friend who joins extends your active membership plan. You keep both your real cash earnings and accumulated bonus days!
+                          </p>
+                        </div>
+                      </div>
+                      <div className="shrink-0 flex items-center gap-2 bg-background/80 border border-border/60 rounded-xl px-3 py-1.5">
+                        <Sparkles className="size-3.5 text-saffrondeep" />
+                        <span className="text-xs font-semibold text-foreground">
+                          <strong className="text-saffrondeep font-mono">+{netBonusDays}</strong> Extra Days Earned
+                        </span>
+                      </div>
                     </div>
                   </div>
                 ) : isSpecialPending ? (
@@ -1413,7 +1439,11 @@ function Dashboard() {
               </div>
 
               {/* STATS TILES */}
-              <div className="mt-5 sm:mt-6 grid grid-cols-2 md:grid-cols-4 gap-2.5 sm:gap-4">
+              <div
+                className={`mt-5 sm:mt-6 grid gap-2.5 sm:gap-4 ${
+                  isSpecialActive ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-2 md:grid-cols-4"
+                }`}
+              >
                 <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
                   <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
                     <Users className="size-3.5 text-primary shrink-0" />
@@ -1436,22 +1466,33 @@ function Dashboard() {
                   <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Subscribed creators</p>
                 </div>
 
+                {/* CASH WALLET TILE (When special referral active) */}
+                {isSpecialActive && (
+                  <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-emerald-500/30 p-3 sm:p-4">
+                    <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
+                      <span>Cash Wallet</span>
+                    </span>
+                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400">
+                      ₹{walletBalance}
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
+                      ₹{totalEarned} total earned
+                    </p>
+                  </div>
+                )}
+
+                {/* BONUS DAYS TILE (Always visible) */}
                 <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
                   <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    {isSpecialActive ? (
-                      <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                    ) : (
-                      <Gift className="size-3.5 text-saffrondeep shrink-0" />
-                    )}
-                    <span>{isSpecialActive ? "Cash Wallet" : "Bonus Days"}</span>
+                    <Gift className="size-3.5 text-saffrondeep shrink-0" />
+                    <span>Bonus Days</span>
                   </span>
-                  <p className={`mt-1 text-xl sm:text-2xl font-display font-bold ${
-                    isSpecialActive ? "text-emerald-600 dark:text-emerald-400" : "text-saffrondeep"
-                  }`}>
-                    {isSpecialActive ? `₹${walletBalance}` : `+${netBonusDays} Days`}
+                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-saffrondeep">
+                    +{netBonusDays} Days
                   </p>
                   <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
-                    {isSpecialActive ? `₹${totalEarned} total earned` : "+7 days per referral"}
+                    +7 days per referral
                   </p>
                 </div>
 
@@ -1652,7 +1693,7 @@ function Dashboard() {
                   <div className="flex items-center gap-2">
                     <History className="size-4 text-primary shrink-0" />
                     <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground">
-                      {isSpecialActive ? "Referral Activity & Cash Earnings" : "Referral Activity & Bonus Days"}
+                      {isSpecialActive ? "Referral Activity, Cash & Bonus Days" : "Referral Activity & Bonus Days"}
                     </h3>
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
                       {referredCreators.length} invited
@@ -1660,7 +1701,7 @@ function Dashboard() {
                   </div>
                   <span className="text-[11px] text-muted-foreground">
                     {isSpecialActive
-                      ? "Track creator signups and cash commission earnings per referral"
+                      ? "Track creator signups, cash commission earnings, and bonus days extensions"
                       : "Track creator signups and earned +7 days bonus milestones"}
                   </span>
                 </div>
