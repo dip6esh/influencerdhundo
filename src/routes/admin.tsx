@@ -1475,7 +1475,7 @@ function AdminDashboard() {
   };
 
   useEffect(() => {
-    refreshFromSupabase();
+    refreshFromSupabase(true);
   }, [tab]);
 
   useEffect(() => {
@@ -1566,7 +1566,7 @@ function AdminDashboard() {
       await startFreeTrial(creatorId);
       setCreatorStatus(creatorId, "Active");
       setActionFeedback({ id: creatorId, msg: "⚡ 3-Day Free Trial activated successfully!", type: "success" });
-      await refreshFromSupabase();
+      await refreshFromSupabase(true);
     } catch (err) {
       setActionFeedback({ id: creatorId, msg: `Error: ${String(err)}`, type: "error" });
     }
@@ -1583,7 +1583,7 @@ function AdminDashboard() {
       });
       setCreatorStatus(creator.id, "Active");
       setActionFeedback({ id: creator.id, msg: `💎 ${duration} plan activated successfully!`, type: "success" });
-      await refreshFromSupabase();
+      await refreshFromSupabase(true);
     } catch (err) {
       setActionFeedback({ id: creator.id, msg: `Error: ${String(err)}`, type: "error" });
     }
@@ -1605,7 +1605,7 @@ function AdminDashboard() {
         msg: `⏳ Extended by +${extraDays} days! New expiry: ${newExpiry.toLocaleDateString("en-IN")}`,
         type: "success",
       });
-      await refreshFromSupabase();
+      await refreshFromSupabase(true);
     } catch (err) {
       setActionFeedback({ id: creator.id, msg: `Error: ${String(err)}`, type: "error" });
     }

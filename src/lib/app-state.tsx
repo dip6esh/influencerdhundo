@@ -114,7 +114,7 @@ type AppState = {
     id: string,
     updates: Partial<ReferralWithdrawalRequest>,
   ) => Promise<{ success: boolean; error?: string }>;
-  refreshFromSupabase: () => Promise<void>;
+  refreshFromSupabase: (forAdmin?: boolean) => Promise<void>;
   discoverFilters: Filters;
   setDiscoverFilters: React.Dispatch<React.SetStateAction<Filters>>;
   discoverHasSearched: boolean;
@@ -177,10 +177,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     async function loadFromSupabase() {
-      const [remoteCreators, remoteSubs, remoteWithdrawals] = await Promise.all([
+      const [remoteCreators, remoteSubs] = await Promise.all([
         supabaseDb.fetchCreators(),
         supabaseDb.fetchAllSubscriptions(),
-        supabaseDb.fetchWithdrawalRequests(),
       ]);
       if (isMounted && remoteCreators && remoteCreators.length > 0) {
         const mergedCreators = remoteCreators.map((c) => {
@@ -201,9 +200,6 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       if (isMounted && remoteSubs && remoteSubs.length > 0) {
         setSubscriptions(remoteSubs);
-      }
-      if (isMounted && remoteWithdrawals && remoteWithdrawals.length > 0) {
-        setWithdrawalRequests(remoteWithdrawals);
       }
 
       // If user has active Supabase session, look up their creator or business profile
@@ -240,14 +236,22 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
           if (creatorProfile && (prefersCreator || !businessProfile)) {
             setCreators((prev) =>
-              prev.some((x) => x.id === creatorProfile.id) ? prev : [creatorProfile, ...prev],
+              prev.some((x) => x.id === creatorProfile.id)
+                ? prev.map((x) => (x.id === creatorProfile.id ? { ...x, ...creatorProfile } : x))
+                : [creatorProfile, ...prev],
             );
             setMyCreatorId(creatorProfile.id);
             setBusiness(null);
 
-            // Fetch referral events
-            const events = await supabaseDb.fetchReferralEvents(creatorProfile.id);
-            if (isMounted) setReferralEvents(events);
+            // Fetch referral events and creator's own withdrawal requests in parallel
+            const [events, myWithdrawals] = await Promise.all([
+              supabaseDb.fetchReferralEvents(creatorProfile.id),
+              supabaseDb.fetchWithdrawalRequests(creatorProfile.id),
+            ]);
+            if (isMounted) {
+              setReferralEvents(events);
+              if (myWithdrawals) setWithdrawalRequests(myWithdrawals);
+            }
           } else if (businessProfile) {
             setBusiness(businessProfile);
             setMyCreatorId(null);
@@ -355,12 +359,53 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
     }
   }, [hydrated, creators, business, myCreatorId, reports, subscriptions, referralEvents, withdrawalRequests]);
 
-  const refreshFromSupabase = async () => {
+  // 5. Ensure active creator has full private wallet & withdrawal data loaded
+  useEffect(() => {
+    if (!hydrated || !myCreatorId) return;
+    let isCancelled = false;
+
+    async function loadMyPrivateData() {
+      const [fullCreator, myWithdrawals, myEvents] = await Promise.all([
+        supabaseDb.fetchCreatorById(myCreatorId!),
+        supabaseDb.fetchWithdrawalRequests(myCreatorId!),
+        supabaseDb.fetchReferralEvents(myCreatorId!),
+      ]);
+
+      if (isCancelled) return;
+
+      if (fullCreator && fullCreator.specialReferralProgram) {
+        setCreators((prev) =>
+          prev.map((c) =>
+            c.id === fullCreator.id
+              ? { ...c, specialReferralProgram: fullCreator.specialReferralProgram }
+              : c,
+          ),
+        );
+      }
+      if (myWithdrawals) {
+        setWithdrawalRequests(myWithdrawals);
+      }
+      if (myEvents) {
+        setReferralEvents(myEvents);
+      }
+    }
+
+    loadMyPrivateData();
+    return () => {
+      isCancelled = true;
+    };
+  }, [hydrated, myCreatorId]);
+
+  const refreshFromSupabase = async (forAdmin: boolean = false) => {
     try {
       const [remoteCreators, remoteSubs, remoteWithdrawals] = await Promise.all([
-        supabaseDb.fetchCreators(),
+        forAdmin ? supabaseDb.fetchCreatorsForAdmin() : supabaseDb.fetchCreators(),
         supabaseDb.fetchAllSubscriptions(),
-        supabaseDb.fetchWithdrawalRequests(),
+        forAdmin
+          ? supabaseDb.fetchWithdrawalRequests()
+          : myCreatorId
+          ? supabaseDb.fetchWithdrawalRequests(myCreatorId)
+          : Promise.resolve([]),
       ]);
       if (remoteCreators && remoteCreators.length > 0) {
         const mergedCreators = remoteCreators.map((c) => {
@@ -956,7 +1001,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       },
 
       fetchWithdrawalRequests: async () => {
-        const reqs = await supabaseDb.fetchWithdrawalRequests();
+        const reqs = await supabaseDb.fetchWithdrawalRequests(myCreatorId || undefined);
         setWithdrawalRequests(reqs);
       },
 

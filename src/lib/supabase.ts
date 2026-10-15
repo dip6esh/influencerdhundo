@@ -159,9 +159,33 @@ export function rowToCreator(row: CreatorRow): Creator {
   };
 }
 
+// Public-safe creator columns (excludes private special referral wallet & banking data)
+export const PUBLIC_CREATOR_SELECT =
+  "id, name, display_name, photo, city, locality, state, pincode, followers, instagram, other_socials, categories, content_types, languages, about, collab_type, starting_price, travels, travel_range, accepts_products, accepts_products_details, turnaround, status, featured, birth_date, gender, contact, referral_code, referred_by, trial_started_at, subscription_expires_at, referral_bonus_days, created_at, updated_at";
+
 // Supabase API service functions
 export const supabaseDb = {
+  /** Public directory fetch: fast, sanitized, excludes private financial wallet data */
   async fetchCreators(): Promise<Creator[] | null> {
+    try {
+      const { data, error } = await supabase
+        .from("creators")
+        .select(PUBLIC_CREATOR_SELECT)
+        .order("created_at", { ascending: false });
+
+      if (error) {
+        console.warn("Supabase fetchCreators error:", error.message);
+        return null;
+      }
+      return (data as unknown as CreatorRow[]).map(rowToCreator);
+    } catch (e) {
+      console.warn("Supabase fetchCreators exception:", e);
+      return null;
+    }
+  },
+
+  /** Admin-only fetch: retrieves full creator profile including special referral program & bank metadata */
+  async fetchCreatorsForAdmin(): Promise<Creator[] | null> {
     try {
       const { data, error } = await supabase
         .from("creators")
@@ -169,12 +193,28 @@ export const supabaseDb = {
         .order("created_at", { ascending: false });
 
       if (error) {
-        console.warn("Supabase fetchCreators error:", error.message);
+        console.warn("Supabase fetchCreatorsForAdmin error:", error.message);
         return null;
       }
       return (data as CreatorRow[]).map(rowToCreator);
     } catch (e) {
-      console.warn("Supabase fetchCreators exception:", e);
+      console.warn("Supabase fetchCreatorsForAdmin exception:", e);
+      return null;
+    }
+  },
+
+  /** Fetch single creator by ID with full private fields for their own dashboard session */
+  async fetchCreatorById(id: string): Promise<Creator | null> {
+    try {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("*")
+        .eq("id", id)
+        .limit(1);
+
+      if (error || !data || data.length === 0) return null;
+      return rowToCreator(data[0] as CreatorRow);
+    } catch {
       return null;
     }
   },
@@ -1866,13 +1906,19 @@ export const supabaseDb = {
     }
   },
 
-  /** Fetch all referral withdrawal requests */
-  async fetchWithdrawalRequests(): Promise<ReferralWithdrawalRequest[]> {
+  /** Fetch referral withdrawal requests (optionally scoped to a specific creator) */
+  async fetchWithdrawalRequests(creatorId?: string): Promise<ReferralWithdrawalRequest[]> {
     try {
-      const { data, error } = await supabase
+      let query = supabase
         .from("referral_withdrawal_requests")
         .select("*")
         .order("requested_at", { ascending: false });
+
+      if (creatorId) {
+        query = query.eq("creator_id", creatorId);
+      }
+
+      const { data, error } = await query;
 
       if (!error && Array.isArray(data) && data.length > 0) {
         return data.map((row: any) => ({
@@ -1886,7 +1932,9 @@ export const supabaseDb = {
           requestedAt: row.requested_at,
           processedAt: row.processed_at || undefined,
           utrNumber: row.utr_number || undefined,
+          transactionReference: row.utr_number || undefined,
           adminNote: row.admin_note || undefined,
+          adminNotes: row.admin_note || undefined,
         }));
       }
     } catch {}
@@ -1894,7 +1942,12 @@ export const supabaseDb = {
     // Fallback: localStorage
     try {
       const local = localStorage.getItem("dhundo_withdrawal_requests");
-      if (local) return JSON.parse(local);
+      if (local) {
+        const parsed = JSON.parse(local);
+        if (Array.isArray(parsed)) {
+          return creatorId ? parsed.filter((r: any) => r.creatorId === creatorId) : parsed;
+        }
+      }
     } catch {}
     return [];
   },
