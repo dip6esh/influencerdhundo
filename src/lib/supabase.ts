@@ -1115,7 +1115,8 @@ export const supabaseDb = {
         referredCreatorId: row.referred_creator_id as string,
         referredSubId: row.referred_sub_id as string | undefined,
         daysDelta: Number(row.days_delta),
-        eventType: row.event_type as "earned" | "reversed",
+        cashDelta: Number((row as any).cash_delta ?? 0),
+        eventType: row.event_type as "earned" | "reversed" | "cash_earned" | "cash_reversed",
         note: row.note as string,
         createdAt: row.created_at as string,
       }));
@@ -1124,7 +1125,7 @@ export const supabaseDb = {
     }
   },
 
-  /** Record a referral event (earned or reversed) */
+  /** Record a referral event (earned or reversed or cash) */
   async addReferralEvent(event: Omit<ReferralEvent, "id" | "createdAt">): Promise<string | null> {
     try {
       const { data, error } = await supabase
@@ -1134,14 +1135,19 @@ export const supabaseDb = {
           referred_creator_id: event.referredCreatorId,
           referred_sub_id: event.referredSubId ?? null,
           days_delta: event.daysDelta,
+          cash_delta: event.cashDelta ?? 0,
           event_type: event.eventType,
           note: event.note,
         })
         .select("id")
         .single();
-      if (error || !data) return null;
+      if (error || !data) {
+        if (error) console.warn("Supabase addReferralEvent error:", error.message);
+        return null;
+      }
       return (data as { id: string }).id;
-    } catch {
+    } catch (e) {
+      console.warn("Supabase addReferralEvent exception:", e);
       return null;
     }
   },
@@ -1906,6 +1912,51 @@ export const supabaseDb = {
     }
   },
 
+  /** Safely fetch fresh referrer record from Supabase and credit cash commission to their wallet */
+  async creditReferralCash(
+    referrerId: string,
+    cashAmount: number,
+  ): Promise<SpecialReferralProgram | null> {
+    try {
+      const { data, error } = await supabase
+        .from("creators")
+        .select("special_referral_program")
+        .eq("id", referrerId)
+        .single();
+
+      if (error || !data) {
+        if (error) console.warn("Supabase creditReferralCash fetch error:", error.message);
+        return null;
+      }
+
+      const currentProg = (data.special_referral_program as SpecialReferralProgram) || {};
+      const updatedProg: SpecialReferralProgram = {
+        ...currentProg,
+        walletBalance: (currentProg.walletBalance || 0) + cashAmount,
+        totalEarned: (currentProg.totalEarned || 0) + cashAmount,
+      };
+
+      const { error: updateErr } = await supabase
+        .from("creators")
+        .update({ special_referral_program: updatedProg, updated_at: new Date().toISOString() })
+        .eq("id", referrerId);
+
+      if (updateErr) {
+        console.warn("Supabase creditReferralCash update error:", updateErr.message);
+        return null;
+      }
+
+      try {
+        localStorage.setItem(`dhundo_special_prog_${referrerId}`, JSON.stringify(updatedProg));
+      } catch {}
+
+      return updatedProg;
+    } catch (e) {
+      console.warn("Supabase creditReferralCash exception:", e);
+      return null;
+    }
+  },
+
   /** Fetch referral withdrawal requests (optionally scoped to a specific creator) */
   async fetchWithdrawalRequests(creatorId?: string): Promise<ReferralWithdrawalRequest[]> {
     try {
@@ -2034,7 +2085,7 @@ export type ReferralEvent = {
   referredSubId?: string | undefined;
   daysDelta: number; // +7 or -7
   cashDelta?: number | undefined; // INR earned
-  eventType: "earned" | "reversed" | "cash_earned";
+  eventType: "earned" | "reversed" | "cash_earned" | "cash_reversed";
   note: string;
   createdAt: string;
 };

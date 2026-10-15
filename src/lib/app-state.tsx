@@ -203,20 +203,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
 
       // If user has active Supabase session, look up their creator or business profile
+      let persistedCreatorId: string | null = null;
+      let persistedBusiness: BusinessAccount | null = null;
+      try {
+        const raw = localStorage.getItem(STORAGE_KEY);
+        if (raw) {
+          const p = JSON.parse(raw);
+          persistedCreatorId = p.myCreatorId || null;
+          persistedBusiness = p.business || null;
+        }
+      } catch {
+        // ignore
+      }
+
       const uid = await supabaseDb.getCreatorSession();
       if (uid && isMounted) {
-        let persistedCreatorId: string | null = null;
-        let persistedBusiness: BusinessAccount | null = null;
-        try {
-          const raw = localStorage.getItem(STORAGE_KEY);
-          if (raw) {
-            const p = JSON.parse(raw);
-            persistedCreatorId = p.myCreatorId || null;
-            persistedBusiness = p.business || null;
-          }
-        } catch {
-          // ignore
-        }
 
         const [creatorProfile, businessProfile] = await Promise.all([
           supabaseDb.getCreatorProfileForAuthUser(uid),
@@ -255,6 +256,21 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           } else if (businessProfile) {
             setBusiness(businessProfile);
             setMyCreatorId(null);
+          }
+        }
+      }
+
+      // Always hydrate referral events & withdrawal requests for active creator profile
+      if (isMounted) {
+        const targetCreatorId = persistedCreatorId || myCreatorId;
+        if (targetCreatorId) {
+          const [events, myWithdrawals] = await Promise.all([
+            supabaseDb.fetchReferralEvents(targetCreatorId),
+            supabaseDb.fetchWithdrawalRequests(targetCreatorId),
+          ]);
+          if (isMounted) {
+            if (events && events.length > 0) setReferralEvents(events);
+            if (myWithdrawals && myWithdrawals.length > 0) setWithdrawalRequests(myWithdrawals);
           }
         }
       }
@@ -739,14 +755,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                 (c.referralCode && c.referralCode.toUpperCase() === cleanRef),
             );
             if (referrer) {
-              const alreadyRewarded = referralEvents.some(
+              // 1. Fetch fresh referrer data directly from Supabase so we have real specialReferralProgram status & details
+              const fullReferrer = await supabaseDb.fetchCreatorById(referrer.id);
+              const referrerSpecialProg = fullReferrer?.specialReferralProgram || referrer.specialReferralProgram;
+              const isSpecialActive = referrerSpecialProg?.status === "active";
+
+              // 2. Query Supabase directly to ensure this referral wasn't already rewarded
+              const existingEvents = await supabaseDb.fetchReferralEvents(referrer.id);
+              const alreadyRewarded = existingEvents.some(
                 (ev) =>
-                  ev.referrerId === referrer.id &&
                   ev.referredCreatorId === s.creatorId &&
                   (ev.eventType === "earned" || ev.eventType === "cash_earned"),
               );
-
-              const isSpecialActive = referrer.specialReferralProgram?.status === "active";
 
               if (!alreadyRewarded) {
                 if (isSpecialActive) {
@@ -763,13 +783,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   const cashCommission = calculateReferralCashCommission(effDiscount ?? 0);
 
                   if (cashCommission > 0) {
-                    const currentProg = referrer.specialReferralProgram!;
-                    const updatedProg: SpecialReferralProgram = {
-                      ...currentProg,
-                      walletBalance: (currentProg.walletBalance || 0) + cashCommission,
-                      totalEarned: (currentProg.totalEarned || 0) + cashCommission,
-                    };
-                    await supabaseDb.updateSpecialReferralProgram(referrer.id, updatedProg);
+                    // Credit cash directly and atomically in Supabase
+                    const updatedProg = await supabaseDb.creditReferralCash(referrer.id, cashCommission);
+
                     await supabaseDb.addReferralEvent({
                       referrerId: referrer.id,
                       referredCreatorId: s.creatorId,
@@ -780,11 +796,13 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                       note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (₹${cashCommission} cash commission earned)`,
                     });
 
-                    setCreators((prev) =>
-                      prev.map((c) =>
-                        c.id === referrer.id ? { ...c, specialReferralProgram: updatedProg } : c,
-                      ),
-                    );
+                    if (updatedProg) {
+                      setCreators((prev) =>
+                        prev.map((c) =>
+                          c.id === referrer.id ? { ...c, specialReferralProgram: updatedProg } : c,
+                        ),
+                      );
+                    }
 
                     if (myCreatorId === referrer.id) {
                       const events = await supabaseDb.fetchReferralEvents(referrer.id);
@@ -793,25 +811,27 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                   }
                 } else {
                   // Standard Program -> 7 Extra Days Added
-                  const referrerExpiry = referrer.subscriptionExpiresAt
-                    ? new Date(referrer.subscriptionExpiresAt)
+                  const refRec = fullReferrer || referrer;
+                  const referrerExpiry = refRec.subscriptionExpiresAt
+                    ? new Date(refRec.subscriptionExpiresAt)
                     : null;
                   const referrerActive = referrerExpiry ? referrerExpiry > now : false;
                   const referrerSub = subscriptions.find(
                     (sub) => sub.creatorId === referrer.id && sub.planId !== "trial-3d" && !sub.isTrial,
                   );
                   if (referrerActive || referrerSub) {
-                    const baseExpiry = referrer.subscriptionExpiresAt
-                      ? new Date(referrer.subscriptionExpiresAt)
+                    const baseExpiry = refRec.subscriptionExpiresAt
+                      ? new Date(refRec.subscriptionExpiresAt)
                       : now;
                     const newExpiry = new Date(baseExpiry.getTime() + 7 * 24 * 60 * 60 * 1000);
-                    const newBonus = (referrer.referralBonusDays ?? 0) + 7;
+                    const newBonus = (refRec.referralBonusDays ?? 0) + 7;
                     await supabaseDb.updateSubscriptionExpiry(referrer.id, newExpiry, newBonus);
                     await supabaseDb.addReferralEvent({
                       referrerId: referrer.id,
                       referredCreatorId: s.creatorId,
                       referredSubId: item.id,
                       daysDelta: 7,
+                      cashDelta: 0,
                       eventType: "earned",
                       note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (+7 Days added)`,
                     });

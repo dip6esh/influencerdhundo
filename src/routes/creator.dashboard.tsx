@@ -6,6 +6,7 @@ import { useAppState } from "@/lib/app-state";
 import {
   PLANS,
   calculateAge,
+  calculateReferralCashCommission,
   formatFollowers,
   formatPrice,
   formatTimeRemaining,
@@ -326,8 +327,9 @@ function Dashboard() {
 
   const referredCreators = creators.filter(
     (c) =>
-      c.referredBy === mine?.id ||
-      (mine?.referralCode && c.referredBy?.trim().toUpperCase() === mine.referralCode.trim().toUpperCase()),
+      c.id !== mine?.id &&
+      (c.referredBy === mine?.id ||
+        (mine?.referralCode && c.referredBy?.trim().toUpperCase() === mine.referralCode.trim().toUpperCase())),
   );
   const paidReferredCount = referredCreators.filter((c) =>
     subscriptions.some(
@@ -339,14 +341,17 @@ function Dashboard() {
     ),
   ).length;
 
+  const isSpecialActiveCreator = mine?.specialReferralProgram?.status === "active";
   const totalBonusDaysEarned = referralEvents.reduce((acc, ev) => acc + (ev.daysDelta || 0), 0);
-  const totalBonusDaysFromReferrals = paidReferredCount * 7;
-  const netBonusDays = Math.max(
-    0,
-    mine?.referralBonusDays && mine.referralBonusDays > 0 ? mine.referralBonusDays : 0,
-    totalBonusDaysEarned,
-    totalBonusDaysFromReferrals,
-  );
+  const totalBonusDaysFromReferrals = isSpecialActiveCreator ? 0 : paidReferredCount * 7;
+  const netBonusDays = isSpecialActiveCreator
+    ? 0
+    : Math.max(
+        0,
+        mine?.referralBonusDays && mine.referralBonusDays > 0 ? mine.referralBonusDays : 0,
+        totalBonusDaysEarned,
+        totalBonusDaysFromReferrals,
+      );
 
   const handleCopyLink = () => {
     if (!referralLink) return;
@@ -1672,8 +1677,26 @@ function Dashboard() {
                             (refCreator.name && ev.note?.toLowerCase().includes(refCreator.name.toLowerCase())) ||
                             ev.note?.toLowerCase().includes(refCreator.id.toLowerCase()),
                         );
+                        const refEventCash = Number(refEvent?.cashDelta ?? 0);
+                        const earnedCash =
+                          refEvent?.eventType === "cash_earned" || refEventCash > 0
+                            ? refEventCash
+                            : (() => {
+                                const paidSub = refSubs.find((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
+                                if (paidSub) {
+                                  const basePlan = PLANS.find((p) => p.id === paidSub.planId);
+                                  const basePrice = basePlan ? basePlan.price : (paidSub.price || 0);
+                                  const disc = basePrice > 0 ? Math.max(0, Math.min(100, Math.round(((basePrice - paidSub.price) / basePrice) * 100))) : 0;
+                                  return calculateReferralCashCommission(disc);
+                                }
+                                return 0;
+                              })();
                         const hasEarnedReward =
-                          Boolean(refEvent && refEvent.daysDelta > 0) ||
+                          earnedCash > 0 ||
+                          Boolean(
+                            refEvent &&
+                              (refEvent.daysDelta > 0 || (refEvent.cashDelta && refEvent.cashDelta > 0)),
+                          ) ||
                           refSubs.some((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
                         const hasFreePass =
                           !hasEarnedReward &&
@@ -1742,15 +1765,19 @@ function Dashboard() {
                             </div>
 
                             <div className="flex items-center justify-end pt-2 border-t border-border/60">
-                              {refEvent?.eventType === "cash_earned" || (refEvent?.cashDelta ?? 0) > 0 ? (
+                              {earnedCash > 0 ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-2.5 py-0.5 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[10px]">
                                   <Check className="size-2.5 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
-                                  <span>+₹{refEvent?.cashDelta || 0} Cash</span>
+                                  <span>+₹{earnedCash} Cash</span>
                                 </span>
                               ) : hasEarnedReward ? (
-                                <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 font-bold text-tealdeep border border-accent/40 text-[10px]">
-                                  <Check className="size-2.5 text-tealdeep stroke-[2.5]" />
-                                  <span>+7 Days Earned</span>
+                                <span className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 font-bold text-[10px] ${
+                                  isSpecialActive
+                                    ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40"
+                                    : "bg-accent/20 text-tealdeep border border-accent/40"
+                                }`}>
+                                  <Check className={`size-2.5 stroke-[2.5] ${isSpecialActive ? "text-emerald-600 dark:text-emerald-400" : "text-tealdeep"}`} />
+                                  <span>{isSpecialActive ? (earnedCash > 0 ? `+₹${earnedCash} Cash` : "Commission Earned") : "+7 Days Earned"}</span>
                                 </span>
                               ) : hasFreePass ? (
                                 <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 font-medium text-muted-foreground border border-border text-[10px]">
@@ -1828,7 +1855,22 @@ function Dashboard() {
                                 (refCreator.name && ev.note?.toLowerCase().includes(refCreator.name.toLowerCase())) ||
                                 ev.note?.toLowerCase().includes(refCreator.id.toLowerCase()),
                             );
+                            const refEventCash = Number(refEvent?.cashDelta ?? 0);
+                            const earnedCash =
+                              refEvent?.eventType === "cash_earned" || refEventCash > 0
+                                ? refEventCash
+                                : (() => {
+                                    const paidSub = refSubs.find((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
+                                    if (paidSub) {
+                                      const basePlan = PLANS.find((p) => p.id === paidSub.planId);
+                                      const basePrice = basePlan ? basePlan.price : (paidSub.price || 0);
+                                      const disc = basePrice > 0 ? Math.max(0, Math.min(100, Math.round(((basePrice - paidSub.price) / basePrice) * 100))) : 0;
+                                      return calculateReferralCashCommission(disc);
+                                    }
+                                    return 0;
+                                  })();
                             const hasEarnedReward =
+                              earnedCash > 0 ||
                               Boolean(
                                 refEvent &&
                                   (refEvent.daysDelta > 0 || (refEvent.cashDelta && refEvent.cashDelta > 0)),
@@ -1899,15 +1941,19 @@ function Dashboard() {
                                 </td>
 
                                 <td className="px-4 py-3 text-right whitespace-nowrap">
-                                  {refEvent?.eventType === "cash_earned" || (refEvent?.cashDelta ?? 0) > 0 ? (
+                                  {earnedCash > 0 ? (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/20 px-3 py-1 font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/40 text-[11px] shadow-2xs">
                                       <Check className="size-3 text-emerald-600 dark:text-emerald-400 stroke-[2.5]" />
-                                      +₹{refEvent?.cashDelta || 0} Cash
+                                      +₹{earnedCash} Cash
                                     </span>
                                   ) : hasEarnedReward ? (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-3 py-1 font-bold text-tealdeep border border-accent/40 text-[11px] shadow-2xs">
-                                      <Check className="size-3 text-tealdeep stroke-[2.5]" />
-                                      +7 Days Earned
+                                    <span className={`inline-flex items-center gap-1 rounded-full px-3 py-1 font-bold text-[11px] shadow-2xs ${
+                                      isSpecialActive
+                                        ? "bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 border border-emerald-500/40"
+                                        : "bg-accent/20 text-tealdeep border border-accent/40"
+                                    }`}>
+                                      <Check className={`size-3 stroke-[2.5] ${isSpecialActive ? "text-emerald-600 dark:text-emerald-400" : "text-tealdeep"}`} />
+                                      {isSpecialActive ? (earnedCash > 0 ? `+₹${earnedCash} Cash` : "Commission Earned") : "+7 Days Earned"}
                                     </span>
                                   ) : hasFreePass ? (
                                     <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-1 font-medium text-muted-foreground border border-border text-[11px]">
