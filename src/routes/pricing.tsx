@@ -435,17 +435,32 @@ function PricingPage() {
                   </ul>
 
                   <div className="mt-6 pt-2">
-                    <Link
-                      to={myCreator ? "/creator/plans" : "/creator/register"}
-                      className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
-                        isLaunchOffer
-                          ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
-                          : "bg-foreground text-background hover:bg-foreground/90"
-                      }`}
-                    >
-                      <span>Choose {plan.duration}</span>
-                      <ArrowRight className="size-3" />
-                    </Link>
+                    {myCreator ? (
+                      <Link
+                        to="/creator/plans"
+                        search={{ plan: plan.id }}
+                        className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                          isLaunchOffer
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                            : "bg-foreground text-background hover:bg-foreground/90"
+                        }`}
+                      >
+                        <span>Choose {plan.duration}</span>
+                        <ArrowRight className="size-3" />
+                      </Link>
+                    ) : (
+                      <Link
+                        to="/creator/register"
+                        className={`inline-flex w-full items-center justify-center gap-1.5 rounded-xl py-2.5 text-xs font-semibold transition-colors ${
+                          isLaunchOffer
+                            ? "bg-primary text-primary-foreground hover:bg-primary/90 shadow-sm"
+                            : "bg-foreground text-background hover:bg-foreground/90"
+                        }`}
+                      >
+                        <span>Choose {plan.duration}</span>
+                        <ArrowRight className="size-3" />
+                      </Link>
+                    )}
                   </div>
                 </div>
               );

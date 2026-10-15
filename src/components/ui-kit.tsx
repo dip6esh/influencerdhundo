@@ -686,7 +686,7 @@ export function Button({
     <button
       {...rest}
       className={cn(
-        "rounded-xl px-5 py-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
+        "inline-flex items-center justify-center gap-2 rounded-xl px-5 py-3 text-sm transition-colors disabled:cursor-not-allowed disabled:opacity-50",
         variants[variant],
         className,
       )}

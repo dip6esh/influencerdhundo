@@ -1604,6 +1604,7 @@ export const supabaseDb = {
       phone?: string | undefined;
       planId?: string | undefined;
       creatorId?: string | undefined;
+      skipPlanCheck?: boolean | undefined;
     },
   ): Promise<
     | { valid: true; discountCode: DiscountCode }
@@ -1675,14 +1676,14 @@ export const supabaseDb = {
         return { valid: false, error: "This coupon code has reached its maximum redemption limit." };
       }
 
-      // Check plan applicability restriction
+      // Check plan applicability restriction (can be skipped when auto-detecting the plan)
       const applicablePlans: string[] = Array.isArray(row.applicable_plans)
         ? row.applicable_plans
         : row.applicable_plans
         ? [row.applicable_plans]
         : [];
 
-      if (applicablePlans.length > 0 && !applicablePlans.includes("all")) {
+      if (!userContext?.skipPlanCheck && applicablePlans.length > 0 && !applicablePlans.includes("all")) {
         if (userContext?.planId && !applicablePlans.includes(userContext.planId)) {
           const planNames = applicablePlans
             .map((p) =>
