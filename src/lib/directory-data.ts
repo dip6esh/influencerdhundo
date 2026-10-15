@@ -560,13 +560,14 @@ export interface ReferralWithdrawalRequest {
 
 /**
  * Calculates cash commission for referrers enrolled in the special program.
- * Base = ₹100 for 0% discount.
- * If invitee received D% discount, referrer earning reduces by D%.
+ * Policy: 10% of the net cash actually paid by the referred creator on their first paid plan.
+ * Renewals do not grant additional rewards.
  */
-export function calculateReferralCashCommission(discountPercent: number): number {
-  if (discountPercent >= 100) return 0;
-  const clampedDiscount = Math.max(0, Math.min(100, discountPercent));
-  return Math.round(100 * (1 - clampedDiscount / 100));
+export function calculateReferralCashCommission(netPaidPrice: number): number {
+  if (typeof netPaidPrice !== "number" || isNaN(netPaidPrice) || netPaidPrice <= 0) {
+    return 0;
+  }
+  return Math.round(netPaidPrice * 0.1);
 }
 
 export const CREATORS: Creator[] = [];

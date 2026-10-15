@@ -760,27 +760,35 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
               const referrerSpecialProg = fullReferrer?.specialReferralProgram || referrer.specialReferralProgram;
               const isSpecialActive = referrerSpecialProg?.status === "active";
 
-              // 2. Query Supabase directly to ensure this referral wasn't already rewarded
+              // 2. Ensure this referral is rewarded ONLY ONCE on their first paid subscription; renewals do NOT reward again
               const existingEvents = await supabaseDb.fetchReferralEvents(referrer.id);
-              const alreadyRewarded = existingEvents.some(
+              const alreadyRewardedInDb = existingEvents.some(
                 (ev) =>
                   ev.referredCreatorId === s.creatorId &&
                   (ev.eventType === "earned" || ev.eventType === "cash_earned"),
               );
+              const alreadyRewardedInMemory = referralEvents.some(
+                (ev) =>
+                  ev.referrerId === referrer.id &&
+                  ev.referredCreatorId === s.creatorId &&
+                  (ev.eventType === "earned" || ev.eventType === "cash_earned"),
+              );
+              // Also check if the referred creator had any prior paid subscriptions (renewal check)
+              const hasPriorPaidSub = subscriptions.some(
+                (sub) =>
+                  sub.creatorId === s.creatorId &&
+                  sub.id !== item.id &&
+                  !sub.isTrial &&
+                  sub.planId !== "trial-3d" &&
+                  (sub.price ?? 0) > 0,
+              );
+              const alreadyRewarded = alreadyRewardedInDb || alreadyRewardedInMemory || hasPriorPaidSub;
 
               if (!alreadyRewarded) {
                 if (isSpecialActive) {
-                  // Creator enrolled in Special Referral Program -> Cash Reward, NO extra days
-                  const basePlan = PLANS.find((p) => p.id === s.planId);
-                  const basePrice = basePlan ? basePlan.price : (s.price || 0);
-                  let effDiscount = discountPercent;
-                  if (effDiscount === undefined && basePrice > 0 && s.price !== undefined) {
-                    effDiscount = Math.max(
-                      0,
-                      Math.min(100, Math.round(((basePrice - s.price) / basePrice) * 100)),
-                    );
-                  }
-                  const cashCommission = calculateReferralCashCommission(effDiscount ?? 0);
+                  // Creator enrolled in Special Referral Program -> 10% Cash Reward of net paid price, NO extra days
+                  const netPaid = s.price ?? 0;
+                  const cashCommission = calculateReferralCashCommission(netPaid);
 
                   if (cashCommission > 0) {
                     // Credit cash directly and atomically in Supabase
@@ -793,7 +801,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
                       daysDelta: 0,
                       cashDelta: cashCommission,
                       eventType: "cash_earned",
-                      note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (₹${cashCommission} cash commission earned)`,
+                      note: `${thisCreator?.name || thisCreator?.displayName || "Referred creator"} subscribed to ${s.duration} (₹${cashCommission} cash commission earned — 10% of ₹${netPaid})`,
                     });
 
                     if (updatedProg) {

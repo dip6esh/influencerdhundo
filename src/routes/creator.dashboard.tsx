@@ -1396,7 +1396,7 @@ function Dashboard() {
 
                       {/* Clear Reward Terms */}
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Earn <strong>up to ₹100 cash</strong> per paying referral based on the plan they purchase (Starter ₹2, 1-Month ₹10, 3-Month ₹25, 1-Year ₹100).
+                        Earn <strong>10% cash commission</strong> on the net amount paid on each referral's first plan purchase (e.g. ₹44 on 1-Month, ₹110 on 3-Month). Renewals do not grant duplicate rewards.
                       </p>
 
                       {/* Contextual Payout CTA */}
@@ -1458,7 +1458,7 @@ function Dashboard() {
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground">
-                        Your payout details were submitted on {new Date(specialProg?.appliedAt || Date.now()).toLocaleDateString("en-IN")}. Once approved, you will earn cash commissions up to ₹100 per paid subscriber directly into your wallet.
+                        Your payout details were submitted on {new Date(specialProg?.appliedAt || Date.now()).toLocaleDateString("en-IN")}. Once approved, you will earn 10% cash commission directly into your wallet on each referral's first paid plan.
                       </p>
                     </div>
                   ) : isSpecialRejected ? (
@@ -1511,7 +1511,7 @@ function Dashboard() {
                         </div>
                       </div>
                       <p className="text-xs text-muted-foreground leading-relaxed">
-                        Earn <strong>up to ₹100 cash</strong> per paying referral (Starter ₹2, 1-Month ₹10, 3-Month ₹25, 1-Year ₹100) deposited directly to your UPI/Bank. Minimum withdrawal ₹200.
+                        Earn <strong>10% cash commission</strong> on the net amount paid by each referral on their first plan purchase (deposited directly to your UPI/Bank). Renewals are not eligible. Minimum withdrawal ₹200.
                       </p>
                       <Button
                         onClick={handleOpenApplyModal}
@@ -1723,10 +1723,7 @@ function Dashboard() {
                             : (() => {
                                 const paidSub = refSubs.find((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
                                 if (paidSub) {
-                                  const basePlan = PLANS.find((p) => p.id === paidSub.planId);
-                                  const basePrice = basePlan ? basePlan.price : (paidSub.price || 0);
-                                  const disc = basePrice > 0 ? Math.max(0, Math.min(100, Math.round(((basePrice - paidSub.price) / basePrice) * 100))) : 0;
-                                  return calculateReferralCashCommission(disc);
+                                  return calculateReferralCashCommission(paidSub.price ?? 0);
                                 }
                                 return 0;
                               })();
@@ -1901,10 +1898,7 @@ function Dashboard() {
                                 : (() => {
                                     const paidSub = refSubs.find((s) => !s.isTrial && s.planId !== "trial-3d" && (s.price ?? 0) > 0);
                                     if (paidSub) {
-                                      const basePlan = PLANS.find((p) => p.id === paidSub.planId);
-                                      const basePrice = basePlan ? basePlan.price : (paidSub.price || 0);
-                                      const disc = basePrice > 0 ? Math.max(0, Math.min(100, Math.round(((basePrice - paidSub.price) / basePrice) * 100))) : 0;
-                                      return calculateReferralCashCommission(disc);
+                                      return calculateReferralCashCommission(paidSub.price ?? 0);
                                     }
                                     return 0;
                                   })();
@@ -2545,7 +2539,7 @@ function Dashboard() {
                   How Cash Referrals Work
                 </p>
                 <p className="text-muted-foreground">
-                  Earn up to <strong>₹100 cash</strong> per referral when an invited creator buys a plan. When your application is approved, extra subscription days will be paused and all earnings will go directly to your cash wallet (minimum withdrawal ₹200).
+                  Earn <strong>10% cash commission</strong> on the net amount paid by each referred creator on their first paid plan. When your application is approved, extra subscription days will be paused and all earnings will go directly to your cash wallet (minimum withdrawal ₹200). Subsequent plan renewals do not grant additional rewards.
                 </p>
               </div>
 
