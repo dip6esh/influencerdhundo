@@ -32,6 +32,7 @@ import {
   Camera,
   Check,
   CheckCheck,
+  ChevronDown,
   Clock,
   Copy,
   CreditCard,
@@ -42,6 +43,7 @@ import {
   IndianRupee,
   Layers,
   Loader2,
+  Lock,
   MapPin,
   Printer,
   ReceiptText,
@@ -151,6 +153,7 @@ function Dashboard() {
   const [submittingWithdrawal, setSubmittingWithdrawal] = useState(false);
   const [withdrawError, setWithdrawError] = useState<string | null>(null);
   const [withdrawSuccess, setWithdrawSuccess] = useState<string | null>(null);
+  const [showPayoutDetails, setShowPayoutDetails] = useState(false);
 
   // If mine is found in state or hydrated from storage, dismiss loading spinner immediately
   useEffect(() => {
@@ -1183,46 +1186,27 @@ function Dashboard() {
 
           {/* ── REFERRAL PROGRAM & REWARDS SECTION ─────────────────────────────────── */}
           <div className="mt-8 sm:mt-10">
-            <Card className="glass-card rounded-2xl sm:rounded-3xl p-4.5 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative">
+            <Card className="glass-card rounded-2xl sm:rounded-3xl p-4.5 sm:p-8 shadow-xl border border-border/80 overflow-hidden relative space-y-6 sm:space-y-7">
               <div className="pointer-events-none absolute -top-24 -right-24 size-48 rounded-full bg-accent/10 blur-3xl" />
 
-              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 pb-5 sm:pb-6 border-b border-border/60">
+              {/* 1. SINGLE CLEAN PAGE TITLE & ONE-SENTENCE INTRO */}
+              <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-5 border-b border-border/60">
                 <div>
-                  <div className="flex flex-wrap items-center gap-2 mb-2">
-                    {isSpecialActive ? (
-                      <>
-                        <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/25">
-                          <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                          <span>Special Referral Active — Cash Rewards 💸</span>
-                        </div>
-                        <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border bg-accent/15 text-tealdeep border-accent/25">
-                          <Gift className="size-3.5 text-tealdeep shrink-0" />
-                          <span>Earn Extra Days &amp; Cash</span>
-                        </div>
-                      </>
-                    ) : (
-                      <div className="inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold border bg-accent/15 text-tealdeep border-accent/25">
-                        <Gift className="size-3.5 text-tealdeep shrink-0" />
-                        <span>Referral Program — Earn +7 Days Free</span>
-                      </div>
-                    )}
-                  </div>
-                  <h2 className="text-xl sm:text-2xl font-display font-semibold tracking-tight text-foreground">
-                    {isSpecialActive ? "Invite Creators, Earn Cash & Extra Days! 💰⚡" : "Never Let Your Plan Expire! ⚡"}
+                  <h2 className="text-xl sm:text-2xl font-display font-bold tracking-tight text-foreground flex items-center gap-2">
+                    <Sparkles className="size-5 text-primary" />
+                    <span>Referrals &amp; Creator Rewards</span>
                   </h2>
-                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground max-w-xl">
-                    {isSpecialActive
-                      ? "Share your link or referral code with creator friends. When they subscribe, you earn real cash commission (up to ₹100 each) directly into your wallet, while also accumulating bonus days to extend your membership plan!"
-                      : "Share your link or referral code with creator friends. Every time someone joins, you get +7 extra days added directly to your active plan — the more you invite, the longer your membership plan stays active!"}
+                  <p className="mt-1 text-xs sm:text-sm text-muted-foreground">
+                    Invite fellow creators with your permanent code to earn real cash commissions and bonus subscription days.
                   </p>
                 </div>
 
-                {/* Referral Link Active Status Badge */}
+                {/* Status Badge */}
                 <div className="shrink-0 flex items-center gap-2">
                   {isSpecialActive ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-emerald-500/15 px-3 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
                       <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
-                      Special Referral Active (Cash Mode)
+                      Cash Rewards Active
                     </span>
                   ) : isReferralUnlocked ? (
                     <span className="inline-flex items-center gap-1.5 rounded-full bg-accent/15 px-3 py-1.5 text-xs font-semibold text-tealdeep border border-accent/30">
@@ -1248,425 +1232,415 @@ function Dashboard() {
                 </div>
               </div>
 
-              {/* SPECIAL REFERRAL PROGRAM BANNER / WALLET SECTION */}
-              <div className="mt-5 rounded-2xl sm:rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-background to-teal-500/5 p-4 sm:p-5 relative overflow-hidden">
-                {isSpecialActive ? (
-                  <div>
-                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3.5 border-b border-border/60">
-                      <div className="flex items-center gap-2.5">
-                        <div className="size-10 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
-                          <Wallet className="size-5" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-2">
-                            <h3 className="font-display font-bold text-base sm:text-lg text-foreground">
-                              Special Referral Cash Wallet
+              {/* 2. DEDICATED PERMANENT REFERRAL CARD (High Visual Attention) */}
+              <div className="rounded-2xl sm:rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-background to-accent/10 p-4 sm:p-6 shadow-xs">
+                <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4">
+                  <div className="space-y-1.5">
+                    <span className="text-[11px] font-bold uppercase tracking-wider text-primary flex items-center gap-1.5">
+                      <Sparkles className="size-3.5 text-primary" />
+                      Your Permanent Invite Code
+                    </span>
+                    <div className="flex flex-wrap items-center gap-3">
+                      <span
+                        className={`text-2xl sm:text-3xl font-mono font-extrabold tracking-wider text-foreground select-all ${
+                          isReferralUnlocked ? "" : "blur-sm opacity-50 select-none"
+                        }`}
+                      >
+                        {isReferralUnlocked ? referralCode : "DHUNDO-XXXXXX"}
+                      </span>
+                      {isReferralUnlocked && (
+                        <button
+                          type="button"
+                          onClick={handleCopyCode}
+                          title={copiedCode ? "Copied!" : "Copy referral code"}
+                          className="inline-flex items-center gap-1.5 rounded-xl bg-primary/15 hover:bg-primary/25 border border-primary/30 px-3 py-1.5 text-xs font-bold text-primary transition-all cursor-pointer active:scale-95"
+                        >
+                          {copiedCode ? (
+                            <>
+                              <Check className="size-3.5 text-tealdeep stroke-[2.5]" />
+                              <span>Copied!</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3.5" />
+                              <span>Copy Code</span>
+                            </>
+                          )}
+                        </button>
+                      )}
+                    </div>
+                    <p className="text-xs text-muted-foreground">
+                      {isReferralUnlocked
+                        ? "Your creator friends get a 3-day free trial, and you earn commissions & bonus days when they subscribe."
+                        : "Referral codes unlock on active paid membership plans. Upgrade to start sharing and earning rewards."}
+                    </p>
+                  </div>
+
+                  {/* Share actions */}
+                  {isReferralUnlocked ? (
+                    <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-2 shrink-0">
+                      <div className="relative min-w-0 flex-1 sm:w-64 md:w-72">
+                        <input
+                          type="text"
+                          readOnly
+                          value={referralLink}
+                          className="w-full truncate rounded-xl bg-background/90 px-3 py-2 text-xs font-mono text-foreground border border-border focus:outline-none select-all shadow-2xs"
+                        />
+                      </div>
+                      <div className="flex items-center gap-2">
+                        <button
+                          type="button"
+                          onClick={handleCopyLink}
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-foreground px-3.5 py-2 text-xs font-bold text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs active:scale-95"
+                        >
+                          {copiedLink ? (
+                            <>
+                              <Check className="size-3.5 text-tealdeep" />
+                              <span>Copied</span>
+                            </>
+                          ) : (
+                            <>
+                              <Copy className="size-3.5" />
+                              <span>Copy Link</span>
+                            </>
+                          )}
+                        </button>
+                        <a
+                          href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white px-3.5 py-2 text-xs font-bold transition-all shadow-xs active:scale-95"
+                        >
+                          <WhatsAppIcon className="size-3.5 shrink-0" />
+                          <span>WhatsApp</span>
+                        </a>
+                      </div>
+                    </div>
+                  ) : (
+                    <Link
+                      to={isDraft ? "/creator/register" : "/creator/plans"}
+                      className="inline-flex items-center justify-center gap-1.5 rounded-xl bg-primary text-primary-foreground px-4 py-2.5 text-xs font-bold hover:bg-primary/90 transition-all shadow-xs shrink-0"
+                    >
+                      <span>{isDraft ? "Complete Profile" : "Upgrade to Unlock Code"}</span>
+                      <ArrowUpRight className="size-3.5" />
+                    </Link>
+                  )}
+                </div>
+              </div>
+
+              {/* 3. TWO DISTINCT REWARD CARDS (Cash Wallet & Bonus Days) */}
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-4 sm:gap-5">
+                {/* ── CARD A: CASH COMMISSION WALLET ── */}
+                <div className="rounded-2xl sm:rounded-3xl border border-emerald-500/30 bg-gradient-to-br from-emerald-500/10 via-background to-teal-500/5 p-4 sm:p-5 flex flex-col justify-between">
+                  {isSpecialActive ? (
+                    <div className="space-y-4">
+                      {/* Top Header */}
+                      <div className="flex items-center justify-between">
+                        <div className="flex items-center gap-2.5">
+                          <div className="size-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                            <Wallet className="size-4.5" />
+                          </div>
+                          <div>
+                            <h3 className="font-display font-bold text-base text-foreground">
+                              Cash Commission Wallet
                             </h3>
-                            <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
-                              <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
-                              Active
+                            <span className="text-[11px] text-muted-foreground">Direct bank / UPI transfers</span>
+                          </div>
+                        </div>
+                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/30">
+                          <span className="size-1.5 rounded-full bg-emerald-500 animate-pulse" />
+                          Enrolled
+                        </span>
+                      </div>
+
+                      {/* Primary Focus: Available Balance (Shown ONCE here!) */}
+                      <div className="rounded-xl bg-background/80 border border-border/60 p-3.5 space-y-2.5">
+                        <div className="flex items-baseline justify-between">
+                          <div>
+                            <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                              Available Balance
+                            </span>
+                            <div className="text-3xl sm:text-4xl font-display font-extrabold text-emerald-600 dark:text-emerald-400">
+                              ₹{walletBalance.toLocaleString("en-IN")}
+                            </div>
+                          </div>
+                          <span className="text-xs font-mono font-bold text-muted-foreground">
+                            Min. ₹200
+                          </span>
+                        </div>
+
+                        {/* Progress Indicator toward ₹200 */}
+                        <div className="space-y-1.5">
+                          <div className="h-2 w-full rounded-full bg-emerald-500/15 overflow-hidden">
+                            <div
+                              className="h-full bg-gradient-to-r from-emerald-500 to-teal-500 rounded-full transition-all duration-500"
+                              style={{ width: `${Math.min(100, Math.round((walletBalance / 200) * 100))}%` }}
+                            />
+                          </div>
+                          <div className="flex items-center justify-between text-[11px]">
+                            {walletBalance < 200 ? (
+                              <span className="text-muted-foreground font-medium">
+                                Earn <strong className="text-emerald-600 dark:text-emerald-400 font-bold">₹{200 - walletBalance} more</strong> to unlock withdrawals
+                              </span>
+                            ) : (
+                              <span className="text-emerald-600 dark:text-emerald-400 font-bold flex items-center gap-1">
+                                <Check className="size-3" /> Threshold reached — Ready for payout!
+                              </span>
+                            )}
+                            <span className="text-muted-foreground font-mono">
+                              {Math.min(100, Math.round((walletBalance / 200) * 100))}%
                             </span>
                           </div>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            You earn real cash commission per paying subscriber directly into your wallet. Min. withdrawal ₹200.
-                          </p>
                         </div>
                       </div>
 
-                      <Button
-                        onClick={handleOpenWithdrawModal}
-                        disabled={walletBalance < 200 || hasPendingWithdrawal || monthlyWithdrawalCount >= 2}
-                        className="shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs sm:text-sm px-4 py-2.5 shadow-sm disabled:opacity-50"
-                      >
-                        <IndianRupee className="size-4" />
-                        <span>Request Payout</span>
+                      {/* Clear Reward Terms */}
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Earn <strong>up to ₹100 cash</strong> per paying referral based on the plan they purchase (Starter ₹2, 1-Month ₹10, 3-Month ₹25, 1-Year ₹100).
+                      </p>
+
+                      {/* Contextual Payout CTA */}
+                      <div>
+                        {walletBalance >= 200 ? (
+                          <Button
+                            onClick={handleOpenWithdrawModal}
+                            disabled={hasPendingWithdrawal || monthlyWithdrawalCount >= 2}
+                            className="w-full rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-bold text-xs sm:text-sm py-2.5 shadow-sm disabled:opacity-50"
+                          >
+                            <IndianRupee className="size-4" />
+                            <span>{hasPendingWithdrawal ? "Withdrawal Under Review" : `Request Payout (₹${walletBalance})`}</span>
+                          </Button>
+                        ) : (
+                          <Button
+                            disabled
+                            className="w-full rounded-xl bg-secondary text-muted-foreground border border-border/80 text-xs py-2.5 cursor-not-allowed opacity-80"
+                          >
+                            <Lock className="size-3.5 mr-1.5" />
+                            <span>Earn ₹{200 - walletBalance} more to unlock payout</span>
+                          </Button>
+                        )}
+                      </div>
+
+                      {/* Collapsible Payout Conditions & Bank Details */}
+                      <div className="pt-2 border-t border-border/60">
+                        <button
+                          type="button"
+                          onClick={() => setShowPayoutDetails(!showPayoutDetails)}
+                          className="w-full flex items-center justify-between text-xs text-muted-foreground hover:text-foreground font-medium py-1 transition-colors cursor-pointer"
+                        >
+                          <span className="flex items-center gap-1.5">
+                            <ShieldCheck className="size-3.5 text-emerald-600 dark:text-emerald-400" />
+                            <span>Payout Rules &amp; Destination Details</span>
+                          </span>
+                          <ChevronDown className={`size-3.5 transition-transform duration-200 ${showPayoutDetails ? "rotate-180" : ""}`} />
+                        </button>
+
+                        {showPayoutDetails && (
+                          <div className="mt-2.5 rounded-xl bg-background/60 border border-border/60 p-3 text-[11px] text-muted-foreground space-y-1.5 animate-in fade-in duration-200">
+                            <p>• <strong>SLA:</strong> Deposited directly to your account within 7–10 working days.</p>
+                            <p>• <strong>Frequency:</strong> Max 2 withdrawal requests per calendar month ({monthlyWithdrawalCount}/2 used).</p>
+                            <p>
+                              • <strong>Payout to:</strong> UPI (<strong>{specialProg?.payoutDetails?.upiId}</strong>) • {specialProg?.payoutDetails?.bankName} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})
+                            </p>
+                          </div>
+                        )}
+                      </div>
+                    </div>
+                  ) : isSpecialPending ? (
+                    <div className="space-y-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-9 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0">
+                          <Clock className="size-4.5" />
+                        </div>
+                        <div>
+                          <h3 className="font-display font-bold text-base text-foreground">Cash Referral Under Review</h3>
+                          <span className="text-[11px] text-amber-600 dark:text-amber-400 font-bold">Application Pending</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        Your payout details were submitted on {new Date(specialProg?.appliedAt || Date.now()).toLocaleDateString("en-IN")}. Once approved, you will earn cash commissions up to ₹100 per paid subscriber directly into your wallet.
+                      </p>
+                    </div>
+                  ) : isSpecialRejected ? (
+                    <div className="space-y-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-9 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0">
+                          <AlertCircle className="size-4.5" />
+                        </div>
+                        <div>
+                          <h3 className="font-display font-bold text-base text-foreground">Application Not Approved</h3>
+                          <span className="text-[11px] text-rose-600 dark:text-rose-400 font-bold">Declined</span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-rose-600 dark:text-rose-400 font-medium">
+                        Reason: {specialProg?.rejectionReason || "Details could not be verified."}
+                      </p>
+                      <Button onClick={handleOpenApplyModal} className="w-full rounded-xl bg-primary text-primary-foreground text-xs py-2 font-bold">
+                        <span>Review &amp; Re-apply</span>
                       </Button>
                     </div>
-
-                    <div className="mt-3.5 grid grid-cols-1 sm:grid-cols-3 gap-3">
-                      <div className="rounded-xl bg-background/80 border border-border/60 p-3 sm:p-3.5">
-                        <span className="text-xs text-muted-foreground font-medium">Available Balance</span>
-                        <p className="text-2xl font-display font-extrabold text-emerald-600 dark:text-emerald-400 mt-0.5">
-                          ₹{walletBalance.toLocaleString("en-IN")}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">
-                          {walletBalance >= 200
-                            ? "Eligible for withdrawal"
-                            : `Need ₹${200 - walletBalance} more to reach min. ₹200`}
-                        </p>
+                  ) : isSpecialClosed ? (
+                    <div className="space-y-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-9 rounded-xl bg-secondary text-muted-foreground flex items-center justify-center shrink-0">
+                          <ShieldCheck className="size-4.5" />
+                        </div>
+                        <div>
+                          <h3 className="font-display font-bold text-base text-foreground">Cash Program Closed</h3>
+                          <span className="text-[11px] text-muted-foreground">Admin Closed</span>
+                        </div>
                       </div>
-
-                      <div className="rounded-xl bg-background/80 border border-border/60 p-3 sm:p-3.5">
-                        <span className="text-xs text-muted-foreground font-medium">Total Cash Earned</span>
-                        <p className="text-2xl font-display font-bold text-foreground mt-0.5">
-                          ₹{totalEarned.toLocaleString("en-IN")}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">Cumulative referral rewards</p>
-                      </div>
-
-                      <div className="rounded-xl bg-background/80 border border-border/60 p-3 sm:p-3.5">
-                        <span className="text-xs text-muted-foreground font-medium">Total Withdrawn</span>
-                        <p className="text-2xl font-display font-bold text-foreground mt-0.5">
-                          ₹{totalWithdrawn.toLocaleString("en-IN")}
-                        </p>
-                        <p className="text-[11px] text-muted-foreground mt-0.5">Transferred to UPI / Bank</p>
-                      </div>
+                      <p className="text-xs text-muted-foreground">
+                        The special referral program was closed. Standard +7 days per referral is active.
+                        {walletBalance > 0 && ` You have ₹${walletBalance} remaining in your wallet.`}
+                      </p>
                     </div>
+                  ) : (
+                    <div className="space-y-3.5">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-9 rounded-xl bg-emerald-500/20 text-emerald-600 dark:text-emerald-400 flex items-center justify-center shrink-0">
+                          <Wallet className="size-4.5" />
+                        </div>
+                        <div>
+                          <h3 className="font-display font-bold text-base text-foreground">
+                            Earn Real Cash Commissions 💸
+                          </h3>
+                          <span className="text-[11px] text-emerald-600 dark:text-emerald-400 font-bold">
+                            Available to Apply
+                          </span>
+                        </div>
+                      </div>
+                      <p className="text-xs text-muted-foreground leading-relaxed">
+                        Earn <strong>up to ₹100 cash</strong> per paying referral (Starter ₹2, 1-Month ₹10, 3-Month ₹25, 1-Year ₹100) deposited directly to your UPI/Bank. Minimum withdrawal ₹200.
+                      </p>
+                      <Button
+                        onClick={handleOpenApplyModal}
+                        className="w-full rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs py-2.5 shadow-sm"
+                      >
+                        <Wallet className="size-3.5 mr-1.5" />
+                        <span>Apply for Cash Referrals</span>
+                      </Button>
+                    </div>
+                  )}
+                </div>
 
-                    <div className="mt-3 flex flex-wrap items-center justify-between text-[11px] text-muted-foreground gap-y-1">
-                      <span>• SLA: Deposited to your account within 7–10 working days</span>
-                      <span>• Max 2 requests/month ({monthlyWithdrawalCount}/2 used)</span>
-                      <span>
-                        • Payout to: UPI (<strong>{specialProg?.payoutDetails?.upiId}</strong>) •{" "}
-                        {specialProg?.payoutDetails?.bankName}
+                {/* ── CARD B: PROMINENT BONUS DAYS REWARD CARD ── */}
+                <div className="rounded-2xl sm:rounded-3xl border border-accent/40 bg-gradient-to-br from-accent/15 via-background to-secondary/60 p-4 sm:p-5 flex flex-col justify-between">
+                  <div className="space-y-4">
+                    {/* Top Header */}
+                    <div className="flex items-center justify-between">
+                      <div className="flex items-center gap-2.5">
+                        <div className="size-9 rounded-xl bg-accent/25 text-tealdeep flex items-center justify-center shrink-0">
+                          <Gift className="size-4.5" />
+                        </div>
+                        <div>
+                          <h3 className="font-display font-bold text-base text-foreground">
+                            Membership Plan Extension
+                          </h3>
+                          <span className="text-[11px] text-muted-foreground">Keep profile active for free</span>
+                        </div>
+                      </div>
+                      <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-tealdeep border border-accent/30">
+                        +7 Days / Referral
                       </span>
                     </div>
 
-                    {/* EARN EXTRA DAYS & PLAN EXTENSION PERK CARD */}
-                    <div className="mt-3.5 pt-3.5 border-t border-emerald-500/20 flex flex-col sm:flex-row sm:items-center justify-between gap-3">
-                      <div className="flex items-start gap-2.5">
-                        <div className="size-8 rounded-lg bg-accent/20 text-tealdeep flex items-center justify-center shrink-0 mt-0.5">
-                          <Gift className="size-4" />
-                        </div>
-                        <div>
-                          <div className="flex items-center gap-1.5">
-                            <h4 className="text-xs sm:text-sm font-bold text-foreground">
-                              Earn Extra Days &amp; Plan Extension
-                            </h4>
-                            <span className="inline-flex items-center rounded-md bg-accent/15 px-1.5 py-0.5 text-[10px] font-semibold text-tealdeep border border-accent/25">
-                              +7 Days / Referral
-                            </span>
-                          </div>
-                          <p className="text-[11px] text-muted-foreground mt-0.5 max-w-xl">
-                            Each friend who joins extends your active membership plan. You keep both your real cash earnings and accumulated bonus days!
-                          </p>
-                        </div>
-                      </div>
-                      <div className="shrink-0 flex items-center gap-2 bg-background/80 border border-border/60 rounded-xl px-3 py-1.5">
-                        <Sparkles className="size-3.5 text-saffrondeep" />
-                        <span className="text-xs font-semibold text-foreground">
-                          <strong className="text-saffrondeep font-mono">+{netBonusDays}</strong> Extra Days Earned
+                    {/* Prominent Days Display */}
+                    <div className="rounded-xl bg-background/80 border border-border/60 p-3.5 space-y-1">
+                      <span className="text-[11px] uppercase tracking-wider text-muted-foreground font-semibold">
+                        Accumulated Bonus Days
+                      </span>
+                      <div className="flex items-baseline gap-2">
+                        <span className="text-3xl sm:text-4xl font-display font-extrabold text-saffrondeep">
+                          +{netBonusDays}
                         </span>
+                        <span className="text-sm font-bold text-foreground">Days Added to Plan</span>
                       </div>
-                    </div>
-                  </div>
-                ) : isSpecialPending ? (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="size-10 rounded-xl bg-amber-500/20 text-amber-600 dark:text-amber-400 flex items-center justify-center shrink-0 mt-0.5">
-                        <Clock className="size-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-display font-bold text-base text-foreground">
-                            Special Referral Program Application Under Review
-                          </h3>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-bold text-amber-600 dark:text-amber-400 border border-amber-500/30">
-                            Pending
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-                          Your application was submitted on{" "}
-                          {new Date(specialProg?.appliedAt || Date.now()).toLocaleDateString("en-IN")}. Once
-                          approved, your referral code will earn cash commissions up to ₹100 per paid subscriber!
-                        </p>
-                        <div className="mt-2 text-xs font-mono text-muted-foreground flex flex-wrap gap-x-4 gap-y-1">
-                          <span>
-                            UPI: <strong className="text-foreground">{specialProg?.payoutDetails?.upiId}</strong>
-                          </span>
-                          <span>
-                            Bank:{" "}
-                            <strong className="text-foreground">
-                              {specialProg?.payoutDetails?.bankName}{" "}
-                              {specialProg?.payoutDetails?.accountNumber?.slice(-4)
-                                ? `(••••${specialProg.payoutDetails.accountNumber.slice(-4)})`
-                                : ""}
-                            </strong>
-                          </span>
-                        </div>
-                      </div>
-                    </div>
-                  </div>
-                ) : isSpecialRejected ? (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="size-10 rounded-xl bg-rose-500/20 text-rose-600 dark:text-rose-400 flex items-center justify-center shrink-0 mt-0.5">
-                        <AlertCircle className="size-5" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-display font-bold text-base text-foreground">
-                            Special Referral Application Not Approved
-                          </h3>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-rose-500/15 px-2 py-0.5 text-[11px] font-bold text-rose-600 dark:text-rose-400 border border-rose-500/30">
-                            Declined
-                          </span>
-                        </div>
-                        <p className="text-xs text-rose-600 dark:text-rose-400 mt-1 font-medium">
-                          Reason: {specialProg?.rejectionReason || "Details could not be verified."}
-                        </p>
-                        <p className="text-xs text-muted-foreground mt-0.5">
-                          You can review your payout details and reapply at any time.
-                        </p>
-                      </div>
-                    </div>
-                    <Button
-                      onClick={handleOpenApplyModal}
-                      className="shrink-0 rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground font-semibold text-xs px-4 py-2"
-                    >
-                      <span>Re-apply Now</span>
-                    </Button>
-                  </div>
-                ) : isSpecialClosed ? (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="size-10 rounded-xl bg-secondary text-muted-foreground flex items-center justify-center shrink-0 mt-0.5">
-                        <ShieldCheck className="size-5" />
-                      </div>
-                      <div>
-                        <h3 className="font-display font-bold text-base text-foreground">
-                          Special Referral Program Closed
-                        </h3>
-                        <p className="text-xs text-muted-foreground mt-1">
-                          The special referral program was closed by admin. You currently receive standard +7 bonus subscription days for referrals.
-                          {walletBalance > 0 && ` You have ₹${walletBalance} remaining in your wallet balance which can still be withdrawn.`}
-                        </p>
-                      </div>
-                    </div>
-                    {walletBalance >= 200 && (
-                      <Button
-                        onClick={handleOpenWithdrawModal}
-                        className="shrink-0 rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white font-semibold text-xs px-4 py-2"
-                      >
-                        <span>Withdraw ₹{walletBalance}</span>
-                      </Button>
-                    )}
-                  </div>
-                ) : (
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                      <h3 className="font-display font-bold text-base text-foreground">
-                        Earn Real Cash with Special Referral Program 💸
-                      </h3>
-                      <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-                        Want to earn money instead of subscription days? Apply now with your UPI &amp; Bank details to earn up to <strong>₹100 real cash commission</strong> per paying referral, withdrawable directly to your account (min. ₹200).
+                      <p className="text-[11px] text-muted-foreground">
+                        {netBonusDays > 0
+                          ? "Automatically extended on top of your current subscription!"
+                          : "Invite a creator who joins on any standard plan to receive your first +7 days."}
                       </p>
                     </div>
-                    <Button
-                      onClick={handleOpenApplyModal}
-                      className="shrink-0 rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white font-bold text-xs sm:text-sm px-4.5 py-2.5 shadow-sm"
-                    >
-                      <Wallet className="size-4" />
-                      <span>Apply to Earn Cash</span>
-                    </Button>
+
+                    {/* Value proposition */}
+                    <p className="text-xs text-muted-foreground leading-relaxed">
+                      Every friend who registers with your link and subscribes adds <strong>+7 extra days</strong> directly to your active subscription. You stay featured on the creator discovery marketplace without recurring renewal costs.
+                    </p>
                   </div>
-                )}
+
+                  {/* Highlights */}
+                  <div className="mt-4 pt-3 border-t border-border/60 flex items-center justify-between text-xs text-muted-foreground">
+                    <span className="flex items-center gap-1.5 font-medium">
+                      <Sparkles className="size-3.5 text-saffrondeep" />
+                      <span>Never let your profile expire</span>
+                    </span>
+                    <span className="font-semibold text-tealdeep">Automatic Extension</span>
+                  </div>
+                </div>
               </div>
 
-              {/* STATS TILES */}
-              <div
-                className={`mt-5 sm:mt-6 grid gap-2.5 sm:gap-4 ${
-                  isSpecialActive ? "grid-cols-2 sm:grid-cols-3 lg:grid-cols-5" : "grid-cols-2 md:grid-cols-4"
-                }`}
-              >
-                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
-                  <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Users className="size-3.5 text-primary shrink-0" />
-                    <span>Total Invites</span>
-                  </span>
-                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-foreground">
-                    {referredCreators.length}
-                  </p>
-                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Creators registered</p>
-                </div>
+              {/* 4. PERFORMANCE STATS ROW (No Repeated Available Balance!) */}
+              <div>
+                <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-muted-foreground mb-3 flex items-center gap-2">
+                  <Zap className="size-4 text-primary" />
+                  <span>Referral Performance</span>
+                </h3>
 
-                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
-                  <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Zap className="size-3.5 text-primary shrink-0" />
-                    <span>Paid Conversions</span>
-                  </span>
-                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-tealdeep">
-                    {paidReferredCount}
-                  </p>
-                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Subscribed creators</p>
-                </div>
+                <div className="grid grid-cols-2 lg:grid-cols-4 gap-2.5 sm:gap-4">
+                  <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
+                    <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Users className="size-3.5 text-primary shrink-0" />
+                      <span>Total Invites</span>
+                    </span>
+                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-foreground">
+                      {referredCreators.length}
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Creators registered</p>
+                  </div>
 
-                {/* CASH WALLET TILE (When special referral active) */}
-                {isSpecialActive && (
-                  <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-emerald-500/30 p-3 sm:p-4">
+                  <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
+                    <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
+                      <Zap className="size-3.5 text-primary shrink-0" />
+                      <span>Paid Conversions</span>
+                    </span>
+                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-tealdeep">
+                      {paidReferredCount}
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">Subscribed creators</p>
+                  </div>
+
+                  <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
                     <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
                       <Wallet className="size-3.5 text-emerald-600 dark:text-emerald-400 shrink-0" />
-                      <span>Cash Wallet</span>
+                      <span>Lifetime Cash</span>
                     </span>
                     <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-emerald-600 dark:text-emerald-400">
-                      ₹{walletBalance}
+                      ₹{totalEarned}
                     </p>
                     <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
-                      ₹{totalEarned} total earned
+                      ₹{totalWithdrawn} withdrawn
                     </p>
                   </div>
-                )}
 
-                {/* BONUS DAYS TILE (Always visible) */}
-                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
-                  <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                    <Gift className="size-3.5 text-saffrondeep shrink-0" />
-                    <span>Bonus Days</span>
-                  </span>
-                  <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-saffrondeep">
-                    +{netBonusDays} Days
-                  </p>
-                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
-                    +7 days per referral
-                  </p>
-                </div>
-
-                <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4 relative group">
-                  <div className="flex items-center justify-between">
+                  <div className="rounded-xl sm:rounded-2xl bg-background/60 border border-border/60 p-3 sm:p-4">
                     <span className="text-[11px] sm:text-xs font-medium text-muted-foreground flex items-center gap-1">
-                      <Clock className="size-3.5 text-primary shrink-0" />
-                      <span>Referral Code</span>
+                      <Gift className="size-3.5 text-saffrondeep shrink-0" />
+                      <span>Bonus Days</span>
                     </span>
-                    {/* Hide copy button when locked */}
-                    {isReferralUnlocked && (
-                      <button
-                        type="button"
-                        onClick={handleCopyCode}
-                        title={copiedCode ? "Copied!" : "Copy referral code"}
-                        aria-label="Copy referral code"
-                        className="inline-flex size-5 sm:size-6 items-center justify-center rounded-lg text-foreground hover:bg-secondary transition-all cursor-pointer"
-                      >
-                        {copiedCode ? (
-                          <Check className="size-3.5 text-tealdeep stroke-[2.5]" />
-                        ) : (
-                          <Copy className="size-3.5 text-foreground" />
-                        )}
-                      </button>
-                    )}
+                    <p className="mt-1 text-xl sm:text-2xl font-display font-bold text-saffrondeep">
+                      +{netBonusDays} Days
+                    </p>
+                    <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
+                      +7 days per referral
+                    </p>
                   </div>
-                  <p
-                    className={`mt-1 text-base sm:text-lg font-mono font-bold text-foreground tracking-wider truncate transition-all select-none ${
-                      isReferralUnlocked ? "" : "blur-sm opacity-50 pointer-events-none"
-                    }`}
-                  >
-                    {isReferralUnlocked ? referralCode : "DHUNDO-XXXXXX"}
-                  </p>
-                  <p className="text-[10px] sm:text-[11px] text-muted-foreground mt-0.5 truncate">
-                    {isReferralUnlocked ? "Permanent code" : "Unlocks on paid plan"}
-                  </p>
                 </div>
               </div>
 
-              {/* LINK SHARING BOX */}
-              {isReferralUnlocked ? (
-                <div className="mt-5 sm:mt-6 rounded-2xl bg-secondary/60 border border-border/80 p-3.5 sm:p-5">
-                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1 mb-2">
-                    <label className="block text-[11px] sm:text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                      Your Unique Referral Link &amp; Code
-                    </label>
-                    <span className="text-[11px] text-muted-foreground">
-                      Code: <strong className="font-mono text-foreground">{referralCode}</strong>
-                    </span>
-                  </div>
-
-                  <div className="flex flex-col lg:flex-row items-stretch lg:items-center gap-2.5">
-                    <div className="min-w-0 flex-1">
-                      <input
-                        type="text"
-                        readOnly
-                        value={referralLink}
-                        className="w-full truncate rounded-xl bg-background px-3 py-2.5 text-xs sm:text-sm font-mono text-foreground border border-border focus:outline-none select-all shadow-xs"
-                      />
-                    </div>
-
-                    <div className="grid grid-cols-3 gap-1.5 sm:gap-2 w-full lg:w-auto shrink-0">
-                      <button
-                        type="button"
-                        onClick={handleCopyLink}
-                        className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl bg-foreground px-2.5 sm:px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-background hover:bg-foreground/90 transition-all cursor-pointer shadow-xs active:scale-98"
-                      >
-                        {copiedLink ? (
-                          <>
-                            <Check className="size-3.5 sm:size-4 text-tealdeep shrink-0" />
-                            <span className="truncate">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="size-3.5 sm:size-4 shrink-0" />
-                            <span className="truncate">Link</span>
-                          </>
-                        )}
-                      </button>
-
-                      <button
-                        type="button"
-                        onClick={handleCopyCode}
-                        className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl bg-background px-2.5 sm:px-3.5 py-2.5 text-xs sm:text-sm font-semibold text-foreground ring-1 ring-border hover:bg-secondary transition-all cursor-pointer shadow-xs active:scale-98"
-                      >
-                        {copiedCode ? (
-                          <>
-                            <Check className="size-3.5 sm:size-4 text-tealdeep shrink-0" />
-                            <span className="truncate">Copied!</span>
-                          </>
-                        ) : (
-                          <>
-                            <Copy className="size-3.5 sm:size-4 text-primary shrink-0" />
-                            <span className="truncate">Code</span>
-                          </>
-                        )}
-                      </button>
-
-                      <a
-                        href={`https://api.whatsapp.com/send?text=${whatsappMessage}`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="inline-flex items-center justify-center gap-1 sm:gap-1.5 rounded-xl bg-[#25D366] hover:bg-[#20ba5a] text-white px-2.5 sm:px-3.5 py-2.5 text-xs sm:text-sm font-semibold transition-all shadow-xs hover:shadow-md active:scale-98"
-                      >
-                        <WhatsAppIcon className="size-3.5 sm:size-4 shrink-0" />
-                        <span className="truncate">WhatsApp</span>
-                      </a>
-                    </div>
-                  </div>
-                </div>
-              ) : (
-                /* Locked state — draft, trial, or expired */
-                <div className="mt-5 sm:mt-6 rounded-2xl border border-dashed border-primary/30 bg-primary/5 p-5 sm:p-6 text-center">
-                  <div className="inline-flex items-center justify-center size-11 rounded-full bg-primary/10 border border-primary/20 mb-2.5">
-                    <AlertCircle className="size-5 text-primary" />
-                  </div>
-                  <h3 className="text-sm font-bold text-foreground">
-                    {isDraft
-                      ? "Referral Code Locked — Profile Incomplete"
-                      : isTrial && subActive
-                        ? "Referral Code Unlocks on Paid Plans ⚡"
-                        : "Referral Code Inactive — Renew to Reactivate"}
-                  </h3>
-                  <p className="text-xs text-muted-foreground mt-1 max-w-sm mx-auto">
-                    {isDraft
-                      ? "Referral codes and links are only available on active paid membership plans. Complete your profile setup to get started!"
-                      : isTrial && subActive
-                        ? "You are currently on the 3-day free trial. Upgrade to any paid plan to unlock your unique referral link and start earning +7 extra days for every friend!"
-                        : "Your subscription has expired. Renew any plan to reactivate your referral link and continue earning +7 extra days!"}
-                  </p>
-                  <Link
-                    to={isDraft ? "/creator/register" : "/creator/plans"}
-                    className="inline-flex items-center gap-1.5 mt-3.5 rounded-xl bg-primary text-primary-foreground px-4 py-2 text-xs font-semibold hover:bg-primary/90 transition-all shadow-xs"
-                  >
-                    <span>
-                      {isDraft
-                        ? "Complete Profile Setup"
-                        : isTrial && subActive
-                          ? "Upgrade to Unlock Referral Code"
-                          : "Renew Plan"}
-                    </span>
-                    <ArrowUpRight className="size-3.5 shrink-0" />
-                  </Link>
-                </div>
-              )}
-
-              {/* CONNECT INVITATION CODE (If this creator was invited but didn't enter code at registration) */}
+              {/* 5. CONNECT INVITATION CODE (If this creator was invited but didn't enter code at registration) */}
               {!mine?.referredBy ? (
-                <div className="mt-5 rounded-2xl bg-secondary/40 border border-border/80 p-4 sm:p-5">
+                <div className="rounded-2xl bg-secondary/40 border border-border/80 p-4 sm:p-5">
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3">
                     <div>
                       <h4 className="text-sm font-semibold text-foreground flex items-center gap-1.5">
@@ -1674,7 +1648,7 @@ function Dashboard() {
                         <span>Invited by a fellow creator?</span>
                       </h4>
                       <p className="text-xs text-muted-foreground mt-0.5">
-                        Enter their referral code here so they automatically receive +7 bonus subscription days when you upgrade.
+                        Enter their referral code here so they automatically receive rewards when you upgrade.
                       </p>
                     </div>
 
@@ -1712,22 +1686,20 @@ function Dashboard() {
                 </div>
               ) : null}
 
-              {/* ── UNIFIED REFERRAL ACTIVITY & REWARDS ── */}
-              <div className="mt-7 sm:mt-8">
+              {/* 6. UNIFIED REFERRAL ACTIVITY LOG */}
+              <div className="pt-2">
                 <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-1.5 mb-3">
                   <div className="flex items-center gap-2">
                     <History className="size-4 text-primary shrink-0" />
                     <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground">
-                      {isSpecialActive ? "Referral Activity, Cash & Bonus Days" : "Referral Activity & Bonus Days"}
+                      Referral Activity
                     </h3>
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
                       {referredCreators.length} invited
                     </span>
                   </div>
                   <span className="text-[11px] text-muted-foreground">
-                    {isSpecialActive
-                      ? "Track creator signups, cash commission earnings, and bonus days extensions"
-                      : "Track creator signups and earned +7 days bonus milestones"}
+                    Track creator signups and rewards earned through your referral code.
                   </span>
                 </div>
 
