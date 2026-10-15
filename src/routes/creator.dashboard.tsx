@@ -143,6 +143,7 @@ function Dashboard() {
   const [applyAccountHolder, setApplyAccountHolder] = useState("");
   const [applyAccountNumber, setApplyAccountNumber] = useState("");
   const [applyBankName, setApplyBankName] = useState("");
+  const [applyBranchName, setApplyBranchName] = useState("");
   const [applyIfsc, setApplyIfsc] = useState("");
   const [applyingSpecial, setApplyingSpecial] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
@@ -477,6 +478,7 @@ function Dashboard() {
     setApplyAccountHolder(p?.accountHolderName || mine?.name || mine?.displayName || "");
     setApplyAccountNumber(p?.accountNumber || "");
     setApplyBankName(p?.bankName || "");
+    setApplyBranchName(p?.branchName || "");
     setApplyIfsc(p?.ifscCode || "");
     setApplyError(null);
     setShowApplyModal(true);
@@ -494,9 +496,10 @@ function Dashboard() {
       !applyAccountHolder.trim() ||
       !applyAccountNumber.trim() ||
       !applyBankName.trim() ||
+      !applyBranchName.trim() ||
       !applyIfsc.trim()
     ) {
-      setApplyError("Please fill in all bank account details.");
+      setApplyError("Please fill in all bank account details (including Branch Name).");
       return;
     }
 
@@ -506,6 +509,7 @@ function Dashboard() {
       accountHolderName: applyAccountHolder.trim(),
       accountNumber: applyAccountNumber.trim(),
       bankName: applyBankName.trim(),
+      branchName: applyBranchName.trim(),
       ifscCode: applyIfsc.trim().toUpperCase(),
     });
     setApplyingSpecial(false);
@@ -1449,7 +1453,7 @@ function Dashboard() {
                             <p>• <strong>SLA:</strong> Deposited directly to your account within 7–10 working days.</p>
                             <p>• <strong>Frequency:</strong> Max 2 withdrawal requests per calendar month ({monthlyWithdrawalCount}/2 used).</p>
                             <p>
-                              • <strong>Payout to:</strong> UPI (<strong>{specialProg?.payoutDetails?.upiId}</strong>) • {specialProg?.payoutDetails?.bankName} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})
+                              • <strong>Payout to:</strong> UPI (<strong>{specialProg?.payoutDetails?.upiId}</strong>) • {specialProg?.payoutDetails?.bankName}{specialProg?.payoutDetails?.branchName ? ` (${specialProg.payoutDetails.branchName})` : ""} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})
                             </p>
                           </div>
                         )}
@@ -2641,7 +2645,7 @@ function Dashboard() {
                 </p>
 
                 <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
-                  <div>
+                  <div className="sm:col-span-2">
                     <label className="block text-[11px] font-medium text-muted-foreground mb-1">
                       Account Holder Name <span className="text-rose-500">*</span>
                     </label>
@@ -2668,9 +2672,21 @@ function Dashboard() {
                       className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
                     />
                   </div>
-                </div>
 
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                  <div>
+                    <label className="block text-[11px] font-medium text-muted-foreground mb-1">
+                      Branch Name <span className="text-rose-500">*</span>
+                    </label>
+                    <input
+                      type="text"
+                      required
+                      placeholder="e.g. Indiranagar, Connaught Place"
+                      value={applyBranchName}
+                      onChange={(e) => setApplyBranchName(e.target.value)}
+                      className="w-full rounded-xl border border-input bg-background px-3 py-2 text-xs text-foreground focus:outline-none focus:ring-2 focus:ring-primary/40"
+                    />
+                  </div>
+
                   <div>
                     <label className="block text-[11px] font-medium text-muted-foreground mb-1">
                       Account Number <span className="text-rose-500">*</span>
@@ -2827,7 +2843,7 @@ function Dashboard() {
                 </span>
                 <div className="font-mono text-[11px] text-muted-foreground space-y-0.5 pt-1">
                   <p>UPI: <strong className="text-foreground">{specialProg?.payoutDetails?.upiId}</strong></p>
-                  <p>Bank: <strong className="text-foreground">{specialProg?.payoutDetails?.bankName} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})</strong></p>
+                  <p>Bank: <strong className="text-foreground">{specialProg?.payoutDetails?.bankName}{specialProg?.payoutDetails?.branchName ? ` (${specialProg.payoutDetails.branchName})` : ""} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})</strong></p>
                   <p>Holder: <strong className="text-foreground">{specialProg?.payoutDetails?.accountHolderName}</strong></p>
                 </div>
               </div>

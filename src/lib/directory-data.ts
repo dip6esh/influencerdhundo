@@ -522,6 +522,7 @@ export interface PayoutDetails {
   accountNumber: string;
   bankAccountNumber?: string | undefined; // alias for accountNumber
   bankName: string;
+  branchName?: string | undefined;
   ifscCode: string;
 }
 

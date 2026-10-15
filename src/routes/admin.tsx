@@ -5108,7 +5108,7 @@ function AdminDashboard() {
                                         <div>
                                           <span className="text-muted-foreground">Bank:</span>{" "}
                                           <span className="text-foreground">
-                                            {p?.bankName} ({p?.accountNumber})
+                                            {p?.bankName}{p?.branchName ? ` (${p.branchName})` : ""} ({p?.accountNumber})
                                           </span>
                                         </div>
                                         <div className="text-[10px] text-muted-foreground">
