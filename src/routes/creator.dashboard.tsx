@@ -1647,14 +1647,16 @@ function Dashboard() {
                   <div className="flex items-center gap-2">
                     <History className="size-4 text-primary shrink-0" />
                     <h3 className="text-xs sm:text-sm font-bold uppercase tracking-wider text-foreground">
-                      Referral Activity &amp; Bonus Days
+                      {isSpecialActive ? "Referral Activity & Cash Earnings" : "Referral Activity & Bonus Days"}
                     </h3>
                     <span className="rounded-full bg-secondary px-2 py-0.5 text-xs text-muted-foreground font-mono">
                       {referredCreators.length} invited
                     </span>
                   </div>
                   <span className="text-[11px] text-muted-foreground">
-                    Track creator signups and earned +7 days bonus milestones
+                    {isSpecialActive
+                      ? "Track creator signups and cash commission earnings per referral"
+                      : "Track creator signups and earned +7 days bonus milestones"}
                   </span>
                 </div>
 
