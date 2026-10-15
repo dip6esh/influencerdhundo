@@ -342,8 +342,33 @@ function Dashboard() {
   ).length;
 
   const isSpecialActiveCreator = mine?.specialReferralProgram?.status === "active";
+
+  // Filter paid referrals that were rewarded as bonus days (excluding cash-rewarded referrals)
+  const paidDaysReferredCount = referredCreators.filter((c) => {
+    const isPaid = subscriptions.some(
+      (s) =>
+        s.creatorId === c.id &&
+        s.planId !== "trial-3d" &&
+        !s.isTrial &&
+        (s.price ?? 0) > 0,
+    );
+    if (!isPaid) return false;
+
+    // Check if this referral earned cash commission
+    const event = referralEvents.find((ev) => ev.referredCreatorId === c.id);
+    if (event && ((event.cashDelta ?? 0) > 0 || event.eventType === "cash_earned")) {
+      return false;
+    }
+    // If the creator is currently in special cash mode and there is no event granting days
+    if (isSpecialActiveCreator && (!event || (event.daysDelta ?? 0) === 0)) {
+      return false;
+    }
+
+    return true;
+  }).length;
+
   const totalBonusDaysEarned = referralEvents.reduce((acc, ev) => acc + (ev.daysDelta || 0), 0);
-  const totalBonusDaysFromReferrals = paidReferredCount * 7;
+  const totalBonusDaysFromReferrals = paidDaysReferredCount * 7;
   const netBonusDays = Math.max(
     0,
     mine?.referralBonusDays && mine.referralBonusDays > 0 ? mine.referralBonusDays : 0,
