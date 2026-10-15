@@ -2554,7 +2554,7 @@ function Dashboard() {
           <div className="relative w-full max-w-lg rounded-3xl bg-background border border-border p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
-                <div className="size-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <div className="size-10 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center">
                   <Wallet className="size-5" />
                 </div>
                 <div>
@@ -2576,9 +2576,9 @@ function Dashboard() {
             </div>
 
             <form onSubmit={handleApplySpecial} className="space-y-4">
-              <div className="rounded-xl bg-accent/10 border border-accent/25 p-3 text-xs space-y-1">
-                <p className="font-semibold text-tealdeep flex items-center gap-1.5">
-                  <Sparkles className="size-3.5" />
+              <div className="rounded-xl bg-secondary/60 border border-border/80 p-3 text-xs space-y-1">
+                <p className="font-semibold text-foreground flex items-center gap-1.5">
+                  <Sparkles className="size-3.5 text-saffrondeep" />
                   How Cash Referrals Work
                 </p>
                 <p className="text-muted-foreground">
@@ -2691,7 +2691,7 @@ function Dashboard() {
                 <Button
                   type="submit"
                   disabled={applyingSpecial}
-                  className="rounded-xl bg-gradient-to-r from-emerald-600 to-teal-600 hover:from-emerald-700 hover:to-teal-700 text-white text-xs font-bold px-5 py-2"
+                  className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold px-5 py-2 shadow-xs"
                 >
                   {applyingSpecial ? (
                     <>
@@ -2718,7 +2718,7 @@ function Dashboard() {
           <div className="relative w-full max-w-md rounded-3xl bg-background border border-border p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
-                <div className="size-10 rounded-xl bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 flex items-center justify-center">
+                <div className="size-10 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center">
                   <IndianRupee className="size-5" />
                 </div>
                 <div>
@@ -2726,7 +2726,7 @@ function Dashboard() {
                     Request Cash Payout 💳
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Available balance: <strong className="text-emerald-600 dark:text-emerald-400">₹{walletBalance}</strong>
+                    Available balance: <strong className="text-saffrondeep font-bold">₹{walletBalance}</strong>
                   </p>
                 </div>
               </div>
@@ -2748,8 +2748,8 @@ function Dashboard() {
               )}
 
               {withdrawSuccess && (
-                <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-3 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2">
-                  <Check className="size-4 shrink-0" />
+                <div className="rounded-xl bg-primary/10 border border-primary/20 p-3 text-xs text-foreground font-medium flex items-center gap-2">
+                  <Check className="size-4 shrink-0 text-saffrondeep" />
                   <span>{withdrawSuccess}</span>
                 </div>
               )}
@@ -2785,7 +2785,7 @@ function Dashboard() {
                     <button
                       type="button"
                       onClick={() => setWithdrawAmount(walletBalance)}
-                      className="text-emerald-600 dark:text-emerald-400 hover:underline font-semibold cursor-pointer"
+                      className="text-saffrondeep hover:underline font-semibold cursor-pointer"
                     >
                       Max (₹{walletBalance})
                     </button>
@@ -2825,7 +2825,7 @@ function Dashboard() {
                 <Button
                   type="submit"
                   disabled={submittingWithdrawal || withdrawAmount < 200 || withdrawAmount > walletBalance || Boolean(withdrawSuccess)}
-                  className="rounded-xl bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-bold px-5 py-2 disabled:opacity-50"
+                  className="rounded-xl bg-primary hover:bg-primary/90 text-primary-foreground text-xs font-bold px-5 py-2 disabled:opacity-50 shadow-xs"
                 >
                   {submittingWithdrawal ? (
                     <>
