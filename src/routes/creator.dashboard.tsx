@@ -1388,23 +1388,13 @@ function Dashboard() {
                   </div>
                 ) : (
                   <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                      <div className="size-10 rounded-xl bg-primary/15 text-primary flex items-center justify-center shrink-0 mt-0.5">
-                        <Sparkles className="size-5 text-saffrondeep" />
-                      </div>
-                      <div>
-                        <div className="flex items-center gap-2">
-                          <h3 className="font-display font-bold text-base text-foreground">
-                            Earn Real Cash with Special Referral Program 💸
-                          </h3>
-                          <span className="inline-flex items-center gap-1 rounded-full bg-accent/20 px-2.5 py-0.5 text-[11px] font-bold text-tealdeep border border-accent/40">
-                            Available Now
-                          </span>
-                        </div>
-                        <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
-                          Want to earn money instead of subscription days? Apply now with your UPI &amp; Bank details to earn up to <strong>₹100 real cash commission</strong> per paying referral, withdrawable directly to your account (min. ₹200).
-                        </p>
-                      </div>
+                    <div>
+                      <h3 className="font-display font-bold text-base text-foreground">
+                        Earn Real Cash with Special Referral Program 💸
+                      </h3>
+                      <p className="text-xs text-muted-foreground mt-1 max-w-2xl">
+                        Want to earn money instead of subscription days? Apply now with your UPI &amp; Bank details to earn up to <strong>₹100 real cash commission</strong> per paying referral, withdrawable directly to your account (min. ₹200).
+                      </p>
                     </div>
                     <Button
                       onClick={handleOpenApplyModal}
