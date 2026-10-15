@@ -1567,7 +1567,7 @@ function Dashboard() {
                       {isReferralUnlocked ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-foreground border border-border/80">
                           <Sparkles className="size-3 text-primary" />
-                          +7 Days / Referral
+                          +7days
                         </span>
                       ) : (
                         <span className="inline-flex items-center gap-1 rounded-full bg-secondary px-2.5 py-0.5 text-[11px] font-bold text-muted-foreground border border-border/80">
