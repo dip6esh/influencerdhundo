@@ -146,6 +146,7 @@ function Dashboard() {
   const [applyIfsc, setApplyIfsc] = useState("");
   const [applyingSpecial, setApplyingSpecial] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [showApplyHowItWorks, setShowApplyHowItWorks] = useState(false);
 
   // Withdrawal states
   const [showWithdrawModal, setShowWithdrawModal] = useState(false);
@@ -2547,18 +2548,22 @@ function Dashboard() {
       {/* ── APPLY FOR SPECIAL REFERRAL PROGRAM MODAL ── */}
       {showApplyModal && mine && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 bg-background/80 backdrop-blur-md overflow-y-auto py-6 sm:py-8 overscroll-contain"
           role="dialog"
           aria-modal="true"
+          onClick={() => setShowApplyModal(false)}
         >
-          <div className="relative w-full max-w-lg rounded-3xl bg-background border border-border p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="relative w-full max-w-lg my-auto rounded-2xl sm:rounded-3xl bg-background border border-border p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
-                <div className="size-10 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center">
+                <div className="size-10 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center shrink-0">
                   <Wallet className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-display font-bold text-foreground">
+                  <h3 className="text-base sm:text-lg font-display font-bold text-foreground">
                     Apply for Special Referral Program 💸
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -2569,21 +2574,38 @@ function Dashboard() {
               <button
                 type="button"
                 onClick={() => setShowApplyModal(false)}
-                className="size-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                className="size-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
               >
                 <X className="size-4" />
               </button>
             </div>
 
-            <form onSubmit={handleApplySpecial} className="space-y-4">
-              <div className="rounded-xl bg-secondary/60 border border-border/80 p-3 text-xs space-y-1">
-                <p className="font-semibold text-foreground flex items-center gap-1.5">
-                  <Sparkles className="size-3.5 text-saffrondeep" />
-                  How Cash Referrals Work
-                </p>
-                <p className="text-muted-foreground">
-                  Earn <strong>10% cash commission</strong> on the net amount paid by each referred creator on their first paid plan. When your application is approved, extra subscription days will be paused and all earnings will go directly to your cash wallet (minimum withdrawal ₹200). Subsequent plan renewals do not grant additional rewards.
-                </p>
+            <form onSubmit={handleApplySpecial} className="space-y-3.5 sm:space-y-4">
+              {/* Collapsible How Cash Referrals Work Box */}
+              <div className="rounded-xl bg-secondary/60 border border-border/80 overflow-hidden text-xs transition-all">
+                <button
+                  type="button"
+                  onClick={() => setShowApplyHowItWorks(!showApplyHowItWorks)}
+                  className="w-full flex items-center justify-between p-3 text-left font-semibold text-foreground hover:bg-secondary/40 transition-colors cursor-pointer"
+                >
+                  <span className="flex items-center gap-1.5">
+                    <Sparkles className="size-3.5 text-saffrondeep" />
+                    <span>How Cash Referrals Work</span>
+                  </span>
+                  <ChevronDown
+                    className={`size-3.5 text-muted-foreground transition-transform duration-200 ${
+                      showApplyHowItWorks ? "rotate-180" : ""
+                    }`}
+                  />
+                </button>
+
+                {showApplyHowItWorks && (
+                  <div className="px-3 pb-3 pt-0 text-muted-foreground leading-relaxed animate-in fade-in duration-150">
+                    <p>
+                      Earn <strong>10% cash commission</strong> on the net amount paid by each referred creator on their first paid plan. When your application is approved, extra subscription days will be paused and all earnings will go directly to your cash wallet (minimum withdrawal ₹200). Subsequent plan renewals do not grant additional rewards.
+                    </p>
+                  </div>
+                )}
               </div>
 
               {applyError && (
@@ -2711,18 +2733,22 @@ function Dashboard() {
       {/* ── REQUEST CASH WITHDRAWAL MODAL ── */}
       {showWithdrawModal && mine && (
         <div
-          className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-background/80 backdrop-blur-md overflow-y-auto"
+          className="fixed inset-0 z-50 flex items-start sm:items-center justify-center p-3 sm:p-4 bg-background/80 backdrop-blur-md overflow-y-auto py-6 sm:py-8 overscroll-contain"
           role="dialog"
           aria-modal="true"
+          onClick={() => setShowWithdrawModal(false)}
         >
-          <div className="relative w-full max-w-md rounded-3xl bg-background border border-border p-6 shadow-2xl space-y-5 animate-in fade-in zoom-in-95 duration-200">
+          <div
+            className="relative w-full max-w-md my-auto rounded-2xl sm:rounded-3xl bg-background border border-border p-4 sm:p-6 shadow-2xl space-y-4 sm:space-y-5 animate-in fade-in zoom-in-95 duration-200"
+            onClick={(e) => e.stopPropagation()}
+          >
             <div className="flex items-center justify-between pb-3 border-b border-border">
               <div className="flex items-center gap-2.5">
-                <div className="size-10 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center">
+                <div className="size-10 rounded-xl bg-primary/15 text-saffrondeep flex items-center justify-center shrink-0">
                   <IndianRupee className="size-5" />
                 </div>
                 <div>
-                  <h3 className="text-lg font-display font-bold text-foreground">
+                  <h3 className="text-base sm:text-lg font-display font-bold text-foreground">
                     Request Cash Payout 💳
                   </h3>
                   <p className="text-xs text-muted-foreground">
@@ -2733,7 +2759,7 @@ function Dashboard() {
               <button
                 type="button"
                 onClick={() => setShowWithdrawModal(false)}
-                className="size-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer"
+                className="size-8 rounded-full bg-secondary hover:bg-secondary/80 flex items-center justify-center text-muted-foreground hover:text-foreground cursor-pointer shrink-0"
               >
                 <X className="size-4" />
               </button>
