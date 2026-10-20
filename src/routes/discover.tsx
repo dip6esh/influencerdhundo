@@ -14,6 +14,17 @@ import { Slider } from "@/components/ui/slider";
 import { cn } from "@/lib/utils";
 import { useAppState } from "@/lib/app-state";
 import {
+  ArrowUpDown,
+  Clock,
+  MapPin,
+  RotateCcw,
+  SlidersHorizontal,
+  Sparkles,
+  User,
+  Users,
+  Zap,
+} from "lucide-react";
+import {
   CATEGORIES,
   CITIES,
   COLLAB_TYPES,
@@ -59,17 +70,19 @@ export const Route = createFileRoute("/discover")({
 });
 
 const SORT_OPTIONS: { label: string; value: SortOptionValue }[] = [
-  { label: "Default (Best Match)", value: "default" },
-  { label: "Followers: High to Low", value: "followers-desc" },
-  { label: "Followers: Low to High (Nano/Micro)", value: "followers-asc" },
-  { label: "Price: Low to High (Budget-Friendly)", value: "price-asc" },
-  { label: "Price: High to Low", value: "price-desc" },
+  { label: "🎯 Best Match (Default)", value: "default" },
+  { label: "💰 Best Value", value: "value" },
+  { label: "🏷️ Price: Low to High", value: "price-asc" },
+  { label: "💎 Price: High to Low", value: "price-desc" },
+  { label: "📈 Followers: High to Low", value: "followers-desc" },
+  { label: "🤝 Nano & Micro First", value: "followers-asc" },
   { label: "⚡ Fastest Delivery", value: "turnaround-asc" },
-  { label: "✨ Newest Creators", value: "newest" },
+  { label: "✨ Newly Joined", value: "newest" },
 ];
 
 type SortOptionValue =
   | "default"
+  | "value"
   | "followers-desc"
   | "followers-asc"
   | "price-asc"
@@ -92,6 +105,7 @@ function Discover() {
   const [showMore, setShowMore] = useState(() => {
     return (
       Boolean(filters.locality) ||
+      Boolean(filters.gender) ||
       Boolean(filters.language) ||
       Boolean(filters.travel) ||
       Boolean(filters.products)
@@ -121,15 +135,7 @@ function Discover() {
     }, 60);
   };
 
-  const [sortBy, setSortBy] = useState<
-    | "default"
-    | "followers-desc"
-    | "followers-asc"
-    | "price-asc"
-    | "price-desc"
-    | "turnaround-asc"
-    | "newest"
-  >("default");
+  const [sortBy, setSortBy] = useState<SortOptionValue>("default");
 
   const results = useMemo(() => {
     if (!discoverHasSearched) return null;
@@ -141,6 +147,16 @@ function Discover() {
     const list = [...results];
 
     switch (sortBy) {
+      case "value": {
+        // High audience reach relative to starting collaboration price
+        return list.sort((a, b) => {
+          const priceA = a.startingPrice && a.startingPrice > 0 ? a.startingPrice : 1;
+          const priceB = b.startingPrice && b.startingPrice > 0 ? b.startingPrice : 1;
+          const valueA = (a.followers || 0) / priceA;
+          const valueB = (b.followers || 0) / priceB;
+          return valueB - valueA;
+        });
+      }
       case "followers-desc":
         return list.sort((a, b) => (b.followers || 0) - (a.followers || 0));
       case "followers-asc":
@@ -153,10 +169,11 @@ function Discover() {
         const getTurnaroundWeight = (t?: string) => {
           if (!t) return 99;
           const lower = t.toLowerCase();
-          if (lower.includes("1–2 day") || lower.includes("1-2 day") || lower.includes("24 hour")) return 1;
+          if (lower.includes("same day") || lower.includes("24 hour")) return 0;
+          if (lower.includes("1–2 day") || lower.includes("1-2 day")) return 1;
           if (lower.includes("3–5 day") || lower.includes("3-5 day")) return 2;
           if (lower.includes("5–7 day") || lower.includes("5-7 day")) return 3;
-          if (lower.includes("1–2 week") || lower.includes("1-2 week") || lower.includes("week")) return 4;
+          if (lower.includes("1–2 week") || lower.includes("1-2 week") || lower.includes("week") || lower.includes("7+")) return 4;
           return 5;
         };
         return list.sort((a, b) => getTurnaroundWeight(a.turnaround) - getTurnaroundWeight(b.turnaround));
@@ -169,10 +186,22 @@ function Discover() {
         });
       }
       case "default":
-      default:
-        return list;
+      default: {
+        return list.sort((a, b) => {
+          if (a.featured && !b.featured) return -1;
+          if (!a.featured && b.featured) return 1;
+          if (filters.locality && filters.locality.trim()) {
+            const query = filters.locality.trim().toLowerCase();
+            const aLoc = (a.locality || "").toLowerCase().includes(query);
+            const bLoc = (b.locality || "").toLowerCase().includes(query);
+            if (aLoc && !bLoc) return -1;
+            if (!aLoc && bLoc) return 1;
+          }
+          return (b.followers || 0) - (a.followers || 0);
+        });
+      }
     }
-  }, [results, sortBy]);
+  }, [results, sortBy, filters.locality]);
 
   const hasActiveFilters =
     Boolean(filters.city) ||
@@ -185,6 +214,8 @@ function Discover() {
     (!isBarter && (filters.budgetRange[0] > 0 || filters.budgetRange[1] < 100000)) ||
     filters.contentTypes.length > 0 ||
     Boolean(filters.collabType) ||
+    Boolean(filters.gender) ||
+    Boolean(filters.fastTurnaround) ||
     Boolean(filters.language) ||
     Boolean(filters.travel) ||
     Boolean(filters.products);
@@ -413,17 +444,28 @@ function Discover() {
                   </div>
                 </div>
 
-                {/* ADVANCED / MORE FILTERS (CLEAN 2-COLUMN GRID) */}
+                {/* ADVANCED / MORE FILTERS (CLEAN GRID) */}
                 {showMore && (
                   <div className="space-y-5 border-t border-border pt-6 animate-in fade-in duration-200">
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                      <Field label="Area">
+                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                      <Field label="Area / Locality">
                         <TextInput
                           placeholder="e.g. Thane West, Bandra, Indiranagar"
                           value={filters.locality}
                           onChange={(e) =>
                             setFilters({ ...filters, locality: e.target.value })
                           }
+                        />
+                      </Field>
+
+                      <Field label="Creator Gender">
+                        <DropdownSelect
+                          value={filters.gender || ""}
+                          onChange={(val) =>
+                            setFilters({ ...filters, gender: val })
+                          }
+                          placeholder="Any gender"
+                          options={["Female", "Male", "Non-binary / Other"]}
                         />
                       </Field>
 
@@ -478,7 +520,9 @@ function Discover() {
                   className="w-full text-xs font-medium cursor-pointer"
                   onClick={() => setShowMore((s) => !s)}
                 >
-                  {showMore ? "▲ Fewer filters" : "▼ More filters (Area, Language, Travel, Products)"}
+                  {showMore
+                    ? "▲ Fewer filters"
+                    : "▼ More filters (Area, Gender, Language, Travel, Products)"}
                 </Button>
               </div>
 
@@ -517,49 +561,290 @@ function Discover() {
             </p>
           </div>
         ) : (
-          <div>
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 border-b border-border pb-4">
-              <p className="text-sm font-medium text-foreground">
-                <span className="font-semibold text-saffrondeep">{sortedResults.length}</span> creator
-                {sortedResults.length === 1 ? "" : "s"} found
-                {filters.city ? ` in ${filters.city}` : ""}
-                {filters.pincode ? ` (${filters.pincode})` : ""}
-                {filters.category
-                  ? ` • ${filters.category === "Other" && filters.otherCategory ? filters.otherCategory : filters.category}`
-                  : ""}
-                {filters.collabType ? ` • ${filters.collabType}` : ""}
-              </p>
+          <div className="space-y-6">
+            {/* STICKY RESULTS CONTROL BAR */}
+            <div className="sticky top-[58px] z-20 rounded-2xl p-3.5 sm:p-4 border border-border bg-card/90 backdrop-blur-xl shadow-md transition-all">
+              {/* Top Row: Count, Context Badges & Sort Dropdown */}
+              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-border/60">
+                <div className="flex flex-wrap items-center gap-2">
+                  {/* Brand Palette Beacon & Count */}
+                  <div className="flex items-center gap-2 bg-secondary text-foreground px-3 py-1 rounded-full border border-border">
+                    <span className="size-2 rounded-full bg-saffrondeep animate-pulse" />
+                    <span className="text-xs font-medium">
+                      <strong className="text-saffrondeep font-bold text-sm">
+                        {sortedResults.length}
+                      </strong>{" "}
+                      {sortedResults.length === 1 ? "Creator" : "Creators"} Found
+                    </span>
+                  </div>
 
-              <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
-                <span className="text-xs font-semibold text-muted-foreground whitespace-nowrap">Sort by:</span>
-                <div className="w-full sm:w-64">
-                  <DropdownSelect
-                    value={sortBy}
-                    onChange={(val) => setSortBy(val as SortOptionValue)}
-                    options={SORT_OPTIONS}
-                    searchable={false}
-                    className="py-2 px-3.5 text-xs rounded-xl bg-background ring-1 ring-border shadow-2xs hover:ring-foreground/30 focus:ring-2 focus:ring-primary"
-                  />
+                  {/* Context Badge: City */}
+                  {filters.city && (
+                    <span className="inline-flex items-center gap-1 bg-secondary text-foreground px-2.5 py-1 rounded-full text-xs font-medium border border-border">
+                      <MapPin className="size-3 text-saffrondeep" />
+                      {filters.city}
+                    </span>
+                  )}
+
+                  {/* Context Badge: Category */}
+                  {filters.category && (
+                    <span className="inline-flex items-center gap-1 bg-secondary text-foreground px-2.5 py-1 rounded-full text-xs font-medium border border-border">
+                      <Sparkles className="size-3 text-saffrondeep" />
+                      {filters.category === "Other" && filters.otherCategory
+                        ? filters.otherCategory
+                        : filters.category}
+                    </span>
+                  )}
+
+                  {/* Context Badge: Pincode */}
+                  {filters.pincode && (
+                    <span className="inline-flex items-center text-[11px] font-mono text-muted-foreground bg-secondary/80 px-2 py-0.5 rounded-md border border-border">
+                      PIN: {filters.pincode}
+                    </span>
+                  )}
+                </div>
+
+                {/* Sort Selector */}
+                <div className="flex items-center gap-2 shrink-0 w-full sm:w-auto">
+                  <div className="inline-flex items-center gap-1.5 text-xs font-semibold text-muted-foreground whitespace-nowrap">
+                    <ArrowUpDown className="size-3.5 text-saffrondeep" />
+                    <span>Sort:</span>
+                  </div>
+                  <div className="w-full sm:w-56">
+                    <DropdownSelect
+                      value={sortBy}
+                      onChange={(val) => setSortBy(val as SortOptionValue)}
+                      options={SORT_OPTIONS}
+                      searchable={false}
+                      className="py-1.5 px-3 text-xs font-medium rounded-xl bg-background text-foreground ring-1 ring-border shadow-2xs hover:ring-foreground/30 focus:ring-2 focus:ring-primary"
+                    />
+                  </div>
+                </div>
+              </div>
+
+              {/* Quick Filters Row */}
+              <div className="pt-2.5">
+                <div className="flex items-center justify-between gap-2 mb-2">
+                  <div className="flex items-center gap-1.5">
+                    <SlidersHorizontal className="size-3.5 text-saffrondeep" />
+                    <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                      Quick Filters
+                    </span>
+                    {(filters.collabType === "Barter" ||
+                      filters.gender === "Female" ||
+                      filters.gender === "Male" ||
+                      filters.travel === "Travels for collaborations" ||
+                      filters.fastTurnaround ||
+                      (filters.followerRange[1] <= 25000 && filters.followerRange[1] < 300000)) && (
+                      <span className="ml-1 rounded-full bg-primary/15 text-saffrondeep px-2 py-0.5 text-[10px] font-bold">
+                        {[
+                          filters.collabType === "Barter",
+                          filters.gender === "Female",
+                          filters.gender === "Male",
+                          filters.travel === "Travels for collaborations",
+                          filters.fastTurnaround,
+                          filters.followerRange[1] <= 25000 && filters.followerRange[1] < 300000,
+                        ].filter(Boolean).length}{" "}
+                        active
+                      </span>
+                    )}
+                  </div>
+
+                  {(filters.collabType === "Barter" ||
+                    filters.gender === "Female" ||
+                    filters.gender === "Male" ||
+                    filters.travel === "Travels for collaborations" ||
+                    filters.fastTurnaround ||
+                    (filters.followerRange[1] <= 25000 && filters.followerRange[1] < 300000)) && (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setFilters((f) => ({
+                          ...f,
+                          collabType: f.collabType === "Barter" ? "" : f.collabType,
+                          gender: "",
+                          travel: f.travel === "Travels for collaborations" ? "" : f.travel,
+                          fastTurnaround: false,
+                          followerRange:
+                            f.followerRange[1] <= 25000 ? [500, 300000] : f.followerRange,
+                        }));
+                      }}
+                      className="inline-flex items-center gap-1 text-[11px] font-medium text-muted-foreground hover:text-foreground transition-colors cursor-pointer"
+                    >
+                      <RotateCcw className="size-3" />
+                      <span>Reset</span>
+                    </button>
+                  )}
+                </div>
+
+                <div className="flex items-center gap-1.5 sm:gap-2 overflow-x-auto pb-1 sm:pb-0 sm:flex-wrap">
+                  {/* 1. Barter (Free) */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({
+                        ...f,
+                        collabType: f.collabType === "Barter" ? "" : "Barter",
+                      }));
+                    }}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                      filters.collabType === "Barter"
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs ring-1 ring-primary"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/60 hover:border-foreground/20",
+                    )}
+                  >
+                    <Zap className="size-3.5" />
+                    <span>Barter (Free)</span>
+                  </button>
+
+                  {/* 2. Female */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({
+                        ...f,
+                        gender: f.gender === "Female" ? "" : "Female",
+                      }));
+                    }}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                      filters.gender === "Female"
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs ring-1 ring-primary"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/60 hover:border-foreground/20",
+                    )}
+                  >
+                    <User className="size-3.5" />
+                    <span>Female</span>
+                  </button>
+
+                  {/* 3. Male */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({
+                        ...f,
+                        gender: f.gender === "Male" ? "" : "Male",
+                      }));
+                    }}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                      filters.gender === "Male"
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs ring-1 ring-primary"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/60 hover:border-foreground/20",
+                    )}
+                  >
+                    <User className="size-3.5" />
+                    <span>Male</span>
+                  </button>
+
+                  {/* 4. Visits Venue */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({
+                        ...f,
+                        travel:
+                          f.travel === "Travels for collaborations"
+                            ? ""
+                            : "Travels for collaborations",
+                      }));
+                    }}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                      filters.travel === "Travels for collaborations"
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs ring-1 ring-primary"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/60 hover:border-foreground/20",
+                    )}
+                  >
+                    <MapPin className="size-3.5" />
+                    <span>Visits Venue</span>
+                  </button>
+
+                  {/* 5. Fast Delivery <= 2 days */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setFilters((f) => ({
+                        ...f,
+                        fastTurnaround: !f.fastTurnaround,
+                      }));
+                    }}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                      filters.fastTurnaround
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs ring-1 ring-primary"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/60 hover:border-foreground/20",
+                    )}
+                  >
+                    <Clock className="size-3.5" />
+                    <span>≤ 2 Days Delivery</span>
+                  </button>
+
+                  {/* 6. Nano Creators < 25k */}
+                  <button
+                    type="button"
+                    onClick={() => {
+                      const isNano = filters.followerRange[1] <= 25000;
+                      setFilters((f) => ({
+                        ...f,
+                        followerRange: isNano ? [500, 300000] : [500, 25000],
+                      }));
+                    }}
+                    className={cn(
+                      "shrink-0 inline-flex items-center gap-1.5 px-3 py-1.5 rounded-full text-xs font-medium border transition-all cursor-pointer",
+                      filters.followerRange[1] <= 25000 && filters.followerRange[1] < 300000
+                        ? "bg-primary text-primary-foreground border-primary font-semibold shadow-xs ring-1 ring-primary"
+                        : "bg-background text-muted-foreground border-border hover:text-foreground hover:bg-secondary/60 hover:border-foreground/20",
+                    )}
+                  >
+                    <Users className="size-3.5" />
+                    <span>Nano (&lt; 25K)</span>
+                  </button>
                 </div>
               </div>
             </div>
 
             {sortedResults.length === 0 ? (
-              <div className="glass-card mt-6 rounded-2xl p-10 text-center max-w-xl mx-auto">
+              <div className="glass-card rounded-2xl p-10 text-center max-w-xl mx-auto">
                 <h2 className="text-lg font-semibold">No creators match yet</h2>
                 <p className="mt-2 text-sm text-muted-foreground">
-                  Try adjusting your follower range slider, selecting a different city/pincode, or widening your budget range.
+                  Try clearing your quick filters or widening your follower and budget ranges.
                 </p>
-                <Button
-                  variant="ghost"
-                  className="mt-4 cursor-pointer"
-                  onClick={resetDiscoverFilters}
-                >
-                  Reset filters
-                </Button>
+                <div className="mt-4 flex items-center justify-center gap-3">
+                  {(filters.collabType === "Barter" ||
+                    filters.gender ||
+                    filters.fastTurnaround ||
+                    filters.travel ||
+                    filters.followerRange[1] < 300000) && (
+                    <Button
+                      variant="primary"
+                      className="cursor-pointer text-xs"
+                      onClick={() => {
+                        setFilters((f) => ({
+                          ...f,
+                          collabType: f.collabType === "Barter" ? "" : f.collabType,
+                          gender: "",
+                          travel: f.travel === "Travels for collaborations" ? "" : f.travel,
+                          fastTurnaround: false,
+                          followerRange: [500, 300000],
+                        }));
+                      }}
+                    >
+                      Clear quick filters
+                    </Button>
+                  )}
+                  <Button
+                    variant="ghost"
+                    className="cursor-pointer text-xs"
+                    onClick={resetDiscoverFilters}
+                  >
+                    Reset all filters
+                  </Button>
+                </div>
               </div>
             ) : (
-              <div className="mt-6 grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
+              <div className="grid gap-5 sm:grid-cols-2 lg:grid-cols-3">
                 {sortedResults.map((c, i) => (
                   <CreatorCard key={c.id} creator={c} index={i} />
                 ))}

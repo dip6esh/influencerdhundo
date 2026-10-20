@@ -596,6 +596,8 @@ export type Filters = {
   language: string;
   travel: string;
   products: string;
+  gender?: string | undefined;
+  fastTurnaround?: boolean | undefined;
 };
 
 export const EMPTY_FILTERS: Filters = {
@@ -611,6 +613,8 @@ export const EMPTY_FILTERS: Filters = {
   language: "",
   travel: "",
   products: "",
+  gender: "",
+  fastTurnaround: false,
 };
 
 export function filterCreators(creators: Creator[], f: Filters) {
@@ -667,6 +671,16 @@ export function filterCreators(creators: Creator[], f: Filters) {
     if (f.products === "Accepts products" && c.acceptsProducts !== "Yes") return false;
     if (f.products === "Doesn't accept products" && c.acceptsProducts !== "No") return false;
     if (f.products === "Depends" && c.acceptsProducts !== "Depends") return false;
+    if (f.gender && c.gender !== f.gender) return false;
+    if (f.fastTurnaround) {
+      const t = (c.turnaround || "").toLowerCase();
+      const isFast =
+        t.includes("same day") ||
+        t.includes("1–2") ||
+        t.includes("1-2") ||
+        t.includes("24 hour");
+      if (!isFast) return false;
+    }
     return true;
   });
 }
