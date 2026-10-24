@@ -1886,6 +1886,100 @@ export const supabaseDb = {
     }
   },
 
+  /** Fetch aggregated visitor places across all time or a selected range (permanent & fast) */
+  async fetchVisitorPlaces(
+    range: "today" | "7d" | "30d" | "all" = "all",
+  ): Promise<VisitorPlaceSummary[]> {
+    try {
+      const { data, error } = await supabase.rpc("get_visitor_places_summary", {
+        time_range: range,
+      });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map((row: any) => ({
+          city: row.city || "Unknown City",
+          region: row.region || "Unknown Region",
+          country: row.country || "India",
+          countryCode: row.country_code || "IN",
+          totalVisits: Number(row.total_visits || 0),
+          uniqueVisitors: Number(row.unique_visitors || 0),
+          firstSeen: row.first_seen,
+          lastSeen: row.last_seen,
+        }));
+      }
+
+      // Fallback: aggregate from raw records if RPC not yet loaded
+      let query = supabase
+        .from("website_visits")
+        .select("city, region, country, country_code, session_id, created_at");
+
+      if (range !== "all") {
+        const now = new Date();
+        if (range === "today") {
+          now.setHours(0, 0, 0, 0);
+          query = query.gte("created_at", now.toISOString());
+        } else if (range === "7d") {
+          const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
+          query = query.gte("created_at", sevenDaysAgo.toISOString());
+        } else if (range === "30d") {
+          const thirtyDaysAgo = new Date(now.getTime() - 30 * 24 * 60 * 60 * 1000);
+          query = query.gte("created_at", thirtyDaysAgo.toISOString());
+        }
+      }
+
+      const { data: rawVisits, error: rawErr } = await query.limit(5000);
+      if (rawErr || !rawVisits) return [];
+
+      const map = new Map<string, {
+        city: string;
+        region: string;
+        country: string;
+        countryCode: string;
+        totalVisits: number;
+        sessions: Set<string>;
+        firstSeen: string;
+        lastSeen: string;
+      }>();
+
+      rawVisits.forEach((r: any) => {
+        const city = r.city || "Unknown City";
+        const region = r.region || "Unknown Region";
+        const key = `${city}___${region}`;
+        const item = map.get(key) || {
+          city,
+          region,
+          country: r.country || "India",
+          countryCode: r.country_code || "IN",
+          totalVisits: 0,
+          sessions: new Set<string>(),
+          firstSeen: r.created_at,
+          lastSeen: r.created_at,
+        };
+        item.totalVisits += 1;
+        if (r.session_id) item.sessions.add(r.session_id);
+        if (new Date(r.created_at).getTime() < new Date(item.firstSeen).getTime()) item.firstSeen = r.created_at;
+        if (new Date(r.created_at).getTime() > new Date(item.lastSeen).getTime()) item.lastSeen = r.created_at;
+        map.set(key, item);
+      });
+
+      return Array.from(map.values())
+        .map((item) => ({
+          city: item.city,
+          region: item.region,
+          country: item.country,
+          countryCode: item.countryCode,
+          totalVisits: item.totalVisits,
+          uniqueVisitors: item.sessions.size,
+          firstSeen: item.firstSeen,
+          lastSeen: item.lastSeen,
+        }))
+        .sort((a, b) => b.totalVisits - a.totalVisits);
+    } catch (e) {
+      console.warn("fetchVisitorPlaces error:", e);
+      return [];
+    }
+  },
+
   /** Update creator's Special Monetized Referral Program */
   async updateSpecialReferralProgram(
     creatorId: string,
@@ -2146,6 +2240,17 @@ export interface AnalyticsSummary {
   osBreakdown: { os: string; count: number }[];
   browserBreakdown: { browser: string; count: number }[];
   recentVisits: WebsiteVisit[];
+}
+
+export interface VisitorPlaceSummary {
+  city: string;
+  region: string;
+  country: string;
+  countryCode: string;
+  totalVisits: number;
+  uniqueVisitors: number;
+  firstSeen: string;
+  lastSeen: string;
 }
 
 

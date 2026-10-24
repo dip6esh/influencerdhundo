@@ -3,7 +3,7 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Chip, DatePicker, Field, SectionEyebrow, StatusPill, TextArea, TextInput } from "@/components/ui-kit";
 import { useAppState, type BusinessAccount } from "@/lib/app-state";
 import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
-import { supabaseDb, type DiscountCode, type WebsiteVisit } from "@/lib/supabase";
+import { supabaseDb, type DiscountCode, type WebsiteVisit, type VisitorPlaceSummary } from "@/lib/supabase";
 import {
   CATEGORIES,
   CITIES,
@@ -74,6 +74,7 @@ import {
   TrendingUp,
   Building2,
   Wallet,
+  Download,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -464,6 +465,48 @@ function getSourceStyle(source: string) {
   };
 }
 
+function formatPlaceDate(isoString?: string) {
+  if (!isoString) return "—";
+  try {
+    const d = new Date(isoString);
+    return d.toLocaleDateString("en-IN", {
+      day: "numeric",
+      month: "short",
+      year: "numeric",
+    });
+  } catch {
+    return isoString;
+  }
+}
+
+function formatPlaceDateTime(isoString?: string) {
+  if (!isoString) return "—";
+  try {
+    const d = new Date(isoString);
+    const now = new Date();
+    const isToday = d.toDateString() === now.toDateString();
+    const timeStr = d.toLocaleTimeString("en-IN", { hour: "numeric", minute: "2-digit", hour12: true });
+    if (isToday) return `Today, ${timeStr}`;
+    return `${d.toLocaleDateString("en-IN", { day: "numeric", month: "short" })}, ${timeStr}`;
+  } catch {
+    return isoString;
+  }
+}
+
+function getCountryFlag(code?: string, countryName?: string) {
+  if (!code && !countryName) return "🌐";
+  const c = (code || "").toUpperCase();
+  if (c === "IN" || countryName?.toLowerCase() === "india") return "🇮🇳";
+  if (c === "US" || countryName?.toLowerCase().includes("united states")) return "🇺🇸";
+  if (c === "GB" || countryName?.toLowerCase().includes("united kingdom")) return "🇬🇧";
+  if (c === "CA" || countryName?.toLowerCase().includes("canada")) return "🇨🇦";
+  if (c === "AE" || countryName?.toLowerCase().includes("emirates")) return "🇦🇪";
+  if (c === "SG" || countryName?.toLowerCase().includes("singapore")) return "🇸🇬";
+  if (c === "AU" || countryName?.toLowerCase().includes("australia")) return "🇦🇺";
+  if (c === "DE" || countryName?.toLowerCase().includes("germany")) return "🇩🇪";
+  return "🌐";
+}
+
 function AnalyticsTabContent({
   visits,
   loading,
@@ -473,6 +516,10 @@ function AnalyticsTabContent({
   setAutoRefresh,
   onRefresh,
   creators,
+  visitorPlaces,
+  loadingPlaces,
+  placesScope,
+  setPlacesScope,
 }: {
   visits: WebsiteVisit[];
   loading: boolean;
@@ -482,7 +529,79 @@ function AnalyticsTabContent({
   setAutoRefresh: (val: boolean) => void;
   onRefresh: () => void;
   creators: Creator[];
+  visitorPlaces: VisitorPlaceSummary[];
+  loadingPlaces: boolean;
+  placesScope: "all" | "30d" | "7d" | "today";
+  setPlacesScope: (scope: "all" | "30d" | "7d" | "today") => void;
 }) {
+  const [placesSearch, setPlacesSearch] = useState("");
+  const [countryFilter, setCountryFilter] = useState<"all" | "IN" | "global">("all");
+  const [placesSort, setPlacesSort] = useState<"visits" | "unique" | "recent" | "alpha">("visits");
+  const [showAllPlaces, setShowAllPlaces] = useState(false);
+  const [selectedCityFilter, setSelectedCityFilter] = useState<string | null>(null);
+
+  const filteredPlaces = useMemo(() => {
+    let list = [...(visitorPlaces || [])];
+
+    if (countryFilter === "IN") {
+      list = list.filter((p) => p.countryCode === "IN" || p.country.toLowerCase() === "india");
+    } else if (countryFilter === "global") {
+      list = list.filter((p) => p.countryCode !== "IN" && p.country.toLowerCase() !== "india");
+    }
+
+    const q = placesSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (p) =>
+          p.city.toLowerCase().includes(q) ||
+          p.region.toLowerCase().includes(q) ||
+          p.country.toLowerCase().includes(q)
+      );
+    }
+
+    list.sort((a, b) => {
+      if (placesSort === "visits") return b.totalVisits - a.totalVisits;
+      if (placesSort === "unique") return b.uniqueVisitors - a.uniqueVisitors;
+      if (placesSort === "recent") return new Date(b.lastSeen).getTime() - new Date(a.lastSeen).getTime();
+      if (placesSort === "alpha") return a.city.localeCompare(b.city);
+      return 0;
+    });
+
+    return list;
+  }, [visitorPlaces, countryFilter, placesSearch, placesSort]);
+
+  const totalPlacesVisits = useMemo(() => {
+    return (visitorPlaces || []).reduce((sum, p) => sum + p.totalVisits, 0);
+  }, [visitorPlaces]);
+
+  const maxCityVisits = useMemo(() => {
+    return (visitorPlaces || []).length > 0 ? Math.max(...visitorPlaces.map((p) => p.totalVisits)) : 1;
+  }, [visitorPlaces]);
+
+  const handleExportPlacesCsv = () => {
+    if (!visitorPlaces || visitorPlaces.length === 0) return;
+    const headers = ["Rank", "City", "State/Region", "Country", "Country Code", "Total Pageviews", "Unique Visitors", "First Seen", "Last Seen"];
+    const rows = filteredPlaces.map((p, idx) => [
+      idx + 1,
+      `"${p.city.replace(/"/g, '""')}"`,
+      `"${p.region.replace(/"/g, '""')}"`,
+      `"${p.country.replace(/"/g, '""')}"`,
+      p.countryCode,
+      p.totalVisits,
+      p.uniqueVisitors,
+      p.firstSeen ? new Date(p.firstSeen).toISOString() : "",
+      p.lastSeen ? new Date(p.lastSeen).toISOString() : "",
+    ]);
+    const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+    const encodedUri = encodeURI(csvContent);
+    const link = document.createElement("a");
+    link.setAttribute("href", encodedUri);
+    link.setAttribute("download", `influencer-dhundo-visitor-places-${placesScope}.csv`);
+    document.body.appendChild(link);
+    link.click();
+    document.body.removeChild(link);
+  };
+
   const stats = useMemo(() => {
     const totalViews = visits.length;
     const uniqueSessionIds = new Set(visits.map((v) => v.sessionId));
@@ -1307,6 +1426,283 @@ function AnalyticsTabContent({
             </Card>
           </div>
 
+          {/* Row 3.5: Permanent All-Time Visitor Places Directory */}
+          <Card className="p-5 border border-border/80 shadow-xs">
+            {/* Header */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-3 pb-4 border-b border-border/60">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary shrink-0 mt-0.5">
+                  <Globe2 className="size-5" />
+                </div>
+                <div>
+                  <div className="flex flex-wrap items-center gap-2">
+                    <h3 className="text-base font-bold text-foreground">
+                      🗺️ All-Time Visitor Locations &amp; Places Directory
+                    </h3>
+                    <span className="rounded-full bg-emerald-500/10 text-emerald-600 dark:text-emerald-400 px-2.5 py-0.5 text-[11px] font-bold">
+                      Stored Forever
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Permanent geographic footprints of every city, state, and region your visitors arrived from.
+                  </p>
+                </div>
+              </div>
+
+              {/* Scope Selector (All Time / 30d / 7d / today) */}
+              <div className="flex flex-wrap items-center gap-2 shrink-0">
+                <div className="flex rounded-xl bg-background p-1 ring-1 ring-border text-xs">
+                  {(
+                    [
+                      { id: "all", label: "All Time (Forever)" },
+                      { id: "30d", label: "30 Days" },
+                      { id: "7d", label: "7 Days" },
+                      { id: "today", label: "Today" },
+                    ] as const
+                  ).map((s) => (
+                    <button
+                      key={s.id}
+                      type="button"
+                      onClick={() => setPlacesScope(s.id)}
+                      className={`px-3 py-1.5 rounded-lg font-semibold transition-all ${
+                        placesScope === s.id
+                          ? "bg-primary text-primary-foreground shadow-xs"
+                          : "text-muted-foreground hover:text-foreground"
+                      }`}
+                    >
+                      {s.label}
+                    </button>
+                  ))}
+                </div>
+
+                {/* Export CSV button */}
+                <Button
+                  variant="outline"
+                  onClick={handleExportPlacesCsv}
+                  disabled={loadingPlaces || filteredPlaces.length === 0}
+                  className="px-3 py-1.5 text-xs flex items-center gap-1.5 bg-background hover:bg-secondary"
+                  title="Export places to CSV"
+                >
+                  <Download className="size-3.5" />
+                  <span>Export CSV</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Metrics Overview Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4 p-3 rounded-xl bg-secondary/30 border border-border/40 text-xs">
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Total Locations</span>
+                <span className="font-mono text-base font-bold text-foreground mt-0.5 block">
+                  {visitorPlaces.length} <span className="text-xs font-normal text-muted-foreground">cities/regions</span>
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Total Recorded Pageviews</span>
+                <span className="font-mono text-base font-bold text-primary mt-0.5 block">
+                  {totalPlacesVisits.toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Unique Visitor Footprints</span>
+                <span className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+                  {visitorPlaces.reduce((sum, p) => sum + p.uniqueVisitors, 0).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Active Search Matches</span>
+                <span className="font-mono text-base font-bold text-foreground mt-0.5 block">
+                  {filteredPlaces.length} <span className="text-xs font-normal text-muted-foreground">places</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Filter and Search Bar */}
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5 pb-3">
+              {/* Search Box */}
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Search city, state, or country..."
+                  value={placesSearch}
+                  onChange={(e) => setPlacesSearch(e.target.value)}
+                  className="w-full pl-8.5 pr-8 py-1.5 text-xs rounded-xl bg-background border border-border/80 focus:outline-hidden focus:ring-2 focus:ring-primary/40 text-foreground"
+                />
+                {placesSearch && (
+                  <button
+                    onClick={() => setPlacesSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+
+              {/* Filters & Sorting */}
+              <div className="flex flex-wrap items-center gap-2">
+                {/* Country filter pills */}
+                <div className="flex rounded-lg bg-background p-0.5 ring-1 ring-border text-xs">
+                  <button
+                    type="button"
+                    onClick={() => setCountryFilter("all")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                      countryFilter === "all" ? "bg-secondary text-foreground font-bold" : "text-muted-foreground"
+                    }`}
+                  >
+                    All ({visitorPlaces.length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCountryFilter("IN")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                      countryFilter === "IN" ? "bg-secondary text-foreground font-bold" : "text-muted-foreground"
+                    }`}
+                  >
+                    🇮🇳 India ({visitorPlaces.filter((p) => p.countryCode === "IN" || p.country.toLowerCase() === "india").length})
+                  </button>
+                  <button
+                    type="button"
+                    onClick={() => setCountryFilter("global")}
+                    className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                      countryFilter === "global" ? "bg-secondary text-foreground font-bold" : "text-muted-foreground"
+                    }`}
+                  >
+                    🌐 Global ({visitorPlaces.filter((p) => p.countryCode !== "IN" && p.country.toLowerCase() !== "india").length})
+                  </button>
+                </div>
+
+                {/* Sort selector */}
+                <select
+                  value={placesSort}
+                  onChange={(e) => setPlacesSort(e.target.value as any)}
+                  className="px-2.5 py-1.5 text-xs rounded-lg bg-background border border-border/80 text-foreground font-medium"
+                >
+                  <option value="visits">Sort: Most Pageviews</option>
+                  <option value="unique">Sort: Most Unique Visitors</option>
+                  <option value="recent">Sort: Most Recent Visit</option>
+                  <option value="alpha">Sort: City Name (A–Z)</option>
+                </select>
+              </div>
+            </div>
+
+            {/* Places Table */}
+            <div className="overflow-x-auto rounded-xl border border-border/60">
+              <table className="w-full text-left text-xs">
+                <thead>
+                  <tr className="bg-secondary/50 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground border-b border-border/60">
+                    <th className="py-2.5 px-3 w-12 text-center">#</th>
+                    <th className="py-2.5 px-3">City &amp; Region</th>
+                    <th className="py-2.5 px-3">Country</th>
+                    <th className="py-2.5 px-3">Pageviews</th>
+                    <th className="py-2.5 px-3">Unique Visitors</th>
+                    <th className="py-2.5 px-3 hidden md:table-cell">First Seen</th>
+                    <th className="py-2.5 px-3">Last Active</th>
+                    <th className="py-2.5 px-3 text-right">Action</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/40">
+                  {loadingPlaces ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                        <Loader2 className="size-5 animate-spin mx-auto mb-2 text-primary" />
+                        Loading visitor places...
+                      </td>
+                    </tr>
+                  ) : filteredPlaces.length === 0 ? (
+                    <tr>
+                      <td colSpan={8} className="py-8 text-center text-muted-foreground">
+                        No visitor locations matching your filter.
+                      </td>
+                    </tr>
+                  ) : (
+                    (showAllPlaces ? filteredPlaces : filteredPlaces.slice(0, 15)).map((place, idx) => {
+                      const flag = getCountryFlag(place.countryCode, place.country);
+                      const barPct = maxCityVisits ? Math.round((place.totalVisits / maxCityVisits) * 100) : 0;
+                      const isSelected = selectedCityFilter === place.city;
+
+                      return (
+                        <tr
+                          key={`${place.city}-${place.region}-${idx}`}
+                          className={`hover:bg-secondary/30 transition-colors ${
+                            isSelected ? "bg-primary/5 font-semibold" : ""
+                          }`}
+                        >
+                          <td className="py-2.5 px-3 font-mono text-[11px] text-muted-foreground text-center font-bold">
+                            #{idx + 1}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <div className="flex items-center gap-1.5 font-bold text-foreground">
+                              <span>{place.city}</span>
+                            </div>
+                            {place.region && place.region !== "Unknown Region" && (
+                              <span className="text-[11px] text-muted-foreground block font-normal">
+                                {place.region}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-2.5 px-3">
+                            <span className="inline-flex items-center gap-1.5 px-2 py-0.5 rounded-md bg-secondary text-[11px] font-medium text-foreground">
+                              <span>{flag}</span>
+                              <span className="truncate max-w-[100px]">{place.country}</span>
+                            </span>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono">
+                            <div className="font-bold text-foreground">{place.totalVisits.toLocaleString()}</div>
+                            <div className="h-1.5 w-24 rounded-full bg-secondary overflow-hidden mt-1">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-primary to-saffrondeep"
+                                style={{ width: `${Math.max(barPct, 6)}%` }}
+                              />
+                            </div>
+                          </td>
+                          <td className="py-2.5 px-3 font-mono text-foreground font-semibold">
+                            {place.uniqueVisitors.toLocaleString()}
+                          </td>
+                          <td className="py-2.5 px-3 text-[11px] text-muted-foreground hidden md:table-cell">
+                            {formatPlaceDate(place.firstSeen)}
+                          </td>
+                          <td className="py-2.5 px-3 text-[11px] text-muted-foreground font-mono">
+                            {formatPlaceDateTime(place.lastSeen)}
+                          </td>
+                          <td className="py-2.5 px-3 text-right">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setSelectedCityFilter(isSelected ? null : place.city);
+                              }}
+                              className={`px-2.5 py-1 rounded-md text-[11px] font-semibold transition-all ${
+                                isSelected
+                                  ? "bg-primary text-primary-foreground shadow-xs"
+                                  : "bg-secondary text-muted-foreground hover:text-foreground hover:bg-secondary/80"
+                              }`}
+                              title={`Filter activity feed for ${place.city}`}
+                            >
+                              {isSelected ? "Clear Filter" : "Filter Feed"}
+                            </button>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {/* Expand / Collapse toggle if more than 15 places */}
+            {filteredPlaces.length > 15 && (
+              <div className="mt-3 text-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAllPlaces(!showAllPlaces)}
+                  className="px-4 py-1.5 text-xs font-semibold bg-background hover:bg-secondary"
+                >
+                  {showAllPlaces ? "Show Top 15 Locations" : `View All ${filteredPlaces.length} Locations`}
+                </Button>
+              </div>
+            )}
+          </Card>
+
           {/* Row 4: Live Real-time Activity Timeline Feed */}
           <Card className="p-5 border border-border/80">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border/60">
@@ -1324,8 +1720,28 @@ function AnalyticsTabContent({
               </span>
             </div>
 
+            {/* Filter banner if city filter is active */}
+            {selectedCityFilter && (
+              <div className="mt-3 mb-1 p-2.5 rounded-xl bg-primary/10 border border-primary/20 flex items-center justify-between text-xs">
+                <span className="text-foreground font-semibold flex items-center gap-1.5">
+                  <MapPin className="size-3.5 text-primary" />
+                  Showing live activity filtered for: <strong className="text-primary">{selectedCityFilter}</strong>
+                </span>
+                <button
+                  type="button"
+                  onClick={() => setSelectedCityFilter(null)}
+                  className="px-2 py-0.5 rounded-md bg-background text-foreground text-[11px] font-bold border border-border/80 hover:bg-secondary"
+                >
+                  ✕ Clear City Filter
+                </button>
+              </div>
+            )}
+
             <div className="mt-4 space-y-2.5">
-              {visits.slice(0, 30).map((v) => {
+              {(selectedCityFilter
+                ? visits.filter((v) => (v.city || "Unknown City") === selectedCityFilter)
+                : visits
+              ).slice(0, 30).map((v) => {
                 const srcStyle = getSourceStyle(v.referrerSource);
                 const isCreator = Boolean(v.creatorName || (v.path && v.path.startsWith("/creators/")));
                 const isDiscover = v.path && v.path.startsWith("/discover");
@@ -1461,16 +1877,25 @@ function AdminDashboard() {
   const [visits, setVisits] = useState<WebsiteVisit[]>([]);
   const [loadingVisits, setLoadingVisits] = useState(false);
   const [liveAutoRefresh, setLiveAutoRefresh] = useState(true);
+  const [visitorPlaces, setVisitorPlaces] = useState<VisitorPlaceSummary[]>([]);
+  const [loadingPlaces, setLoadingPlaces] = useState(false);
+  const [placesScope, setPlacesScope] = useState<"all" | "30d" | "7d" | "today">("all");
 
-  const loadAnalytics = async (range = analyticsRange) => {
+  const loadAnalytics = async (range = analyticsRange, scope = placesScope) => {
     setLoadingVisits(true);
+    setLoadingPlaces(true);
     try {
-      const data = await supabaseDb.fetchWebsiteVisits(range, 1000);
-      setVisits(data);
+      const [visitData, placesData] = await Promise.all([
+        supabaseDb.fetchWebsiteVisits(range, 1000),
+        supabaseDb.fetchVisitorPlaces(scope),
+      ]);
+      setVisits(visitData);
+      setVisitorPlaces(placesData);
     } catch {
       // ignore
     } finally {
       setLoadingVisits(false);
+      setLoadingPlaces(false);
     }
   };
 
@@ -1480,9 +1905,19 @@ function AdminDashboard() {
 
   useEffect(() => {
     if (tab === "Analytics") {
-      loadAnalytics(analyticsRange);
+      loadAnalytics(analyticsRange, placesScope);
     }
   }, [tab, analyticsRange]);
+
+  useEffect(() => {
+    if (tab === "Analytics") {
+      setLoadingPlaces(true);
+      supabaseDb.fetchVisitorPlaces(placesScope).then((data) => {
+        setVisitorPlaces(data);
+        setLoadingPlaces(false);
+      });
+    }
+  }, [tab, placesScope]);
 
   // Live polling every 15s if auto refresh is enabled and Analytics tab is active
   useEffect(() => {
@@ -1987,8 +2422,12 @@ function AdminDashboard() {
             setRange={setAnalyticsRange}
             autoRefresh={liveAutoRefresh}
             setAutoRefresh={setLiveAutoRefresh}
-            onRefresh={() => loadAnalytics(analyticsRange)}
+            onRefresh={() => loadAnalytics(analyticsRange, placesScope)}
             creators={creators}
+            visitorPlaces={visitorPlaces}
+            loadingPlaces={loadingPlaces}
+            placesScope={placesScope}
+            setPlacesScope={setPlacesScope}
           />
         </div>
       ) : null}
