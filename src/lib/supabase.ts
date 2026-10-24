@@ -2172,6 +2172,121 @@ export const supabaseDb = {
 
     return false;
   },
+
+  /** Fetch recent contact inquiries and contact reveal clicks */
+  async fetchContactInquiries(limit: number = 250): Promise<ContactInquiryRecord[]> {
+    try {
+      const { data, error } = await supabase
+        .from("contact_inquiries")
+        .select("*")
+        .order("created_at", { ascending: false })
+        .limit(limit);
+
+      if (error || !data) return [];
+      return data.map((r: any) => ({
+        id: r.id,
+        creatorId: r.creator_id,
+        creatorName: r.creator_name || "Unknown Creator",
+        contactType: (r.contact_type || "phone") as "phone" | "whatsapp" | "email" | "unlock_attempt",
+        businessId: r.business_id,
+        businessName: r.business_name,
+        sessionId: r.session_id,
+        city: r.city || "Unknown City",
+        region: r.region || "Unknown Region",
+        country: r.country || "India",
+        countryCode: r.country_code || "IN",
+        deviceType: r.device_type || "Desktop",
+        createdAt: r.created_at,
+      }));
+    } catch {
+      return [];
+    }
+  },
+
+  /** Fetch city-to-creator discovery demand breakdown */
+  async fetchCityDemandBreakdown(limit: number = 50): Promise<CityCreatorDemand[]> {
+    try {
+      const { data, error } = await supabase.rpc("get_city_creator_demand_summary", {
+        p_limit: limit,
+      });
+
+      if (!error && Array.isArray(data) && data.length > 0) {
+        return data.map((r: any) => ({
+          city: r.city || "Unknown City",
+          region: r.region || "Unknown Region",
+          country: r.country || "India",
+          totalCreatorViews: Number(r.total_creator_views || 0),
+          uniqueCreatorsViewed: Number(r.unique_creators_viewed || 0),
+          topCreators: Array.isArray(r.top_creators) ? r.top_creators : [],
+          lastViewedAt: r.last_viewed_at,
+        }));
+      }
+
+      // Fallback query if RPC isn't available
+      const { data: rawVisits } = await supabase
+        .from("website_visits")
+        .select("city, region, country, creator_id, creator_name, created_at")
+        .not("creator_name", "is", null)
+        .neq("creator_name", "")
+        .limit(2000);
+
+      if (!rawVisits || rawVisits.length === 0) return [];
+
+      const cityMap = new Map<string, {
+        city: string;
+        region: string;
+        country: string;
+        totalCreatorViews: number;
+        creatorCounts: Map<string, { creator_id: string; creator_name: string; views: number }>;
+        lastViewedAt: string;
+      }>();
+
+      rawVisits.forEach((v: any) => {
+        const city = v.city || "Unknown City";
+        const region = v.region || "Unknown Region";
+        const key = `${city}___${region}`;
+        const item = cityMap.get(key) || {
+          city,
+          region,
+          country: v.country || "India",
+          totalCreatorViews: 0,
+          creatorCounts: new Map(),
+          lastViewedAt: v.created_at,
+        };
+        item.totalCreatorViews += 1;
+        const cKey = v.creator_name;
+        const currentC = item.creatorCounts.get(cKey) || {
+          creator_id: v.creator_id || "",
+          creator_name: v.creator_name,
+          views: 0,
+        };
+        currentC.views += 1;
+        item.creatorCounts.set(cKey, currentC);
+        if (new Date(v.created_at).getTime() > new Date(item.lastViewedAt).getTime()) {
+          item.lastViewedAt = v.created_at;
+        }
+        cityMap.set(key, item);
+      });
+
+      return Array.from(cityMap.values())
+        .map((item) => ({
+          city: item.city,
+          region: item.region,
+          country: item.country,
+          totalCreatorViews: item.totalCreatorViews,
+          uniqueCreatorsViewed: item.creatorCounts.size,
+          topCreators: Array.from(item.creatorCounts.values())
+            .sort((a: any, b: any) => b.views - a.views)
+            .slice(0, 5),
+          lastViewedAt: item.lastViewedAt,
+        }))
+        .sort((a, b) => b.totalCreatorViews - a.totalCreatorViews)
+        .slice(0, limit);
+    } catch (e) {
+      console.warn("fetchCityDemandBreakdown error:", e);
+      return [];
+    }
+  },
 };
 
 // ── Referral Event type ────────────────────────────────────────────────────
@@ -2251,6 +2366,32 @@ export interface VisitorPlaceSummary {
   uniqueVisitors: number;
   firstSeen: string;
   lastSeen: string;
+}
+
+export interface ContactInquiryRecord {
+  id: string;
+  creatorId: string;
+  creatorName: string;
+  contactType: "phone" | "whatsapp" | "email" | "unlock_attempt";
+  businessId?: string;
+  businessName?: string;
+  sessionId?: string;
+  city?: string;
+  region?: string;
+  country?: string;
+  countryCode?: string;
+  deviceType?: string;
+  createdAt: string;
+}
+
+export interface CityCreatorDemand {
+  city: string;
+  region: string;
+  country: string;
+  totalCreatorViews: number;
+  uniqueCreatorsViewed: number;
+  topCreators: { creator_id: string; creator_name: string; views: number }[];
+  lastViewedAt: string;
 }
 
 

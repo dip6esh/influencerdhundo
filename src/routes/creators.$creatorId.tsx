@@ -3,7 +3,7 @@ import { useEffect, useState } from "react";
 import { Button, Card, Field, Select, Tag, TextArea } from "@/components/ui-kit";
 import { InstagramIcon, FacebookIcon, YouTubeIcon } from "@/components/icons";
 import { useAppState } from "@/lib/app-state";
-import { trackPageView } from "@/lib/analytics-tracker";
+import { trackPageView, trackContactInquiry } from "@/lib/analytics-tracker";
 import {
   REPORT_REASONS,
   calculateAge,
@@ -134,6 +134,17 @@ function CreatorProfile() {
       });
     }
   }, [creator?.id, creator?.displayName, creator?.name, creator?.city]);
+
+  const handleContactAction = (type: "phone" | "whatsapp" | "email" | "unlock_attempt") => {
+    if (!creator) return;
+    trackContactInquiry({
+      creatorId: creator.id,
+      creatorName: creator.displayName || creator.name,
+      contactType: type,
+      businessId: business?.id,
+      businessName: business?.businessName || business?.name,
+    });
+  };
 
   if (!creator) {
     return (
@@ -606,6 +617,7 @@ function CreatorProfile() {
               {creator.contact.phone ? (
                 <a
                   href={`tel:${creator.contact.phone.replace(/\s/g, "")}`}
+                  onClick={() => handleContactAction("phone")}
                   className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-primary hover:bg-secondary/40 transition-all flex flex-col justify-between gap-2 group"
                 >
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -630,6 +642,7 @@ function CreatorProfile() {
                   href={`https://wa.me/${(creator.contact.whatsapp || creator.contact.phone).replace(/\D/g, "")}`}
                   target="_blank"
                   rel="noreferrer"
+                  onClick={() => handleContactAction("whatsapp")}
                   className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-primary hover:bg-secondary/40 transition-all flex flex-col justify-between gap-2 group"
                 >
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -654,6 +667,7 @@ function CreatorProfile() {
               {creator.contact.email ? (
                 <a
                   href={`mailto:${creator.contact.email}`}
+                  onClick={() => handleContactAction("email")}
                   className="rounded-2xl bg-background p-4 ring-1 ring-border shadow-sm hover:ring-primary hover:bg-secondary/40 transition-all flex flex-col justify-between gap-2 group"
                 >
                   <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">
@@ -704,12 +718,13 @@ function CreatorProfile() {
             <Button
               variant="primary"
               className="mt-5 py-3.5 px-8 font-semibold text-base"
-              onClick={() =>
+              onClick={() => {
+                handleContactAction("unlock_attempt");
                 navigate({
                   to: "/business/signup",
                   search: { redirect: `/creators/${creator.id}` },
-                })
-              }
+                });
+              }}
             >
               Contact Creator
             </Button>

@@ -81,6 +81,9 @@ function RouteAnalyticsTracker() {
   const currentSearch = routerState.location.searchStr;
 
   useEffect(() => {
+    // For creator profile pages, creators.$creatorId.tsx tracks with creator metadata
+    if (currentPath.startsWith("/creators/")) return;
+
     const fullPath = currentSearch ? `${currentPath}${currentSearch}` : currentPath;
     trackPageView(fullPath);
   }, [currentPath, currentSearch]);

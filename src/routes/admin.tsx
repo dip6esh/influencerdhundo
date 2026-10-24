@@ -3,7 +3,14 @@ import { useEffect, useMemo, useRef, useState } from "react";
 import { Button, Card, Chip, DatePicker, Field, SectionEyebrow, StatusPill, TextArea, TextInput } from "@/components/ui-kit";
 import { useAppState, type BusinessAccount } from "@/lib/app-state";
 import { AdminStateProvider, useAdminState } from "@/lib/admin-state";
-import { supabaseDb, type DiscountCode, type WebsiteVisit, type VisitorPlaceSummary } from "@/lib/supabase";
+import {
+  supabaseDb,
+  type DiscountCode,
+  type WebsiteVisit,
+  type VisitorPlaceSummary,
+  type ContactInquiryRecord,
+  type CityCreatorDemand,
+} from "@/lib/supabase";
 import {
   CATEGORIES,
   CITIES,
@@ -75,6 +82,8 @@ import {
   Building2,
   Wallet,
   Download,
+  Target,
+  Flame,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -624,6 +633,74 @@ function exportBusinessesToCsv(list: BusinessAccount[]) {
   document.body.removeChild(link);
 }
 
+function exportInquiriesToCsv(inquiries: ContactInquiryRecord[]) {
+  if (!inquiries || inquiries.length === 0) return;
+  const headers = [
+    "Date & Time",
+    "Inquiry Type",
+    "Creator Name",
+    "Creator ID",
+    "Business / Brand Name",
+    "Business ID",
+    "City",
+    "State / Region",
+    "Country",
+    "Device",
+  ];
+  const rows = inquiries.map((inq) => [
+    inq.createdAt ? new Date(inq.createdAt).toISOString() : "",
+    inq.contactType,
+    `"${(inq.creatorName || "").replace(/"/g, '""')}"`,
+    inq.creatorId || "",
+    `"${(inq.businessName || "Anonymous Brand").replace(/"/g, '""')}"`,
+    inq.businessId || "",
+    `"${(inq.city || "Unknown City").replace(/"/g, '""')}"`,
+    `"${(inq.region || "Unknown Region").replace(/"/g, '""')}"`,
+    inq.country || "India",
+    inq.deviceType || "Desktop",
+  ]);
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `influencer-dhundo-brand-inquiries-${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function exportCityDemandToCsv(demand: CityCreatorDemand[]) {
+  if (!demand || demand.length === 0) return;
+  const headers = [
+    "Rank",
+    "City",
+    "State / Region",
+    "Country",
+    "Total Creator Profile Views",
+    "Unique Creators Explored",
+    "Top Discovered Creators",
+    "Last Viewed At",
+  ];
+  const rows = demand.map((d, idx) => [
+    idx + 1,
+    `"${(d.city || "").replace(/"/g, '""')}"`,
+    `"${(d.region || "").replace(/"/g, '""')}"`,
+    `"${(d.country || "India").replace(/"/g, '""')}"`,
+    d.totalCreatorViews,
+    d.uniqueCreatorsViewed,
+    `"${(d.topCreators || []).map((c) => `${c.creator_name} (${c.views} views)`).join("; ").replace(/"/g, '""')}"`,
+    d.lastViewedAt ? new Date(d.lastViewedAt).toISOString() : "",
+  ]);
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `influencer-dhundo-city-creator-demand-${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function AnalyticsTabContent({
   visits,
   loading,
@@ -637,6 +714,10 @@ function AnalyticsTabContent({
   loadingPlaces,
   placesScope,
   setPlacesScope,
+  contactInquiries,
+  loadingInquiries,
+  cityDemand,
+  loadingCityDemand,
 }: {
   visits: WebsiteVisit[];
   loading: boolean;
@@ -650,12 +731,25 @@ function AnalyticsTabContent({
   loadingPlaces: boolean;
   placesScope: "all" | "30d" | "7d" | "today";
   setPlacesScope: (scope: "all" | "30d" | "7d" | "today") => void;
+  contactInquiries: ContactInquiryRecord[];
+  loadingInquiries: boolean;
+  cityDemand: CityCreatorDemand[];
+  loadingCityDemand: boolean;
 }) {
   const [placesSearch, setPlacesSearch] = useState("");
   const [countryFilter, setCountryFilter] = useState<"all" | "IN" | "global">("all");
   const [placesSort, setPlacesSort] = useState<"visits" | "unique" | "recent" | "alpha">("visits");
   const [showAllPlaces, setShowAllPlaces] = useState(false);
   const [selectedCityFilter, setSelectedCityFilter] = useState<string | null>(null);
+
+  // Inquiries UI state
+  const [inquiryTypeFilter, setInquiryTypeFilter] = useState<"all" | "whatsapp" | "phone" | "email" | "unlock_attempt">("all");
+  const [inquirySearch, setInquirySearch] = useState("");
+  const [showAllInquiries, setShowAllInquiries] = useState(false);
+
+  // City-to-Creator Demand UI state
+  const [demandSearch, setDemandSearch] = useState("");
+  const [showAllDemand, setShowAllDemand] = useState(false);
 
   const filteredPlaces = useMemo(() => {
     let list = [...(visitorPlaces || [])];
@@ -936,6 +1030,97 @@ function AnalyticsTabContent({
       topSourceChannel: topSources[0]?.source || "Direct",
     };
   }, [visits, creators]);
+
+  const filteredInquiries = useMemo(() => {
+    let list = [...(contactInquiries || [])];
+    if (inquiryTypeFilter !== "all") {
+      list = list.filter((inq) => inq.contactType === inquiryTypeFilter);
+    }
+    const q = inquirySearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter(
+        (inq) =>
+          (inq.creatorName || "").toLowerCase().includes(q) ||
+          (inq.businessName && inq.businessName.toLowerCase().includes(q)) ||
+          (inq.city && inq.city.toLowerCase().includes(q)) ||
+          (inq.region && inq.region.toLowerCase().includes(q))
+      );
+    }
+    return list;
+  }, [contactInquiries, inquiryTypeFilter, inquirySearch]);
+
+  const inquiryStats = useMemo(() => {
+    const list = contactInquiries || [];
+    const total = list.length;
+    const whatsappCount = list.filter((i) => i.contactType === "whatsapp").length;
+    const phoneCount = list.filter((i) => i.contactType === "phone").length;
+    const emailCount = list.filter((i) => i.contactType === "email").length;
+    const unlockCount = list.filter((i) => i.contactType === "unlock_attempt").length;
+
+    // Leaderboard: Top Inquired Creators
+    const map = new Map<string, {
+      creatorId: string;
+      creatorName: string;
+      total: number;
+      whatsapp: number;
+      phone: number;
+      email: number;
+      unlocks: number;
+      lastInquiryAt: string;
+    }>();
+
+    list.forEach((inq) => {
+      const key = inq.creatorId || inq.creatorName;
+      const cur = map.get(key) || {
+        creatorId: inq.creatorId,
+        creatorName: inq.creatorName,
+        total: 0,
+        whatsapp: 0,
+        phone: 0,
+        email: 0,
+        unlocks: 0,
+        lastInquiryAt: inq.createdAt,
+      };
+      cur.total += 1;
+      if (inq.contactType === "whatsapp") cur.whatsapp += 1;
+      else if (inq.contactType === "phone") cur.phone += 1;
+      else if (inq.contactType === "email") cur.email += 1;
+      else if (inq.contactType === "unlock_attempt") cur.unlocks += 1;
+
+      if (new Date(inq.createdAt).getTime() > new Date(cur.lastInquiryAt).getTime()) {
+        cur.lastInquiryAt = inq.createdAt;
+      }
+      map.set(key, cur);
+    });
+
+    const topCreators = Array.from(map.values()).sort((a, b) => b.total - a.total);
+    return {
+      total,
+      whatsappCount,
+      phoneCount,
+      emailCount,
+      unlockCount,
+      uniqueCreatorsCount: map.size,
+      topCreators,
+    };
+  }, [contactInquiries]);
+
+  const filteredCityDemand = useMemo(() => {
+    let list = [...(cityDemand || [])];
+    const q = demandSearch.trim().toLowerCase();
+    if (q) {
+      list = list.filter((d) => {
+        const matchCity = (d.city || "").toLowerCase().includes(q) || (d.region || "").toLowerCase().includes(q);
+        const matchCreator = (d.topCreators || []).some((c) => (c.creator_name || "").toLowerCase().includes(q));
+        return matchCity || matchCreator;
+      });
+    }
+    return list;
+  }, [cityDemand, demandSearch]);
+
+  const maxDemandCityViews = useMemo(() => {
+    return (cityDemand || []).length > 0 ? Math.max(...cityDemand.map((d) => d.totalCreatorViews)) : 1;
+  }, [cityDemand]);
 
   return (
     <div className="space-y-6">
@@ -1820,6 +2005,472 @@ function AnalyticsTabContent({
             )}
           </Card>
 
+          {/* ── FEATURE 3: BRAND INQUIRIES & CONTACT REVEALS TRACKER ── */}
+          <Card className="p-5 border border-border/80 shadow-xs">
+            <div className="flex flex-col md:flex-row md:items-center justify-between gap-3 pb-4 border-b border-border/60">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-tealdeep/15 text-tealdeep border border-tealdeep/20 shrink-0">
+                  <PhoneCall className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-foreground">
+                      📞 Brand Inquiries & Contact Reveals Tracker
+                    </h3>
+                    <span className="rounded-full bg-emerald-500/10 px-2.5 py-0.5 text-[11px] font-bold text-emerald-600 dark:text-emerald-400 border border-emerald-500/20">
+                      High Commercial Intent Leads
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Real-time log of business clicks on creator WhatsApp, Phone, Email, and Unlock Contact attempts
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => exportInquiriesToCsv(filteredInquiries)}
+                  disabled={loadingInquiries || filteredInquiries.length === 0}
+                  className="px-3 py-1.5 text-xs flex items-center gap-1.5 bg-background hover:bg-secondary"
+                  title="Export brand inquiries to CSV"
+                >
+                  <Download className="size-3.5" />
+                  <span>Export Leads CSV</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Metrics Overview Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-5 gap-3 my-4 p-3 rounded-xl bg-secondary/30 border border-border/40 text-xs">
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Total Leads Logged</span>
+                <span className="font-mono text-base font-bold text-foreground mt-0.5 block">
+                  {inquiryStats.total.toLocaleString()} <span className="text-xs font-normal text-muted-foreground">clicks</span>
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">WhatsApp Inquiries</span>
+                <span className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+                  {inquiryStats.whatsappCount.toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Direct Calls</span>
+                <span className="font-mono text-base font-bold text-sky-600 dark:text-sky-400 mt-0.5 block">
+                  {inquiryStats.phoneCount.toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Email Pitches</span>
+                <span className="font-mono text-base font-bold text-purple-600 dark:text-purple-400 mt-0.5 block">
+                  {inquiryStats.emailCount.toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Unlock Attempts</span>
+                <span className="font-mono text-base font-bold text-amber-600 dark:text-amber-400 mt-0.5 block">
+                  {inquiryStats.unlockCount.toLocaleString()}
+                </span>
+              </div>
+            </div>
+
+            {/* Inquiries Content: Two Columns (Leaderboard + Stream) */}
+            <div className="grid grid-cols-1 lg:grid-cols-12 gap-5 mt-2">
+              {/* Left Column: Top Inquired Creators Leaderboard (5 cols) */}
+              <div className="lg:col-span-5 rounded-xl border border-border/70 p-4 bg-background/50 flex flex-col">
+                <div className="flex items-center justify-between pb-3 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <Flame className="size-4 text-saffrondeep" />
+                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                      Most Inquired Creators
+                    </h4>
+                  </div>
+                  <span className="text-[11px] text-muted-foreground">
+                    {inquiryStats.uniqueCreatorsCount} creators
+                  </span>
+                </div>
+
+                <div className="divide-y divide-border/40 overflow-y-auto max-h-[360px] mt-2 pr-1">
+                  {loadingInquiries ? (
+                    <div className="py-8 text-center text-xs text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin mx-auto mb-2 text-primary" />
+                      Loading leaderboard...
+                    </div>
+                  ) : inquiryStats.topCreators.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-muted-foreground">
+                      No contact reveals recorded yet.
+                    </div>
+                  ) : (
+                    inquiryStats.topCreators.slice(0, 10).map((c, idx) => (
+                      <div key={c.creatorId || idx} className="py-2.5 flex items-center justify-between gap-2 hover:bg-secondary/20 rounded-lg px-1.5 transition-colors">
+                        <div className="flex items-center gap-2.5 min-w-0">
+                          <span className={`size-5 rounded-full flex items-center justify-center text-[10px] font-bold shrink-0 ${
+                            idx === 0
+                              ? "bg-amber-500/20 text-amber-600 dark:text-amber-400 border border-amber-500/30"
+                              : idx === 1
+                              ? "bg-slate-500/20 text-slate-600 dark:text-slate-300 border border-slate-500/30"
+                              : idx === 2
+                              ? "bg-amber-700/20 text-amber-700 dark:text-amber-500 border border-amber-700/30"
+                              : "text-muted-foreground bg-secondary"
+                          }`}>
+                            {idx + 1}
+                          </span>
+                          <div className="min-w-0">
+                            <Link
+                              to={`/creators/${c.creatorId}` as any}
+                              target="_blank"
+                              className="text-xs font-bold text-foreground hover:text-primary truncate block hover:underline"
+                            >
+                              {c.creatorName}
+                            </Link>
+                            <div className="flex items-center gap-1.5 text-[10px] text-muted-foreground mt-0.5">
+                              {c.whatsapp > 0 && <span className="text-emerald-600 dark:text-emerald-400 font-medium">WA: {c.whatsapp}</span>}
+                              {c.phone > 0 && <span>· Call: {c.phone}</span>}
+                              {c.email > 0 && <span>· Email: {c.email}</span>}
+                              {c.unlocks > 0 && <span>· Unlock: {c.unlocks}</span>}
+                            </div>
+                          </div>
+                        </div>
+
+                        <div className="text-right shrink-0">
+                          <span className="font-mono text-xs font-bold text-primary block">
+                            {c.total}
+                          </span>
+                          <span className="text-[10px] text-muted-foreground block">
+                            leads
+                          </span>
+                        </div>
+                      </div>
+                    ))
+                  )}
+                </div>
+              </div>
+
+              {/* Right Column: Live Inquiry Stream with Filters (7 cols) */}
+              <div className="lg:col-span-7 rounded-xl border border-border/70 p-4 bg-background/50 flex flex-col">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border/50">
+                  <div className="flex items-center gap-2">
+                    <span className="size-2 rounded-full bg-emerald-500 animate-pulse" />
+                    <h4 className="text-xs font-bold text-foreground uppercase tracking-wider">
+                      Recent Inquiries & Contact Clicks
+                    </h4>
+                  </div>
+
+                  {/* Filter Pills */}
+                  <div className="flex flex-wrap items-center gap-1">
+                    {(["all", "whatsapp", "phone", "email", "unlock_attempt"] as const).map((t) => (
+                      <button
+                        key={t}
+                        type="button"
+                        onClick={() => setInquiryTypeFilter(t)}
+                        className={`px-2 py-0.5 rounded text-[10px] font-semibold transition-all ${
+                          inquiryTypeFilter === t
+                            ? "bg-primary text-primary-foreground"
+                            : "bg-secondary text-muted-foreground hover:text-foreground"
+                        }`}
+                      >
+                        {t === "all" ? "All" : t === "whatsapp" ? "WhatsApp" : t === "phone" ? "Call" : t === "email" ? "Email" : "Unlock"}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+
+                {/* Search Box */}
+                <div className="my-2.5 relative">
+                  <Search className="absolute left-2.5 top-1/2 -translate-y-1/2 size-3 text-muted-foreground" />
+                  <input
+                    type="text"
+                    placeholder="Search by creator, brand name, or city..."
+                    value={inquirySearch}
+                    onChange={(e) => setInquirySearch(e.target.value)}
+                    className="w-full pl-7 pr-3 py-1 text-xs rounded-lg bg-background border border-border/70 focus:outline-hidden focus:ring-1 focus:ring-primary text-foreground"
+                  />
+                </div>
+
+                <div className="divide-y divide-border/40 overflow-y-auto max-h-[310px] pr-1">
+                  {loadingInquiries ? (
+                    <div className="py-8 text-center text-xs text-muted-foreground">
+                      <Loader2 className="size-4 animate-spin mx-auto mb-2 text-primary" />
+                      Loading recent inquiries...
+                    </div>
+                  ) : filteredInquiries.length === 0 ? (
+                    <div className="py-8 text-center text-xs text-muted-foreground">
+                      No inquiries match your current filters.
+                    </div>
+                  ) : (
+                    (showAllInquiries ? filteredInquiries : filteredInquiries.slice(0, 15)).map((inq) => {
+                      const flag = getCountryFlag(inq.countryCode, inq.country);
+                      const isWa = inq.contactType === "whatsapp";
+                      const isPhone = inq.contactType === "phone";
+                      const isEmail = inq.contactType === "email";
+
+                      return (
+                        <div key={inq.id} className="py-2.5 flex items-start justify-between gap-3 text-xs hover:bg-secondary/20 rounded-lg px-1.5 transition-colors">
+                          <div className="flex items-start gap-2.5 min-w-0">
+                            <span className={`mt-0.5 inline-flex items-center gap-1 px-2 py-0.5 rounded-md text-[10px] font-bold border shrink-0 ${
+                              isWa
+                                ? "bg-emerald-500/15 text-emerald-600 dark:text-emerald-400 border-emerald-500/30"
+                                : isPhone
+                                ? "bg-sky-500/15 text-sky-600 dark:text-sky-400 border-sky-500/30"
+                                : isEmail
+                                ? "bg-purple-500/15 text-purple-600 dark:text-purple-400 border-purple-500/30"
+                                : "bg-amber-500/15 text-amber-600 dark:text-amber-400 border-amber-500/30"
+                            }`}>
+                              {isWa ? "WhatsApp" : isPhone ? "Phone Call" : isEmail ? "Email" : "Unlock Attempt"}
+                            </span>
+
+                            <div className="min-w-0">
+                              <p className="font-semibold text-foreground text-xs truncate">
+                                <span>Inquiry for </span>
+                                <Link
+                                  to={`/creators/${inq.creatorId}` as any}
+                                  target="_blank"
+                                  className="text-primary hover:underline font-bold"
+                                >
+                                  {inq.creatorName}
+                                </Link>
+                              </p>
+                              <p className="text-[11px] text-muted-foreground flex items-center gap-1.5 mt-0.5 flex-wrap">
+                                <span className="font-medium text-foreground/80">
+                                  {inq.businessName || "Anonymous Business Visitor"}
+                                </span>
+                                <span>·</span>
+                                <span>{flag} {inq.city || "Unknown City"}</span>
+                                {inq.deviceType && (
+                                  <>
+                                    <span>·</span>
+                                    <span className="text-[10px] bg-secondary px-1.5 py-0.5 rounded font-mono">{inq.deviceType}</span>
+                                  </>
+                                )}
+                              </p>
+                            </div>
+                          </div>
+
+                          <span className="text-[10px] text-muted-foreground font-mono shrink-0 whitespace-nowrap" title={inq.createdAt}>
+                            {formatTimeAgo(inq.createdAt)}
+                          </span>
+                        </div>
+                      );
+                    })
+                  )}
+                </div>
+
+                {filteredInquiries.length > 15 && (
+                  <div className="mt-2 text-center pt-2 border-t border-border/40">
+                    <button
+                      type="button"
+                      onClick={() => setShowAllInquiries(!showAllInquiries)}
+                      className="text-xs text-primary font-semibold hover:underline"
+                    >
+                      {showAllInquiries ? "Show Latest 15 Leads" : `View All ${filteredInquiries.length} Leads`}
+                    </button>
+                  </div>
+                )}
+              </div>
+            </div>
+          </Card>
+
+          {/* ── FEATURE 4: CITY-TO-CREATOR DISCOVERY BREAKDOWN (HEATMAP) ── */}
+          <Card className="p-5 border border-border/80 shadow-xs">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-4 border-b border-border/60">
+              <div className="flex items-start gap-3">
+                <div className="flex size-9 items-center justify-center rounded-xl bg-primary/10 text-primary border border-primary/20 shrink-0">
+                  <Target className="size-5" />
+                </div>
+                <div>
+                  <div className="flex items-center gap-2 flex-wrap">
+                    <h3 className="text-base font-bold text-foreground">
+                      🎯 City-to-Creator Discovery Demand Heatmap
+                    </h3>
+                    <span className="rounded-full bg-saffrondeep/10 px-2.5 py-0.5 text-[11px] font-bold text-saffrondeep border border-saffrondeep/20">
+                      Discovery Intelligence
+                    </span>
+                  </div>
+                  <p className="text-xs text-muted-foreground mt-0.5">
+                    Breakdown showing which creators are capturing user demand & views in specific cities
+                  </p>
+                </div>
+              </div>
+
+              {/* Action Buttons */}
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  variant="outline"
+                  onClick={() => exportCityDemandToCsv(filteredCityDemand)}
+                  disabled={loadingCityDemand || filteredCityDemand.length === 0}
+                  className="px-3 py-1.5 text-xs flex items-center gap-1.5 bg-background hover:bg-secondary"
+                  title="Export city demand breakdown to CSV"
+                >
+                  <Download className="size-3.5" />
+                  <span>Export Demand CSV</span>
+                </Button>
+              </div>
+            </div>
+
+            {/* Metrics Overview Bar */}
+            <div className="grid grid-cols-2 sm:grid-cols-4 gap-3 my-4 p-3 rounded-xl bg-secondary/30 border border-border/40 text-xs">
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Cities with Demand</span>
+                <span className="font-mono text-base font-bold text-foreground mt-0.5 block">
+                  {cityDemand.length} <span className="text-xs font-normal text-muted-foreground">cities</span>
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Total Creator Pageviews</span>
+                <span className="font-mono text-base font-bold text-primary mt-0.5 block">
+                  {cityDemand.reduce((sum, d) => sum + d.totalCreatorViews, 0).toLocaleString()}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Top Demand Hub</span>
+                <span className="font-mono text-base font-bold text-foreground mt-0.5 block">
+                  {cityDemand[0]?.city || "N/A"}
+                </span>
+              </div>
+              <div>
+                <span className="text-muted-foreground block text-[11px] font-medium uppercase tracking-wider">Active Search Matches</span>
+                <span className="font-mono text-base font-bold text-emerald-600 dark:text-emerald-400 mt-0.5 block">
+                  {filteredCityDemand.length} <span className="text-xs font-normal text-muted-foreground">locations</span>
+                </span>
+              </div>
+            </div>
+
+            {/* Search Filter */}
+            <div className="flex items-center justify-between gap-3 pb-3">
+              <div className="relative flex-1 max-w-sm">
+                <Search className="absolute left-3 top-1/2 -translate-y-1/2 size-3.5 text-muted-foreground" />
+                <input
+                  type="text"
+                  placeholder="Filter by city, state, or creator name..."
+                  value={demandSearch}
+                  onChange={(e) => setDemandSearch(e.target.value)}
+                  className="w-full pl-8.5 pr-8 py-1.5 text-xs rounded-xl bg-background border border-border/80 focus:outline-hidden focus:ring-2 focus:ring-primary/40 text-foreground"
+                />
+                {demandSearch && (
+                  <button
+                    type="button"
+                    onClick={() => setDemandSearch("")}
+                    className="absolute right-2.5 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground text-xs"
+                  >
+                    ✕
+                  </button>
+                )}
+              </div>
+            </div>
+
+            {/* City Demand Breakdown Table */}
+            <div className="overflow-x-auto rounded-xl border border-border/80">
+              <table className="w-full text-left text-xs border-collapse">
+                <thead className="bg-secondary/60 text-muted-foreground font-semibold uppercase text-[10px] tracking-wider border-b border-border/80">
+                  <tr>
+                    <th className="py-2.5 px-3 text-center w-12">#</th>
+                    <th className="py-2.5 px-3">Visitor City & Region</th>
+                    <th className="py-2.5 px-3">Creator Profile Views</th>
+                    <th className="py-2.5 px-3">Unique Creators Explored</th>
+                    <th className="py-2.5 px-3">Top Discovered Creators from this City</th>
+                    <th className="py-2.5 px-3 text-right">Latest Discovery</th>
+                  </tr>
+                </thead>
+                <tbody className="divide-y divide-border/60">
+                  {loadingCityDemand ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                        <Loader2 className="size-5 animate-spin mx-auto mb-2 text-primary" />
+                        Loading city demand breakdown...
+                      </td>
+                    </tr>
+                  ) : filteredCityDemand.length === 0 ? (
+                    <tr>
+                      <td colSpan={6} className="py-8 text-center text-muted-foreground">
+                        No city discovery records matching your search.
+                      </td>
+                    </tr>
+                  ) : (
+                    (showAllDemand ? filteredCityDemand : filteredCityDemand.slice(0, 15)).map((d, idx) => {
+                      const flag = getCountryFlag(undefined, d.country);
+                      const barPct = maxDemandCityViews ? Math.round((d.totalCreatorViews / maxDemandCityViews) * 100) : 0;
+
+                      return (
+                        <tr key={`${d.city}-${d.region}-${idx}`} className="hover:bg-secondary/30 transition-colors">
+                          <td className="py-3 px-3 font-mono text-[11px] text-muted-foreground text-center font-bold">
+                            #{idx + 1}
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-1.5 font-bold text-foreground">
+                              <span>{flag}</span>
+                              <span>{d.city}</span>
+                            </div>
+                            {d.region && d.region !== "Unknown Region" && (
+                              <span className="text-[11px] text-muted-foreground block">
+                                {d.region}, {d.country}
+                              </span>
+                            )}
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex items-center gap-2">
+                              <span className="font-mono font-bold text-primary text-sm">
+                                {d.totalCreatorViews}
+                              </span>
+                              <span className="text-[11px] text-muted-foreground">views</span>
+                            </div>
+                            <div className="mt-1 h-1.5 w-24 rounded-full bg-secondary overflow-hidden">
+                              <div
+                                className="h-full rounded-full bg-gradient-to-r from-primary to-tealdeep"
+                                style={{ width: `${Math.max(barPct, 8)}%` }}
+                              />
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 font-mono text-foreground font-semibold">
+                            {d.uniqueCreatorsViewed} creators
+                          </td>
+                          <td className="py-3 px-3">
+                            <div className="flex flex-wrap items-center gap-1.5 max-w-md">
+                              {(d.topCreators || []).length === 0 ? (
+                                <span className="text-muted-foreground text-[11px]">No creator data</span>
+                              ) : (
+                                (d.topCreators || []).map((tc, cIdx) => (
+                                  <Link
+                                    key={tc.creator_id || cIdx}
+                                    to={`/creators/${tc.creator_id}` as any}
+                                    target="_blank"
+                                    className="inline-flex items-center gap-1 px-2 py-0.5 rounded-md bg-secondary/80 hover:bg-primary/10 hover:text-primary text-foreground text-[11px] font-medium border border-border/70 transition-colors"
+                                    title={`${tc.creator_name}: ${tc.views} views from ${d.city}`}
+                                  >
+                                    <span className="font-bold">{tc.creator_name}</span>
+                                    <span className="font-mono text-[10px] text-primary font-semibold">
+                                      ({tc.views})
+                                    </span>
+                                  </Link>
+                                ))
+                              )}
+                            </div>
+                          </td>
+                          <td className="py-3 px-3 text-right text-[11px] text-muted-foreground font-mono" title={d.lastViewedAt}>
+                            {d.lastViewedAt ? formatTimeAgo(d.lastViewedAt) : "—"}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  )}
+                </tbody>
+              </table>
+            </div>
+
+            {filteredCityDemand.length > 15 && (
+              <div className="mt-3 text-center">
+                <Button
+                  variant="outline"
+                  onClick={() => setShowAllDemand(!showAllDemand)}
+                  className="px-4 py-1.5 text-xs font-semibold bg-background hover:bg-secondary"
+                >
+                  {showAllDemand ? "Show Top 15 Cities" : `View All ${filteredCityDemand.length} Cities`}
+                </Button>
+              </div>
+            )}
+          </Card>
+
           {/* Row 4: Live Real-time Activity Timeline Feed */}
           <Card className="p-5 border border-border/80">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 pb-3 border-b border-border/60">
@@ -1998,21 +2649,37 @@ function AdminDashboard() {
   const [loadingPlaces, setLoadingPlaces] = useState(false);
   const [placesScope, setPlacesScope] = useState<"all" | "30d" | "7d" | "today">("all");
 
+  // Contact Inquiries State
+  const [contactInquiries, setContactInquiries] = useState<ContactInquiryRecord[]>([]);
+  const [loadingInquiries, setLoadingInquiries] = useState(false);
+
+  // City-to-Creator Demand State
+  const [cityDemand, setCityDemand] = useState<CityCreatorDemand[]>([]);
+  const [loadingCityDemand, setLoadingCityDemand] = useState(false);
+
   const loadAnalytics = async (range = analyticsRange, scope = placesScope) => {
     setLoadingVisits(true);
     setLoadingPlaces(true);
+    setLoadingInquiries(true);
+    setLoadingCityDemand(true);
     try {
-      const [visitData, placesData] = await Promise.all([
+      const [visitData, placesData, inquiriesData, demandData] = await Promise.all([
         supabaseDb.fetchWebsiteVisits(range, 1000),
         supabaseDb.fetchVisitorPlaces(scope),
+        supabaseDb.fetchContactInquiries(250),
+        supabaseDb.fetchCityDemandBreakdown(50),
       ]);
       setVisits(visitData);
       setVisitorPlaces(placesData);
+      setContactInquiries(inquiriesData);
+      setCityDemand(demandData);
     } catch {
       // ignore
     } finally {
       setLoadingVisits(false);
       setLoadingPlaces(false);
+      setLoadingInquiries(false);
+      setLoadingCityDemand(false);
     }
   };
 
@@ -2042,6 +2709,9 @@ function AdminDashboard() {
     const interval = setInterval(() => {
       supabaseDb.fetchWebsiteVisits(analyticsRange, 1000).then((data) => {
         setVisits(data);
+      });
+      supabaseDb.fetchContactInquiries(250).then((data) => {
+        setContactInquiries(data);
       });
     }, 15000);
     return () => clearInterval(interval);
@@ -2604,6 +3274,10 @@ function AdminDashboard() {
             loadingPlaces={loadingPlaces}
             placesScope={placesScope}
             setPlacesScope={setPlacesScope}
+            contactInquiries={contactInquiries}
+            loadingInquiries={loadingInquiries}
+            cityDemand={cityDemand}
+            loadingCityDemand={loadingCityDemand}
           />
         </div>
       ) : null}

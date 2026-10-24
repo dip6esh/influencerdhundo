@@ -219,6 +219,7 @@ export async function getVisitorGeo(): Promise<GeoLocationInfo> {
 // Memory throttle cache to avoid duplicate trackings on hot re-renders
 let lastTrackedPath = "";
 let lastTrackedTime = 0;
+let lastTrackedCreatorId = "";
 
 /**
  * Non-blocking page visit recorder
@@ -237,12 +238,17 @@ export function trackPageView(
   if (path.startsWith("/admin") || path.startsWith("/admin/")) return;
 
   // Debounce duplicate tracking on the same path within 2.5 seconds
+  // But allow through if this call includes rich creatorId while the previous didn't
   const now = Date.now();
-  if (path === lastTrackedPath && now - lastTrackedTime < 2500) {
+  const currentCreatorId = extra?.creatorId || "";
+  const isUpgradingWithCreator = Boolean(currentCreatorId && !lastTrackedCreatorId);
+
+  if (path === lastTrackedPath && now - lastTrackedTime < 2500 && !isUpgradingWithCreator) {
     return;
   }
   lastTrackedPath = path;
   lastTrackedTime = now;
+  lastTrackedCreatorId = currentCreatorId;
 
   // Execute asynchronously in background without blocking page render
   setTimeout(async () => {
@@ -277,4 +283,43 @@ export function trackPageView(
       console.debug("Analytics visit logging skipped:", err);
     }
   }, 100);
+}
+
+export interface ContactInquiryPayload {
+  creatorId: string;
+  creatorName: string;
+  contactType: "phone" | "whatsapp" | "email" | "unlock_attempt";
+  businessId?: string;
+  businessName?: string;
+}
+
+/**
+ * Record a high-intent business inquiry or contact reveal action
+ */
+export function trackContactInquiry(payload: ContactInquiryPayload) {
+  if (typeof window === "undefined") return;
+
+  setTimeout(async () => {
+    try {
+      const sessionId = getSessionId();
+      const geo = await getVisitorGeo();
+      const device = detectDeviceInfo();
+
+      await supabase.from("contact_inquiries").insert({
+        creator_id: payload.creatorId,
+        creator_name: payload.creatorName,
+        contact_type: payload.contactType,
+        business_id: payload.businessId || null,
+        business_name: payload.businessName || null,
+        session_id: sessionId,
+        city: geo.city,
+        region: geo.region,
+        country: geo.country,
+        country_code: geo.countryCode,
+        device_type: device.deviceType,
+      });
+    } catch (err) {
+      console.debug("Contact inquiry logging skipped:", err);
+    }
+  }, 50);
 }
