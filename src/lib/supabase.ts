@@ -143,7 +143,10 @@ export function rowToCreator(row: CreatorRow): Creator {
     travels: Boolean(row.travels),
     travelRange: row.travel_range ?? undefined,
     acceptsProducts: row.accepts_products || "Depends",
-    acceptsProductsDetails: row.accepts_products_details ?? undefined,
+    acceptsProductsDetails:
+      row.status === "Active" && row.accepts_products_details?.trim().startsWith("[")
+        ? undefined
+        : row.accepts_products_details ?? undefined,
     turnaround: row.turnaround || "3–5 days",
     status: row.status || "Active",
     featured: Boolean(row.featured),

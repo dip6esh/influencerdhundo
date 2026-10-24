@@ -323,7 +323,7 @@ function Register() {
         travels: existing.travels ? "Yes" : "No",
         travelRange: existing.travelRange ?? "",
         acceptsProducts: existing.acceptsProducts,
-        acceptsProductsDetails: existing.acceptsProductsDetails ?? "",
+        acceptsProductsDetails: existing.acceptsProductsDetails?.startsWith("[") ? "" : (existing.acceptsProductsDetails ?? ""),
         turnaround: existing.turnaround,
       };
     }
@@ -372,7 +372,7 @@ function Register() {
           travels: existing.travels ? "Yes" : "No",
           travelRange: existing.travelRange ?? "",
           acceptsProducts: existing.acceptsProducts || "Depends",
-          acceptsProductsDetails: existing.acceptsProductsDetails ?? "",
+          acceptsProductsDetails: existing.acceptsProductsDetails?.startsWith("[") ? "" : (existing.acceptsProductsDetails ?? ""),
           turnaround: existing.turnaround || "3–5 days",
         };
       });
@@ -617,7 +617,7 @@ function Register() {
         acceptsProducts: (form.acceptsProducts || "Depends") as Creator["acceptsProducts"],
         acceptsProductsDetails:
           form.acceptsProducts === "Depends"
-            ? form.acceptsProductsDetails.trim() || undefined
+            ? (form.acceptsProductsDetails.trim().startsWith("[") ? undefined : form.acceptsProductsDetails.trim() || undefined)
             : undefined,
         turnaround: form.turnaround || "3–5 days",
         status: existing?.status ?? "Draft",
@@ -2060,7 +2060,7 @@ function Register() {
                         <dt className="label-caps">Accepts products</dt>
                         <dd className="mt-1 font-medium">
                           {draft.acceptsProducts}
-                          {draft.acceptsProducts === "Depends" && draft.acceptsProductsDetails
+                          {draft.acceptsProducts === "Depends" && draft.acceptsProductsDetails && !draft.acceptsProductsDetails.startsWith("[")
                             ? ` (${draft.acceptsProductsDetails})`
                             : ""}
                         </dd>

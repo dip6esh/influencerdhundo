@@ -556,9 +556,9 @@ function CreatorProfile() {
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
                     Accepts Products / Deliveries
                   </span>
-                  <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 truncate" title={creator.acceptsProductsDetails}>
+                  <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 truncate" title={creator.acceptsProductsDetails && !creator.acceptsProductsDetails.trim().startsWith("[") ? creator.acceptsProductsDetails : undefined}>
                     {creator.acceptsProducts || "Depends"}
-                    {creator.acceptsProducts === "Depends" && creator.acceptsProductsDetails && (
+                    {creator.acceptsProducts === "Depends" && creator.acceptsProductsDetails && !creator.acceptsProductsDetails.trim().startsWith("[") && (
                       <span className="text-xs font-normal text-muted-foreground ml-1.5">
                         ({creator.acceptsProductsDetails})
                       </span>
