@@ -507,6 +507,123 @@ function getCountryFlag(code?: string, countryName?: string) {
   return "🌐";
 }
 
+function getTimeRemainingText(expiresAt?: string) {
+  if (!expiresAt) return "Unknown";
+  const diff = new Date(expiresAt).getTime() - Date.now();
+  if (diff <= 0) return "Expired";
+  const hours = Math.floor(diff / (1000 * 60 * 60));
+  if (hours < 1) {
+    const mins = Math.floor(diff / (1000 * 60));
+    return `${mins}m left`;
+  }
+  if (hours < 24) {
+    return `${hours}h left`;
+  }
+  const days = Math.floor(hours / 24);
+  const remHours = hours % 24;
+  return `${days}d ${remHours}h left`;
+}
+
+function exportCreatorsToCsv(list: Creator[], filterName = "all") {
+  if (!list.length) return;
+  const headers = [
+    "ID",
+    "Name",
+    "Display Name",
+    "Status",
+    "Phone",
+    "WhatsApp",
+    "Email",
+    "Instagram",
+    "Followers",
+    "Categories",
+    "Content Types",
+    "Languages",
+    "Collab Type",
+    "Starting Price (INR)",
+    "City",
+    "Locality",
+    "State",
+    "Pincode",
+    "Travels",
+    "Accepts Products",
+    "Product Details",
+    "Turnaround",
+    "Featured",
+    "Subscription Expiry",
+    "Referral Code",
+    "Referred By",
+  ];
+
+  const rows = list.map((c) => [
+    `"${(c.id || "").replace(/"/g, '""')}"`,
+    `"${(c.name || "").replace(/"/g, '""')}"`,
+    `"${(c.displayName || "").replace(/"/g, '""')}"`,
+    `"${(c.status || "").replace(/"/g, '""')}"`,
+    `"${(c.contact?.phone || "").replace(/"/g, '""')}"`,
+    `"${(c.contact?.whatsapp || c.contact?.phone || "").replace(/"/g, '""')}"`,
+    `"${(c.contact?.email || "").replace(/"/g, '""')}"`,
+    `"${(c.instagram || "").replace(/"/g, '""')}"`,
+    c.followers || 0,
+    `"${(c.categories || []).join(", ").replace(/"/g, '""')}"`,
+    `"${(c.contentTypes || []).join(", ").replace(/"/g, '""')}"`,
+    `"${(c.languages || []).join(", ").replace(/"/g, '""')}"`,
+    `"${(c.collabType || "").replace(/"/g, '""')}"`,
+    c.startingPrice || 0,
+    `"${(c.city || "").replace(/"/g, '""')}"`,
+    `"${(c.locality || "").replace(/"/g, '""')}"`,
+    `"${(c.state || "").replace(/"/g, '""')}"`,
+    `"${(c.pincode || "").replace(/"/g, '""')}"`,
+    c.travels ? "Yes" : "No",
+    `"${(c.acceptsProducts || "").replace(/"/g, '""')}"`,
+    `"${(c.acceptsProductsDetails || "").replace(/"/g, '""')}"`,
+    `"${(c.turnaround || "").replace(/"/g, '""')}"`,
+    c.featured ? "Yes" : "No",
+    c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toISOString() : "",
+    `"${(c.referralCode || "").replace(/"/g, '""')}"`,
+    `"${(c.referredBy || "").replace(/"/g, '""')}"`,
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `influencer-dhundo-creators-${filterName}-${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
+function exportBusinessesToCsv(list: BusinessAccount[]) {
+  if (!list.length) return;
+  const headers = [
+    "ID",
+    "Company / Brand Name",
+    "Contact Person",
+    "Mobile / WhatsApp",
+    "Email",
+    "Created At",
+  ];
+
+  const rows = list.map((b) => [
+    `"${(b.id || "").replace(/"/g, '""')}"`,
+    `"${(b.businessName || "").replace(/"/g, '""')}"`,
+    `"${(b.name || "").replace(/"/g, '""')}"`,
+    `"${(b.mobile || "").replace(/"/g, '""')}"`,
+    `"${(b.email || "").replace(/"/g, '""')}"`,
+    b.createdAt ? new Date(b.createdAt).toISOString() : "",
+  ]);
+
+  const csvContent = "data:text/csv;charset=utf-8," + [headers.join(","), ...rows.map((r) => r.join(","))].join("\n");
+  const encodedUri = encodeURI(csvContent);
+  const link = document.createElement("a");
+  link.setAttribute("href", encodedUri);
+  link.setAttribute("download", `influencer-dhundo-businesses-${new Date().toISOString().slice(0, 10)}.csv`);
+  document.body.appendChild(link);
+  link.click();
+  document.body.removeChild(link);
+}
+
 function AnalyticsTabContent({
   visits,
   loading,
@@ -1939,6 +2056,65 @@ function AdminDashboard() {
     "all" | "paid" | "promo100" | "trial" | "draft" | "expired" | "inactive"
   >("all");
   const [actionFeedback, setActionFeedback] = useState<{ id: string; msg: string; type: "success" | "error" } | null>(null);
+  const [expiringWindow, setExpiringWindow] = useState<"48h" | "7d" | "30d">("48h");
+
+  const filteredCreators = useMemo(() => {
+    const now = Date.now();
+    return creators.filter((c) => {
+      const q = creatorSearch.toLowerCase().trim();
+      if (q) {
+        const matchName = c.name?.toLowerCase().includes(q);
+        const matchDisplay = c.displayName?.toLowerCase().includes(q);
+        const matchInsta = c.instagram?.toLowerCase().includes(q);
+        const matchCity = c.city?.toLowerCase().includes(q);
+        const matchLocality = c.locality?.toLowerCase().includes(q);
+        const matchPhone = c.contact?.phone?.toLowerCase().includes(q);
+        const matchEmail = c.contact?.email?.toLowerCase().includes(q);
+        if (!matchName && !matchDisplay && !matchInsta && !matchCity && !matchLocality && !matchPhone && !matchEmail) {
+          return false;
+        }
+      }
+
+      const isDraft = c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"));
+      const creatorSubs = subscriptions.filter((s) => s.creatorId === c.id);
+      const hasRealPaidSub = creatorSubs.some(
+        (s) =>
+          !s.isTrial &&
+          s.planId !== "trial-3d" &&
+          (s.price ?? 0) > 0 &&
+          (s.expiresAt ? new Date(s.expiresAt).getTime() > now : s.status === "active"),
+      );
+      const hasPromo100Sub = !hasRealPaidSub && creatorSubs.some(
+        (s) =>
+          !s.isTrial &&
+          s.planId !== "trial-3d" &&
+          (s.price === 0 || s.price == null) &&
+          (s.expiresAt ? new Date(s.expiresAt).getTime() > now : s.status === "active" || s.isQueued),
+      );
+      const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+      const isExpired = !isDraft && (c.status === "Expired" || (expTime > 0 && expTime <= now));
+      const isTrial =
+        !isDraft &&
+        !hasRealPaidSub &&
+        !hasPromo100Sub &&
+        !isExpired &&
+        ((Boolean(c.trialStartedAt) && expTime > now) ||
+          creatorSubs.some((s) => (s.isTrial || s.planId === "trial-3d") && (s.expiresAt ? new Date(s.expiresAt).getTime() > now : true)));
+      const isInactive = c.status === "Inactive" || c.status === "Suspended";
+
+      if (creatorFunnelFilter === "paid" && !hasRealPaidSub) return false;
+      if (creatorFunnelFilter === "promo100" && !hasPromo100Sub) return false;
+      if (creatorFunnelFilter === "trial" && !isTrial) return false;
+      if (creatorFunnelFilter === "draft" && !isDraft) return false;
+      if (creatorFunnelFilter === "expired" && !isExpired) return false;
+      if (creatorFunnelFilter === "inactive" && !isInactive) return false;
+
+      if (creatorStatusFilter !== "All" && c.status !== creatorStatusFilter) return false;
+      if (creatorCategoryFilter !== "All" && !c.categories?.includes(creatorCategoryFilter)) return false;
+
+      return true;
+    });
+  }, [creators, creatorSearch, creatorFunnelFilter, creatorStatusFilter, creatorCategoryFilter, subscriptions]);
 
   // Subscriptions tab state
   const [subSearch, setSubSearch] = useState("");
@@ -2698,6 +2874,157 @@ function AdminDashboard() {
             })()}
           </div>
 
+          {/* ── ⚡ UPCOMING EXPIRATIONS & RENEWAL WATCH (PROACTIVE RETENTION) ── */}
+          {(() => {
+            const now = Date.now();
+            const limit = expiringWindow === "48h"
+              ? now + 48 * 60 * 60 * 1000
+              : expiringWindow === "7d"
+                ? now + 7 * 24 * 60 * 60 * 1000
+                : now + 30 * 24 * 60 * 60 * 1000;
+
+            const expiringList = creators.filter((c) => {
+              if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
+              const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+              return expTime > now && expTime <= limit;
+            }).sort((a, b) => {
+              const tA = a.subscriptionExpiresAt ? new Date(a.subscriptionExpiresAt).getTime() : 0;
+              const tB = b.subscriptionExpiresAt ? new Date(b.subscriptionExpiresAt).getTime() : 0;
+              return tA - tB;
+            });
+
+            return (
+              <Card className="p-4 bg-amber-500/[0.04] border border-amber-500/30 rounded-2xl shadow-xs">
+                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-500/20">
+                  <div className="flex items-center gap-2.5">
+                    <div className="flex size-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold shrink-0">
+                      <Clock className="size-4" />
+                    </div>
+                    <div>
+                      <div className="flex items-center gap-2">
+                        <h3 className="text-sm font-bold text-foreground">
+                          ⚡ Subscriptions &amp; Trials Expiring Soon
+                        </h3>
+                        <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-bold">
+                          {expiringList.length} creator{expiringList.length === 1 ? "" : "s"}
+                        </span>
+                      </div>
+                      <p className="text-[11px] text-muted-foreground mt-0.5">
+                        Proactive renewal watch — reach out via 1-click WhatsApp before passes expire to keep creator retention high.
+                      </p>
+                    </div>
+                  </div>
+
+                  {/* Window selector */}
+                  <div className="flex items-center gap-1.5 self-start sm:self-center">
+                    <div className="flex rounded-xl bg-background p-0.5 ring-1 ring-border text-xs">
+                      {(
+                        [
+                          { id: "48h", label: "Next 48 Hours" },
+                          { id: "7d", label: "Next 7 Days" },
+                          { id: "30d", label: "Next 30 Days" },
+                        ] as const
+                      ).map((w) => (
+                        <button
+                          key={w.id}
+                          type="button"
+                          onClick={() => setExpiringWindow(w.id)}
+                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                            expiringWindow === w.id
+                              ? "bg-amber-500 text-white shadow-xs"
+                              : "text-muted-foreground hover:text-foreground"
+                          }`}
+                        >
+                          {w.label}
+                        </button>
+                      ))}
+                    </div>
+                  </div>
+                </div>
+
+                {/* List or empty state */}
+                {expiringList.length === 0 ? (
+                  <div className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
+                    <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
+                    <span>
+                      No creator passes expiring in the selected time window (
+                      {expiringWindow === "48h" ? "next 48 hours" : expiringWindow === "7d" ? "next 7 days" : "next 30 days"}). All active profiles are healthy.
+                    </span>
+                  </div>
+                ) : (
+                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                    {expiringList.map((c) => {
+                      const timeLeft = getTimeRemainingText(c.subscriptionExpiresAt);
+                      const isTrial = Boolean(c.trialStartedAt);
+                      const phoneClean = (c.contact?.whatsapp || c.contact?.phone || "").replace(/\D/g, "");
+                      const waNumber = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
+                      const renewalMsg = `Hi ${c.name}, your Influencer Dhundo creator pass is expiring in ${timeLeft}! Renew today to keep receiving brand sponsorships and client deal inquiries: https://influencerdhundo.com/creator/plans`;
+                      const waRenewalUrl = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(renewalMsg)}` : null;
+
+                      return (
+                        <div
+                          key={c.id}
+                          className="p-3 rounded-xl bg-background border border-amber-500/30 flex flex-col justify-between gap-2.5 shadow-2xs hover:border-amber-500/60 transition-all"
+                        >
+                          <div>
+                            <div className="flex items-start justify-between gap-2">
+                              <div className="min-w-0">
+                                <span className="font-bold text-foreground text-xs truncate block">{c.name}</span>
+                                <span className="text-[11px] text-muted-foreground truncate block">
+                                  {c.instagram || c.city || "Creator"}
+                                </span>
+                              </div>
+                              <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                                <Clock className="size-3" />
+                                {timeLeft}
+                              </span>
+                            </div>
+
+                            <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
+                              <span>Expires: {c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+                              <span>·</span>
+                              <span className="font-semibold text-foreground">{isTrial ? "3-Day Trial" : "Paid Pass"}</span>
+                            </div>
+                          </div>
+
+                          <div className="flex items-center gap-1.5 pt-2 border-t border-border/50">
+                            {waRenewalUrl && (
+                              <a
+                                href={waRenewalUrl}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors shadow-2xs"
+                              >
+                                <MessageSquare className="size-3" />
+                                <span>WhatsApp Reminder</span>
+                              </a>
+                            )}
+                            <button
+                              type="button"
+                              onClick={() => handleExtendExpiry(c, 7)}
+                              className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
+                              title="Extend pass by 7 days"
+                            >
+                              +7 Days
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => handleExtendExpiry(c, 30)}
+                              className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
+                              title="Extend pass by 30 days"
+                            >
+                              +30 Days
+                            </button>
+                          </div>
+                        </div>
+                      );
+                    })}
+                  </div>
+                )}
+              </Card>
+            );
+          })()}
+
           {/* SEARCH & FILTERS BAR */}
           <Card className="p-4 bg-secondary/30 border border-border/80">
             <div className="flex flex-col md:flex-row items-stretch md:items-center justify-between gap-3">
@@ -2763,6 +3090,18 @@ function AdminDashboard() {
                   ))}
                 </select>
 
+                {/* 1-Click Creators CSV Export */}
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => exportCreatorsToCsv(filteredCreators, creatorFunnelFilter)}
+                  className="px-3 py-2 text-xs flex items-center gap-1.5 bg-background hover:bg-secondary cursor-pointer font-semibold shadow-xs"
+                  title="Export filtered creators to CSV"
+                >
+                  <Download className="size-3.5" />
+                  <span>Export CSV ({filteredCreators.length})</span>
+                </Button>
+
                 {(creatorSearch || creatorFunnelFilter !== "all" || creatorStatusFilter !== "All" || creatorCategoryFilter !== "All") && (
                   <Button
                     type="button"
@@ -2785,62 +3124,7 @@ function AdminDashboard() {
           {/* CREATOR LIST WITH LIFECYCLE & FUNNEL INTELLIGENCE */}
           {(() => {
             const now = Date.now();
-            const filtered = creators.filter((c) => {
-              const q = creatorSearch.toLowerCase().trim();
-              if (q) {
-                const matchName = c.name?.toLowerCase().includes(q);
-                const matchDisplay = c.displayName?.toLowerCase().includes(q);
-                const matchInsta = c.instagram?.toLowerCase().includes(q);
-                const matchCity = c.city?.toLowerCase().includes(q);
-                const matchLocality = c.locality?.toLowerCase().includes(q);
-                const matchPhone = c.contact?.phone?.toLowerCase().includes(q);
-                const matchEmail = c.contact?.email?.toLowerCase().includes(q);
-                if (!matchName && !matchDisplay && !matchInsta && !matchCity && !matchLocality && !matchPhone && !matchEmail) {
-                  return false;
-                }
-              }
-
-              const isDraft = c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"));
-              const creatorSubs = subscriptions.filter((s) => s.creatorId === c.id);
-              const hasRealPaidSub = creatorSubs.some(
-                (s) =>
-                  !s.isTrial &&
-                  s.planId !== "trial-3d" &&
-                  (s.price ?? 0) > 0 &&
-                  (s.expiresAt ? new Date(s.expiresAt).getTime() > now : s.status === "active"),
-              );
-              const hasPromo100Sub = !hasRealPaidSub && creatorSubs.some(
-                (s) =>
-                  !s.isTrial &&
-                  s.planId !== "trial-3d" &&
-                  (s.price === 0 || s.price == null) &&
-                  (s.expiresAt ? new Date(s.expiresAt).getTime() > now : s.status === "active" || s.isQueued),
-              );
-              const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
-              const isExpired = !isDraft && (c.status === "Expired" || (expTime > 0 && expTime <= now));
-              const isTrial =
-                !isDraft &&
-                !hasRealPaidSub &&
-                !hasPromo100Sub &&
-                !isExpired &&
-                ((Boolean(c.trialStartedAt) && expTime > now) ||
-                  creatorSubs.some((s) => (s.isTrial || s.planId === "trial-3d") && (s.expiresAt ? new Date(s.expiresAt).getTime() > now : true)));
-              const isInactive = c.status === "Inactive" || c.status === "Suspended";
-
-              if (creatorFunnelFilter === "paid" && !hasRealPaidSub) return false;
-              if (creatorFunnelFilter === "promo100" && !hasPromo100Sub) return false;
-              if (creatorFunnelFilter === "trial" && !isTrial) return false;
-              if (creatorFunnelFilter === "draft" && !isDraft) return false;
-              if (creatorFunnelFilter === "expired" && !isExpired) return false;
-              if (creatorFunnelFilter === "inactive" && !isInactive) return false;
-
-              if (creatorStatusFilter !== "All" && c.status !== creatorStatusFilter) return false;
-              if (creatorCategoryFilter !== "All" && !c.categories?.includes(creatorCategoryFilter)) return false;
-
-              return true;
-            });
-
-            if (filtered.length === 0) {
+            if (filteredCreators.length === 0) {
               return (
                 <Card className="p-8 text-center text-sm text-muted-foreground">
                   No creators match the selected filters or search query.
@@ -2850,7 +3134,7 @@ function AdminDashboard() {
 
             return (
               <div className="grid gap-4">
-                {filtered.map((c) => {
+                {filteredCreators.map((c) => {
                   const isDraft = c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"));
                   // ── Comprehensive Subscriptions Inspection (Active + Queued) ──
                   const creatorSubs = subscriptions.filter((s) => s.creatorId === c.id);
@@ -5708,6 +5992,17 @@ function AdminDashboard() {
             </div>
 
             <div className="flex items-center gap-2">
+              <Button
+                variant="outline"
+                className="px-3 py-2 text-xs flex items-center gap-1.5 bg-background hover:bg-secondary cursor-pointer ring-1 ring-border shadow-xs font-semibold"
+                onClick={() => exportBusinessesToCsv(filteredBusinesses)}
+                disabled={filteredBusinesses.length === 0}
+                title="Export registered businesses to CSV"
+              >
+                <Download className="size-3.5" />
+                <span>Export CSV ({filteredBusinesses.length})</span>
+              </Button>
+
               <Button
                 variant="ghost"
                 className="px-3 py-2 text-xs flex items-center gap-1.5 ring-1 ring-border bg-background hover:bg-secondary cursor-pointer"
