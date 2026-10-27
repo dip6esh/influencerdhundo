@@ -7,6 +7,7 @@ import { trackPageView, trackContactInquiry } from "@/lib/analytics-tracker";
 import {
   REPORT_REASONS,
   calculateAge,
+  formatCollabType,
   formatFollowers,
   formatInstagramHandle,
   formatPrice,
@@ -538,7 +539,7 @@ function CreatorProfile() {
                     Collaboration Type
                   </span>
                   <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 whitespace-nowrap">
-                    {creator.collabType || "Paid"}
+                    {formatCollabType(creator.collabType)}
                   </p>
                 </div>
               </div>
@@ -550,7 +551,7 @@ function CreatorProfile() {
                 </div>
                 <div className="min-w-0 flex-1">
                   <span className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground block">
-                    Typical Turnaround
+                    Content Delivered In
                   </span>
                   <p className="text-sm sm:text-base font-bold text-foreground mt-0.5 whitespace-nowrap">
                     {creator.turnaround || "3–5 days"}

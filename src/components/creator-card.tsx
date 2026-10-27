@@ -1,6 +1,7 @@
 import { Link } from "@tanstack/react-router";
 import {
   calculateAge,
+  formatCollabType,
   formatFollowers,
   formatPrice,
   getCreatorProfileSlug,
@@ -38,7 +39,7 @@ export function CreatorCard({ creator, index = 0 }: { creator: Creator; index?: 
 
         {/* Collab type — top-left */}
         <span className="absolute top-3 left-3 rounded-full bg-primary/90 px-2.5 py-1 text-[11px] font-semibold text-primary-foreground backdrop-blur-sm">
-          {creator.collabType}
+          {formatCollabType(creator.collabType)}
         </span>
 
         {/* Followers — top-right */}

@@ -294,12 +294,45 @@ export const supabaseDb = {
         id: report.id,
         creator_id: report.creatorId,
         reason: report.reason,
-        details: report.details,
+        details: report.details || "",
         at: report.at,
       });
       return !error;
     } catch (e) {
       console.warn("Supabase addReport error:", e);
+      return false;
+    }
+  },
+
+  async fetchReports(): Promise<Report[]> {
+    try {
+      const { data, error } = await supabase
+        .from("reports")
+        .select("*")
+        .order("created_at", { ascending: false });
+      if (error) {
+        console.warn("Supabase fetchReports error:", error.message);
+        return [];
+      }
+      return (data || []).map((row) => ({
+        id: row.id,
+        creatorId: row.creator_id,
+        reason: row.reason,
+        details: row.details || undefined,
+        at: row.at || row.created_at,
+      }));
+    } catch (e) {
+      console.warn("Supabase fetchReports error:", e);
+      return [];
+    }
+  },
+
+  async deleteReport(id: string): Promise<boolean> {
+    try {
+      const { error } = await supabase.from("reports").delete().eq("id", id);
+      return !error;
+    } catch (e) {
+      console.warn("Supabase deleteReport error:", e);
       return false;
     }
   },

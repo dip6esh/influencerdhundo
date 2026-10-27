@@ -32,6 +32,7 @@ import {
   EMPTY_FILTERS,
   LANGUAGES,
   filterCreators,
+  formatCollabType,
   formatFollowers,
   formatPrice,
   type Filters,
@@ -312,7 +313,7 @@ function Discover() {
                   <div className="mt-2.5 grid grid-cols-2 sm:grid-cols-4 gap-2">
                     {[
                       { label: "Any type", value: "" },
-                      ...COLLAB_TYPES.map((c) => ({ label: c, value: c })),
+                      ...COLLAB_TYPES.map((c) => ({ label: formatCollabType(c), value: c })),
                     ].map((item) => (
                       <button
                         key={item.value}

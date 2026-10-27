@@ -84,6 +84,9 @@ import {
   Download,
   Target,
   Flame,
+  Menu,
+  ChevronRight,
+  ChevronLeft,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -2606,6 +2609,7 @@ function AdminDashboard() {
     creators,
     business,
     reports,
+    removeReport,
     subscriptions,
     withdrawalRequests,
     setCreatorStatus,
@@ -2619,6 +2623,47 @@ function AdminDashboard() {
     updateWithdrawalRequest,
   } = useAppState();
   const [tab, setTab] = useState<(typeof TABS)[number]>("Analytics");
+  // Sidebar states:
+  // - sidebarVisible: true = visible (rail or expanded on desktop, open drawer on mobile); false = completely hidden (0px)
+  // - sidebarExpanded: true = full width with text; false = partially collapsed icon rail (icons only)
+  const [sidebarVisible, setSidebarVisible] = useState(() => {
+    if (typeof window === "undefined") return true;
+    if (window.innerWidth < 1024) return false;
+    const saved = localStorage.getItem("cc_admin_sidebar_visible");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  const [sidebarExpanded, setSidebarExpanded] = useState(() => {
+    if (typeof window === "undefined") return true;
+    const saved = localStorage.getItem("cc_admin_sidebar_expanded");
+    return saved !== null ? saved === "true" : true;
+  });
+
+  // Listen for custom event from navbar hamburger button
+  useEffect(() => {
+    const handleToggle = () => {
+      setSidebarVisible((prev) => {
+        const next = !prev;
+        try {
+          localStorage.setItem("cc_admin_sidebar_visible", String(next));
+        } catch {}
+        return next;
+      });
+    };
+    window.addEventListener("toggle-admin-sidebar", handleToggle);
+    return () => window.removeEventListener("toggle-admin-sidebar", handleToggle);
+  }, []);
+
+  // Close sidebar on ESC key if on mobile / drawer overlay
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && window.innerWidth < 1024 && sidebarVisible) {
+        setSidebarVisible(false);
+      }
+    };
+    window.addEventListener("keydown", handleKeyDown);
+    return () => window.removeEventListener("keydown", handleKeyDown);
+  }, [sidebarVisible]);
 
   // Special Referrals Admin State
   const [specialSubTab, setSpecialSubTab] = useState<"withdrawals" | "applications">("withdrawals");
@@ -3190,73 +3235,609 @@ function AdminDashboard() {
     setTimeout(() => setCopiedCode(null), 2000);
   };
 
-  return (
-    <div className="mx-auto max-w-5xl px-5 py-10">
-      <div className="flex flex-wrap items-start justify-between gap-4">
-        <div>
-          <SectionEyebrow>
-            <span className="flex items-center gap-1.5">
-              <ShieldCheck className="size-3" /> Admin · {adminUser?.name || adminUser?.email}
-            </span>
-          </SectionEyebrow>
-          <h1 className="mt-2 text-3xl leading-tight">Manage the directory</h1>
-        </div>
-        <div className="flex items-center gap-2">
-          <Button
-            variant="ghost"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400"
-            title="Lock and cloak the admin portal on this device (reverts to 404)"
-            onClick={async () => {
-              await signOutAdmin();
-              lockAndCloakAdminPortal();
-            }}
-          >
-            <Lock className="size-3.5" />
-            Lock & Cloak
-          </Button>
-          <Button
-            variant="ghost"
-            className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-rose"
-            onClick={() => signOutAdmin()}
-          >
-            <LogOut className="size-3.5" />
-            Sign out
-          </Button>
-        </div>
-      </div>
+  const pendingPayouts = withdrawalRequests.filter((r) => r.status === "pending").length;
+  const pendingSpecialRefs = creators.filter((c) => c.specialReferralProgram?.status === "pending").length;
+  const totalPendingAction = pendingPayouts + pendingSpecialRefs + reports.length;
 
-      <div className="mt-5 flex flex-wrap gap-2">
-        {TABS.map((t) => (
-          <button
-            key={t}
-            onClick={() => setTab(t)}
-            className={
-              tab === t
-                ? "rounded-full bg-foreground px-4 py-2 text-xs font-semibold text-background"
-                : "rounded-full px-4 py-2 text-xs font-medium text-muted-foreground ring-1 ring-border hover:text-foreground"
-            }
+  const activeCreatorsCount = creators.filter((c) => c.status === "Active").length;
+  const now = Date.now();
+  const paidSubCount = creators.filter((c) =>
+    subscriptions.some(
+      (s) =>
+        s.creatorId === c.id &&
+        !s.isTrial &&
+        s.planId !== "trial-3d" &&
+        (s.price ?? 0) > 0 &&
+        new Date(s.expiresAt || s.startedAt).getTime() > now,
+    ),
+  ).length;
+
+  type NavItem = {
+    id: (typeof TABS)[number];
+    label: string;
+    icon: typeof BarChart3;
+    count?: number;
+    badge?: number;
+    badgeType?: "warning" | "danger";
+  };
+
+  const NAV_SECTIONS: { title: string; items: NavItem[] }[] = [
+    {
+      title: "Overview",
+      items: [
+        { id: "Analytics" as const, label: "Analytics & Traffic", icon: BarChart3 },
+      ],
+    },
+    {
+      title: "Directory",
+      items: [
+        { id: "Creators" as const, label: "Creators", icon: Users, count: creators.length },
+        { id: "Businesses" as const, label: "Businesses", icon: Building2, count: businessAccounts.length },
+      ],
+    },
+    {
+      title: "Monetization",
+      items: [
+        { id: "Subscriptions" as const, label: "Subscriptions", icon: CreditCard },
+        { id: "Discount Codes" as const, label: "Discount Codes", icon: Tag, count: discountCodes.length },
+        {
+          id: "Special Referrals" as const,
+          label: "Referrals & Payouts",
+          icon: Wallet,
+          badge: pendingPayouts + pendingSpecialRefs,
+          badgeType: "warning" as const,
+        },
+      ],
+    },
+    {
+      title: "Safety & Settings",
+      items: [
+        {
+          id: "Reports" as const,
+          label: "Reported Profiles",
+          icon: AlertTriangle,
+          badge: reports.length,
+          badgeType: "danger" as const,
+        },
+        { id: "Taxonomy" as const, label: "Categories & Cities", icon: Layers },
+      ],
+    },
+  ];
+
+  const currentTabMeta = (() => {
+    switch (tab) {
+      case "Analytics":
+        return { title: "Analytics & Footprints", subtitle: "Live traffic, visitor cities, page impressions, and contact inquiries" };
+      case "Creators":
+        return { title: "Creator Directory", subtitle: "Manage creator profiles, subscription passes, verified badges, and reviews" };
+      case "Businesses":
+        return { title: "Registered Businesses", subtitle: "Brands, agencies, and clients registered on Influencer Dhundo" };
+      case "Subscriptions":
+        return { title: "Subscriptions & Access", subtitle: "Creator subscription passes, expiry dates, and trial access" };
+      case "Discount Codes":
+        return { title: "Discount & Referral Codes", subtitle: "Create promo codes, attribution discounts, and 100% off passes" };
+      case "Special Referrals":
+        return { title: "Special Referrals & Payouts", subtitle: "Affiliate program applications, commissions, and UPI withdrawals" };
+      case "Reports":
+        return { title: "Reported Profiles", subtitle: "Review and resolve user-flagged profiles and policy violations" };
+      case "Taxonomy":
+        return { title: "Categories & Cities", subtitle: "Manage platform search taxonomy, popular hubs, and niches" };
+      default:
+        return { title: "Admin Portal", subtitle: "Manage the platform" };
+    }
+  })();
+
+  return (
+    <div className="w-full min-h-[calc(100vh-57px)]">
+      {/* ── MOBILE SLIDE-OUT DRAWER OVERLAY (< lg) ── */}
+      {sidebarVisible && (
+        <div className="lg:hidden">
+          {/* Backdrop */}
+          <div
+            onClick={() => setSidebarVisible(false)}
+            className="fixed inset-0 z-50 bg-black/60 backdrop-blur-xs transition-opacity"
+            aria-hidden="true"
+          />
+
+          {/* Mobile Drawer Panel */}
+          <aside
+            className="fixed inset-y-0 left-0 z-50 w-72 sm:w-80 bg-card border-r border-border shadow-2xl p-4 flex flex-col justify-between overflow-y-auto animate-in slide-in-from-left duration-200"
+            role="dialog"
+            aria-modal="true"
+            aria-label="Navigation Drawer"
           >
-            {t === "Analytics"
-              ? "📊 Traffic & Footprints"
-              : t === "Discount Codes"
-              ? "🏷️ Discount & Referral Codes"
-              : t === "Special Referrals"
-              ? `💸 Special Referrals & Payouts${
-                  withdrawalRequests.filter((r) => r.status === "pending").length +
-                    creators.filter((c) => c.specialReferralProgram?.status === "pending").length >
-                  0
-                    ? ` (${
-                        withdrawalRequests.filter((r) => r.status === "pending").length +
-                        creators.filter((c) => c.specialReferralProgram?.status === "pending").length
-                      })`
-                    : ""
-                }`
-              : t === "Businesses"
-              ? `🏢 Businesses (${businessAccounts.length})`
-              : t}
-          </button>
-        ))}
-      </div>
+            <div>
+              <div className="flex items-center justify-between pb-3.5 border-b border-border/70">
+                <span className="text-xs font-bold tracking-tight text-foreground select-none">
+                  Admin Portal
+                </span>
+
+                <button
+                  type="button"
+                  onClick={() => setSidebarVisible(false)}
+                  className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors cursor-pointer"
+                  title="Close navigation"
+                  aria-label="Close navigation"
+                >
+                  <X className="size-4" />
+                </button>
+              </div>
+
+              <div className="py-2 px-2.5 my-2.5 rounded-xl bg-secondary/40 border border-border/50 text-[11px] text-muted-foreground truncate">
+                Admin: <strong className="text-foreground">{adminUser?.name || adminUser?.email || "Admin"}</strong>
+              </div>
+
+              {/* Mobile Nav Groups */}
+              <nav className="space-y-3.5 mt-2">
+                {NAV_SECTIONS.map((sec) => (
+                  <div key={sec.title}>
+                    <div className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 mb-1">
+                      {sec.title}
+                    </div>
+                    <div className="space-y-0.5">
+                      {sec.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = tab === item.id;
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => {
+                              setTab(item.id);
+                              setSidebarVisible(false);
+                            }}
+                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                              isActive
+                                ? "bg-foreground text-background shadow-xs font-bold"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2.5">
+                              <Icon className={`size-4 shrink-0 ${isActive ? "text-background" : "text-muted-foreground"}`} />
+                              <span>{item.label}</span>
+                            </span>
+
+                            {typeof item.count === "number" && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                                  isActive
+                                    ? "bg-background/20 text-background"
+                                    : "bg-secondary text-muted-foreground"
+                                }`}
+                              >
+                                {item.count}
+                              </span>
+                            )}
+
+                            {Boolean(item.badge && item.badge > 0) && (
+                              <span
+                                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                  item.badgeType === "danger"
+                                    ? "bg-rose-500 text-white animate-pulse"
+                                    : "bg-amber-500 text-white"
+                                }`}
+                              >
+                                {item.badge}
+                              </span>
+                            )}
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+            </div>
+
+            <div className="pt-3 border-t border-border/70 space-y-1 mt-4">
+              <Button
+                variant="ghost"
+                className="w-full flex items-center justify-start gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer"
+                onClick={async () => {
+                  setSidebarVisible(false);
+                  await signOutAdmin();
+                  lockAndCloakAdminPortal();
+                }}
+              >
+                <Lock className="size-3.5" />
+                <span>Lock &amp; Cloak</span>
+              </Button>
+              <Button
+                variant="ghost"
+                className="w-full flex items-center justify-start gap-2 px-3 py-2 text-xs text-muted-foreground hover:text-rose cursor-pointer"
+                onClick={() => {
+                  setSidebarVisible(false);
+                  signOutAdmin();
+                }}
+              >
+                <LogOut className="size-3.5" />
+                <span>Sign out</span>
+              </Button>
+            </div>
+          </aside>
+        </div>
+      )}
+
+      {/* ── SIDEBAR FLOATING TOGGLE (shown at left edge on mobile & when desktop sidebar is hidden) ── */}
+      {!sidebarVisible && (
+        <button
+          type="button"
+          onClick={() => {
+            setSidebarVisible(true);
+            try { localStorage.setItem("cc_admin_sidebar_visible", "true"); } catch {}
+          }}
+          className="flex fixed left-0 top-20 lg:top-16 z-30 items-center justify-center w-7 h-14 sm:h-16 bg-card border border-l-0 border-border rounded-r-xl shadow-md text-muted-foreground hover:text-primary hover:bg-secondary active:scale-95 transition-all cursor-pointer group"
+          title="Open sidebar"
+          aria-label="Open Admin Sidebar"
+        >
+          <ChevronRight className="size-4 group-hover:translate-x-0.5 transition-transform" />
+          {totalPendingAction > 0 && (
+            <span className="absolute top-2 right-1.5 size-2 rounded-full bg-amber-500" />
+          )}
+        </button>
+      )}
+
+      {/* ── DESKTOP SIDEBAR (DOCKED DIRECTLY TO LEFT EDGE OF SCREEN) ── */}
+      <aside
+        className={`hidden lg:flex fixed left-0 top-16 bottom-0 z-20 bg-card border-r border-border shadow-xs flex-col justify-between overflow-x-hidden overflow-y-auto transition-[width,transform] duration-300 ease-in-out p-3 ${
+          !sidebarVisible
+            ? sidebarExpanded
+              ? "-translate-x-full w-64 pointer-events-none"
+              : "-translate-x-full w-16 pointer-events-none"
+            : sidebarExpanded
+            ? "w-64 translate-x-0"
+            : "w-16 items-center translate-x-0"
+        }`}
+      >
+            {/* Top Header & Navigation */}
+            <div className={sidebarExpanded ? "w-full min-w-[232px]" : "w-full"}>
+              {sidebarExpanded ? (
+                /* Expanded Header */
+                <div className="flex items-center justify-between h-10 pb-3 border-b border-border/60 w-full">
+                  <span className="text-xs font-bold tracking-tight text-foreground whitespace-nowrap select-none">
+                    Admin Portal
+                  </span>
+
+                  <div className="flex items-center gap-1 shrink-0">
+                    {/* Collapse to icons button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSidebarExpanded(false);
+                        try {
+                          localStorage.setItem("cc_admin_sidebar_expanded", "false");
+                        } catch {}
+                      }}
+                      className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors duration-150 cursor-pointer"
+                      title="Collapse to icons only"
+                      aria-label="Collapse sidebar"
+                    >
+                      <ChevronLeft className="size-4" />
+                    </button>
+                    {/* Hide completely button */}
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setSidebarVisible(false);
+                        try {
+                          localStorage.setItem("cc_admin_sidebar_visible", "false");
+                        } catch {}
+                      }}
+                      className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors duration-150 cursor-pointer"
+                      title="Hide sidebar completely"
+                      aria-label="Close sidebar"
+                    >
+                      <X className="size-4" />
+                    </button>
+                  </div>
+                </div>
+              ) : (
+                /* Collapsed (Mini Rail) Header - Only Arrow Icon (exact same height & vertical position) */
+                <div className="flex items-center justify-center h-10 pb-3 border-b border-border/60 w-full">
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setSidebarExpanded(true);
+                      try {
+                        localStorage.setItem("cc_admin_sidebar_expanded", "true");
+                      } catch {}
+                    }}
+                    className="size-7 rounded-lg flex items-center justify-center text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors duration-150 cursor-pointer"
+                    title="Expand sidebar"
+                    aria-label="Expand sidebar"
+                  >
+                    <ChevronRight className="size-4" />
+                  </button>
+                </div>
+              )}
+
+              {/* Navigation Items */}
+              <nav className={`mt-3 ${sidebarExpanded ? "space-y-4" : "space-y-2 w-full flex flex-col items-center"}`}>
+                {NAV_SECTIONS.map((sec) => (
+                  <div key={sec.title} className={sidebarExpanded ? "w-full" : "w-full flex flex-col items-center"}>
+                    {sidebarExpanded && (
+                      <div className="px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground/70 mb-1 whitespace-nowrap select-none">
+                        {sec.title}
+                      </div>
+                    )}
+                    <div className={sidebarExpanded ? "space-y-0.5" : "space-y-0.5 w-full flex flex-col items-center"}>
+                      {sec.items.map((item) => {
+                        const Icon = item.icon;
+                        const isActive = tab === item.id;
+
+                        if (!sidebarExpanded) {
+                          // Icon-only Mini Rail Button (snappy hover, zero OS tooltip interference, zero repaint loop)
+                          return (
+                            <button
+                              key={item.id}
+                              type="button"
+                              onClick={() => setTab(item.id)}
+                              className={`group size-9 rounded-xl flex items-center justify-center transition-colors duration-75 ease-out cursor-pointer relative select-none ${
+                                isActive
+                                  ? "bg-foreground text-background shadow-xs font-bold"
+                                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                              }`}
+                              aria-label={item.label}
+                            >
+                              <Icon className={`size-4.5 pointer-events-none transition-colors duration-75 ${isActive ? "text-background" : "text-muted-foreground group-hover:text-foreground"}`} />
+
+                              {/* Badge Dot (solid without continuous repaint animation) */}
+                              {Boolean(item.badge && item.badge > 0) && (
+                                <span
+                                  className={`absolute top-1.5 right-1.5 size-2 rounded-full ring-2 ring-card pointer-events-none ${
+                                    item.badgeType === "danger"
+                                      ? "bg-rose-500"
+                                      : "bg-amber-500"
+                                  }`}
+                                />
+                              )}
+                            </button>
+                          );
+                        }
+
+                        // Full Expanded Row Button (monolithic mouse target, snappy duration-75, no gap strobing)
+                        return (
+                          <button
+                            key={item.id}
+                            type="button"
+                            onClick={() => setTab(item.id)}
+                            className={`group w-full h-9 flex items-center justify-between px-2.5 rounded-xl text-xs font-semibold transition-colors duration-75 ease-out cursor-pointer whitespace-nowrap select-none ${
+                              isActive
+                                ? "bg-foreground text-background shadow-xs font-bold"
+                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                            }`}
+                          >
+                            <span className="flex items-center gap-2.5 truncate pointer-events-none">
+                              <Icon className={`size-4 shrink-0 transition-colors duration-75 ${isActive ? "text-background" : "text-muted-foreground group-hover:text-foreground"}`} />
+                              <span className="truncate whitespace-nowrap">{item.label}</span>
+                            </span>
+
+                            <div className="flex items-center gap-1 shrink-0 ml-2 pointer-events-none">
+                              {typeof item.count === "number" && (
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                                    isActive
+                                      ? "bg-background/20 text-background"
+                                      : "bg-secondary text-muted-foreground"
+                                  }`}
+                                >
+                                  {item.count}
+                                </span>
+                              )}
+
+                              {Boolean(item.badge && item.badge > 0) && (
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                    item.badgeType === "danger"
+                                      ? "bg-rose-500 text-white"
+                                      : "bg-amber-500 text-white"
+                                  }`}
+                                >
+                                  {item.badge}
+                                </span>
+                              )}
+                            </div>
+                          </button>
+                        );
+                      })}
+                    </div>
+                  </div>
+                ))}
+              </nav>
+            </div>
+
+            {/* Sidebar Bottom Controls */}
+            {sidebarExpanded ? (
+              <div className="pt-3 mt-4 border-t border-border/60 space-y-0.5 w-full min-w-[232px]">
+                <Button
+                  variant="ghost"
+                  className="w-full flex items-center justify-start gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400 cursor-pointer h-9 whitespace-nowrap transition-colors duration-75 ease-out select-none"
+                  title="Lock and cloak the admin portal on this device (reverts to 404)"
+                  onClick={async () => {
+                    await signOutAdmin();
+                    lockAndCloakAdminPortal();
+                  }}
+                >
+                  <Lock className="size-3.5 shrink-0 pointer-events-none" />
+                  <span className="whitespace-nowrap pointer-events-none">Lock &amp; Cloak</span>
+                </Button>
+                <Button
+                  variant="ghost"
+                  className="w-full flex items-center justify-start gap-2 px-3 py-1.5 text-xs text-muted-foreground hover:text-rose cursor-pointer h-9 whitespace-nowrap transition-colors duration-75 ease-out select-none"
+                  onClick={() => signOutAdmin()}
+                >
+                  <LogOut className="size-3.5 shrink-0 pointer-events-none" />
+                  <span className="whitespace-nowrap pointer-events-none">Sign out</span>
+                </Button>
+              </div>
+            ) : (
+              <div className="pt-3 mt-4 border-t border-border/60 flex flex-col items-center gap-1 w-full">
+                <button
+                  type="button"
+                  onClick={async () => {
+                    await signOutAdmin();
+                    lockAndCloakAdminPortal();
+                  }}
+                  className="size-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-amber-500 hover:bg-secondary transition-colors duration-75 ease-out cursor-pointer select-none"
+                  title="Lock &amp; Cloak"
+                >
+                  <Lock className="size-4 pointer-events-none" />
+                </button>
+                <button
+                  type="button"
+                  onClick={() => signOutAdmin()}
+                  className="size-9 rounded-xl flex items-center justify-center text-muted-foreground hover:text-rose hover:bg-secondary transition-colors duration-75 ease-out cursor-pointer select-none"
+                  title="Sign out"
+                >
+                  <LogOut className="size-4 pointer-events-none" />
+                </button>
+              </div>
+            )}
+      </aside>
+
+      {/* ── MAIN WORKSPACE (DYNAMIC PADDING TO ACCOMMODATE LEFT-DOCKED SIDEBAR) ── */}
+      <div
+        className={`w-full min-w-0 transition-all duration-300 ease-in-out ${
+          !sidebarVisible
+            ? "lg:pl-0"
+            : sidebarExpanded
+            ? "lg:pl-64"
+            : "lg:pl-16"
+        }`}
+      >
+        <div className="w-full px-4 sm:px-6 py-6 lg:py-8 min-w-0">
+          <main className="w-full space-y-6 min-w-0">
+          {/* Header Bar */}
+          <div className="flex flex-wrap items-center justify-between gap-4 pb-4 border-b border-border/60 min-w-0">
+            <div className="flex items-center gap-3 min-w-0 pl-7 lg:pl-0">
+              <div className="min-w-0">
+                <div className="flex items-center gap-1.5 text-[11px] font-semibold text-muted-foreground uppercase tracking-wider whitespace-nowrap">
+                  <span>Dashboard</span>
+                  <span>/</span>
+                  <span className="text-foreground">{tab}</span>
+                </div>
+                <h1 className="text-xl sm:text-2xl font-bold tracking-tight text-foreground whitespace-nowrap truncate">
+                  {currentTabMeta.title}
+                </h1>
+              </div>
+            </div>
+
+            {/* Quick Header Right Items */}
+            <div className="flex items-center gap-2">
+              {totalPendingAction > 0 && (
+                <button
+                  type="button"
+                  onClick={() => {
+                    if (reports.length > 0) setTab("Reports");
+                    else setTab("Special Referrals");
+                  }}
+                  className="px-3 py-1.5 rounded-xl bg-amber-500/10 border border-amber-500/30 text-amber-700 dark:text-amber-300 text-xs font-semibold flex items-center gap-1.5 hover:bg-amber-500/20 transition-all cursor-pointer"
+                >
+                  <AlertCircle className="size-3.5 text-amber-500 animate-pulse" />
+                  <span>{totalPendingAction} Action{totalPendingAction === 1 ? "" : "s"} Needed</span>
+                </button>
+              )}
+
+              <Button
+                variant="ghost"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400"
+                title="Lock and cloak the admin portal on this device (reverts to 404)"
+                onClick={async () => {
+                  await signOutAdmin();
+                  lockAndCloakAdminPortal();
+                }}
+              >
+                <Lock className="size-3.5" />
+                <span className="hidden sm:inline">Lock &amp; Cloak</span>
+              </Button>
+              <Button
+                variant="ghost"
+                className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-rose"
+                onClick={() => signOutAdmin()}
+                title="Sign out"
+              >
+                <LogOut className="size-3.5" />
+                <span className="hidden sm:inline">Sign out</span>
+              </Button>
+            </div>
+          </div>
+
+        {/* Subtitle */}
+        <p className="-mt-3 text-xs text-muted-foreground">
+          {currentTabMeta.subtitle}
+        </p>
+
+        {/* Compact Top KPI strip (Shown on Analytics & Creators view) */}
+        {(tab === "Analytics" || tab === "Creators") && (
+          <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
+            <div
+              onClick={() => setTab("Creators")}
+              className="p-3 rounded-xl border border-border/80 bg-card hover:border-primary/40 transition-all cursor-pointer group shadow-2xs"
+            >
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-medium group-hover:text-foreground">Total Creators</span>
+                <Users className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-bold tracking-tight text-foreground">{creators.length}</span>
+                <span className="text-[10px] text-emerald-600 dark:text-emerald-400 font-medium">{activeCreatorsCount} active</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => setTab("Businesses")}
+              className="p-3 rounded-xl border border-border/80 bg-card hover:border-primary/40 transition-all cursor-pointer group shadow-2xs"
+            >
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-medium group-hover:text-foreground">Businesses</span>
+                <Building2 className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-bold tracking-tight text-foreground">{businessAccounts.length}</span>
+                <span className="text-[10px] text-muted-foreground">registered brands</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => setTab("Subscriptions")}
+              className="p-3 rounded-xl border border-border/80 bg-card hover:border-primary/40 transition-all cursor-pointer group shadow-2xs"
+            >
+              <div className="flex items-center justify-between text-muted-foreground mb-1">
+                <span className="text-[10px] font-medium group-hover:text-foreground">Paid Subscriptions</span>
+                <CreditCard className="size-3 text-muted-foreground group-hover:text-primary transition-colors" />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className="text-lg font-bold tracking-tight text-emerald-600 dark:text-emerald-400">{paidSubCount}</span>
+                <span className="text-[10px] text-muted-foreground">active revenue</span>
+              </div>
+            </div>
+
+            <div
+              onClick={() => {
+                if (reports.length > 0) setTab("Reports");
+                else if (pendingPayouts + pendingSpecialRefs > 0) setTab("Special Referrals");
+              }}
+              className={`p-3 rounded-xl border transition-all cursor-pointer group shadow-2xs ${
+                totalPendingAction > 0
+                  ? "border-amber-500/40 bg-amber-500/5 hover:border-amber-500/70"
+                  : "border-border/80 bg-card hover:border-primary/40"
+              }`}
+            >
+              <div className="flex items-center justify-between mb-1">
+                <span className="text-[10px] font-medium text-muted-foreground group-hover:text-foreground">Action Needed</span>
+                <AlertCircle className={`size-3 ${totalPendingAction > 0 ? "text-amber-500 animate-pulse" : "text-muted-foreground"}`} />
+              </div>
+              <div className="flex items-baseline gap-1.5">
+                <span className={`text-lg font-bold tracking-tight ${totalPendingAction > 0 ? "text-amber-600 dark:text-amber-400" : "text-foreground"}`}>
+                  {totalPendingAction}
+                </span>
+                <span className="text-[10px] text-muted-foreground">
+                  {totalPendingAction === 0 ? "all clear" : `${pendingPayouts + pendingSpecialRefs} payouts, ${reports.length} reports`}
+                </span>
+              </div>
+            </div>
+          </div>
+        )}
 
       {/* ── TAB 0: ANALYTICS & FOOTPRINTS ──────────────────────────────── */}
       {tab === "Analytics" ? (
@@ -3309,7 +3890,7 @@ function AdminDashboard() {
           )}
 
           {/* ── INTERACTIVE FUNNEL / LIFECYCLE STATS CARDS ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-7 gap-2.5">
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2.5">
             {/* 1. ALL PROFILES */}
             <button
               type="button"
@@ -6887,31 +7468,82 @@ function AdminDashboard() {
       {/* ── TAB 5: REPORTS ──────────────────────────────────────────────── */}
       {tab === "Reports" ? (
         <Card className="mt-5">
+          <div className="flex items-center justify-between mb-4 pb-3 border-b border-border">
+            <div>
+              <h2 className="text-lg font-bold">Reported Profiles</h2>
+              <p className="text-xs text-muted-foreground mt-0.5">
+                Profiles flagged by visitors and businesses for policy violations or inaccuracies.
+              </p>
+            </div>
+            <span className="text-xs px-2.5 py-1 rounded-full bg-secondary text-foreground font-semibold">
+              {reports.length} {reports.length === 1 ? "report" : "reports"}
+            </span>
+          </div>
+
           {reports.length === 0 ? (
-            <p className="text-sm text-muted-foreground">No reported profiles.</p>
+            <p className="text-sm text-muted-foreground py-8 text-center">No reported profiles.</p>
           ) : (
-            <ul className="space-y-4 text-sm">
-              {reports.map((r) => (
-                <li key={r.id} className="border-b border-border pb-3 last:border-0">
-                  <p className="font-semibold">
-                    {creators.find((c) => c.id === r.creatorId)?.name ?? r.creatorId} ·{" "}
-                    <span className="text-rose">{r.reason}</span>
-                  </p>
-                  {r.details ? (
-                    <p className="mt-1 text-muted-foreground">{r.details}</p>
-                  ) : null}
-                  <p className="mt-1 text-xs text-muted-foreground">
-                    {new Date(r.at).toLocaleString("en-IN")}
-                  </p>
-                  <Button
-                    variant="ghost"
-                    className="mt-2 px-3 py-2 text-xs"
-                    onClick={() => setCreatorStatus(r.creatorId, "Suspended")}
-                  >
-                    Suspend this creator
-                  </Button>
-                </li>
-              ))}
+            <ul className="space-y-4 text-sm divide-y divide-border">
+              {reports.map((r) => {
+                const targetCreator = creators.find((c) => c.id === r.creatorId);
+                const creatorName = targetCreator?.displayName || targetCreator?.name || r.creatorId;
+                const isSuspended = targetCreator?.status === "Suspended";
+
+                return (
+                  <li key={r.id} className="pt-4 first:pt-0">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div className="flex-1 min-w-[240px]">
+                        <div className="flex items-center gap-2 flex-wrap">
+                          <Link
+                            to="/creators/$creatorId"
+                            params={{ creatorId: r.creatorId }}
+                            target="_blank"
+                            className="font-bold text-foreground hover:underline inline-flex items-center gap-1"
+                          >
+                            <span>{creatorName}</span>
+                            <ExternalLink className="size-3 text-muted-foreground" />
+                          </Link>
+                          <span className="inline-block rounded-md bg-destructive/10 text-destructive border border-destructive/20 px-2 py-0.5 text-xs font-semibold">
+                            {r.reason}
+                          </span>
+                          {isSuspended && (
+                            <span className="inline-block rounded-md bg-rose/10 text-rose px-2 py-0.5 text-xs font-semibold">
+                              Suspended
+                            </span>
+                          )}
+                        </div>
+                        {r.details ? (
+                          <p className="mt-2 text-sm text-muted-foreground bg-secondary/30 p-2.5 rounded-lg border border-border/50">
+                            {r.details}
+                          </p>
+                        ) : null}
+                        <p className="mt-1.5 text-xs text-muted-foreground">
+                          Reported on: {new Date(r.at).toLocaleString("en-IN")}
+                        </p>
+                      </div>
+
+                      <div className="flex items-center gap-2 shrink-0">
+                        {!isSuspended && (
+                          <Button
+                            variant="outline"
+                            className="px-3 py-1.5 text-xs h-auto border-destructive/40 text-destructive hover:bg-destructive/10"
+                            onClick={() => setCreatorStatus(r.creatorId, "Suspended")}
+                          >
+                            Suspend creator
+                          </Button>
+                        )}
+                        <Button
+                          variant="ghost"
+                          className="px-3 py-1.5 text-xs h-auto text-muted-foreground hover:text-foreground hover:bg-secondary/60"
+                          onClick={() => removeReport(r.id)}
+                        >
+                          Dismiss report
+                        </Button>
+                      </div>
+                    </div>
+                  </li>
+                );
+              })}
             </ul>
           )}
         </Card>
@@ -7315,6 +7947,9 @@ function AdminDashboard() {
           </div>
         </div>
       )}
+          </main>
+        </div>
+      </div>
     </div>
   );
 }

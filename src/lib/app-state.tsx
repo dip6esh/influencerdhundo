@@ -84,6 +84,7 @@ type AppState = {
   removeCreator: (id: string) => void;
   toggleFeatured: (id: string) => void;
   addReport: (r: Omit<Report, "id" | "at">) => void;
+  removeReport: (id: string) => Promise<boolean>;
   activateSubscription: (
     s: Omit<Subscription, "startedAt">,
     referralCode?: string | undefined,
@@ -177,9 +178,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     let isMounted = true;
     async function loadFromSupabase() {
-      const [remoteCreators, remoteSubs] = await Promise.all([
+      const [remoteCreators, remoteSubs, remoteReports] = await Promise.all([
         supabaseDb.fetchCreators(),
         supabaseDb.fetchAllSubscriptions(),
+        supabaseDb.fetchReports(),
       ]);
       if (isMounted && remoteCreators && remoteCreators.length > 0) {
         const mergedCreators = remoteCreators.map((c) => {
@@ -200,6 +202,9 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
       }
       if (isMounted && remoteSubs && remoteSubs.length > 0) {
         setSubscriptions(remoteSubs);
+      }
+      if (isMounted && remoteReports) {
+        setReports(remoteReports);
       }
 
       // If user has active Supabase session, look up their creator or business profile
@@ -638,6 +643,10 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         };
         setReports((prev) => [item, ...prev]);
         supabaseDb.addReport(item);
+      },
+      removeReport: async (id: string) => {
+        setReports((prev) => prev.filter((r) => r.id !== id));
+        return await supabaseDb.deleteReport(id);
       },
 
       activateSubscription: async (s, referralCode, discountPercent) => {

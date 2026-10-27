@@ -227,9 +227,9 @@ let lastTrackedCreatorId = "";
 export function trackPageView(
   path: string,
   extra?: {
-    creatorId?: string;
-    creatorName?: string;
-    overrideReferrer?: string;
+    creatorId?: string | undefined;
+    creatorName?: string | undefined;
+    overrideReferrer?: string | undefined;
   },
 ) {
   if (typeof window === "undefined") return;
@@ -289,8 +289,8 @@ export interface ContactInquiryPayload {
   creatorId: string;
   creatorName: string;
   contactType: "phone" | "whatsapp" | "email" | "unlock_attempt";
-  businessId?: string;
-  businessName?: string;
+  businessId?: string | undefined;
+  businessName?: string | undefined;
 }
 
 /**

@@ -208,9 +208,18 @@ CREATE POLICY "Public can read admin accounts" ON public.admin_accounts FOR SELE
 CREATE POLICY "Public can insert and read website visits" ON public.website_visits FOR ALL USING (true) WITH CHECK (true);
 
 -- ── STORAGE BUCKET FOR CREATOR PROFILE PHOTOS ──────────────────────────────
-INSERT INTO storage.buckets (id, name, public)
-VALUES ('creator-photos', 'creator-photos', true)
-ON CONFLICT (id) DO NOTHING;
+INSERT INTO storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+VALUES (
+  'creator-photos',
+  'creator-photos',
+  true,
+  5242880, -- 5MB limit
+  ARRAY['image/jpeg', 'image/png', 'image/webp']
+)
+ON CONFLICT (id) DO UPDATE SET
+  public = true,
+  file_size_limit = 5242880,
+  allowed_mime_types = ARRAY['image/jpeg', 'image/png', 'image/webp'];
 
 DO $$ BEGIN
   IF NOT EXISTS (

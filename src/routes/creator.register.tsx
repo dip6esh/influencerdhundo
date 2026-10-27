@@ -1566,7 +1566,7 @@ function Register() {
                                   <span>Change Photo</span>
                                   <input
                                     type="file"
-                                    accept="image/*"
+                                    accept="image/jpeg,image/png,image/webp"
                                     className="hidden"
                                     onChange={async (e) => {
                                       const file = e.target.files?.[0];
@@ -1621,7 +1621,7 @@ function Register() {
                                 </div>
                                 <input
                                   type="file"
-                                  accept="image/*"
+                                  accept="image/jpeg,image/png,image/webp"
                                   className="hidden"
                                   onChange={async (e) => {
                                       const file = e.target.files?.[0];
@@ -2066,7 +2066,7 @@ function Register() {
                         </dd>
                       </div>
                       <div>
-                        <dt className="label-caps">Turnaround</dt>
+                        <dt className="label-caps">Content delivered in</dt>
                         <dd className="mt-1 font-medium">{draft.turnaround}</dd>
                       </div>
                       <div>

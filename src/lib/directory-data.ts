@@ -59,6 +59,11 @@ export const LANGUAGES = [
 
 export const COLLAB_TYPES = ["Paid", "Barter", "Both"] as const;
 
+export function formatCollabType(collabType?: string): string {
+  if (collabType === "Both") return "Paid & Barter";
+  return collabType || "Paid";
+}
+
 export const GENDERS = [
   "Female",
   "Male",
@@ -468,10 +473,12 @@ export function calculateAge(birthDate?: string | null): number | null {
 
 export const REPORT_REASONS = [
   "Fake profile",
-  "Incorrect information",
-  "Misleading information",
-  "Inappropriate content",
-  "No longer active",
+  "Duplicate profile",
+  "Wrong phone or WhatsApp",
+  "Fake followers/views",
+  "Scam or non-delivery",
+  "Nudity or adult content",
+  "Inactive account",
   "Other",
 ] as const;
 
