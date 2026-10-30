@@ -1,4 +1,4 @@
-import { createFileRoute, useNavigate } from "@tanstack/react-router";
+import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
 import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-kit";
 import { useAppState, type BusinessAccount } from "@/lib/app-state";
@@ -30,11 +30,47 @@ function BusinessCompleteProfile() {
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [userEmail, setUserEmail] = useState("");
 
+  const [duplicateMobileError, setDuplicateMobileError] = useState<string | null>(null);
+  const [checkingMobile, setCheckingMobile] = useState(false);
+
   const [form, setForm] = useState({
     name: "",
     businessName: "",
     mobile: "",
   });
+
+  // Debounce check for duplicate mobile number
+  useEffect(() => {
+    const cleanMobile = form.mobile.replace(/\D/g, "").slice(-10);
+    if (cleanMobile.length !== 10) {
+      setDuplicateMobileError(null);
+      setCheckingMobile(false);
+      return;
+    }
+
+    setCheckingMobile(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await supabaseDb.findExistingBusinessByContact({
+          mobile: cleanMobile,
+          excludeAuthUserId: authUserId || undefined,
+        });
+        if (res.exists) {
+          setDuplicateMobileError(
+            "A business account with this mobile number already exists."
+          );
+        } else {
+          setDuplicateMobileError(null);
+        }
+      } catch {
+        setDuplicateMobileError(null);
+      } finally {
+        setCheckingMobile(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [form.mobile, authUserId]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -95,11 +131,28 @@ function BusinessCompleteProfile() {
       setError("Please enter a valid 10-digit WhatsApp / phone number.");
       return;
     }
+    if (duplicateMobileError) {
+      setError(duplicateMobileError);
+      return;
+    }
 
     setError("");
     setSubmitting(true);
 
     try {
+      // Final check to prevent race condition
+      const check = await supabaseDb.findExistingBusinessByContact({
+        mobile: cleanMobile.slice(-10),
+        excludeAuthUserId: authUserId,
+      });
+      if (check.exists) {
+        const msg = "A business account with this mobile number already exists.";
+        setDuplicateMobileError(msg);
+        setError(msg);
+        setSubmitting(false);
+        return;
+      }
+
       const account: BusinessAccount = {
         name: trimmedName,
         businessName: trimmedBusiness,
@@ -204,7 +257,8 @@ function BusinessCompleteProfile() {
 
             <Field
               label="WhatsApp / Mobile Number"
-              hint="Creators will use this to reply to your collaboration inquiries"
+              hint={duplicateMobileError ? undefined : "Creators will use this to reply to your collaboration inquiries"}
+              error={duplicateMobileError || undefined}
             >
               <div className="relative">
                 <TextInput
@@ -213,11 +267,27 @@ function BusinessCompleteProfile() {
                   maxLength={15}
                   onChange={(e) => setForm((prev) => ({ ...prev, mobile: e.target.value }))}
                   placeholder="9876543210"
-                  className="pl-9"
+                  className={`pl-9 ${duplicateMobileError ? "border-rose focus:ring-rose" : ""}`}
                   required
                 />
                 <Phone className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 size-4 text-muted-foreground" />
+                {checkingMobile ? (
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                    <Loader2 className="size-4 animate-spin text-primary" />
+                  </div>
+                ) : null}
               </div>
+              {duplicateMobileError ? (
+                <div className="mt-2 flex items-center justify-between rounded-xl bg-destructive/10 border border-destructive/20 p-2.5 text-xs text-destructive">
+                  <span>{duplicateMobileError}</span>
+                  <Link
+                    to="/business/login"
+                    className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
+                  >
+                    Log in &rarr;
+                  </Link>
+                </div>
+              ) : null}
             </Field>
 
             <div className="pt-2">

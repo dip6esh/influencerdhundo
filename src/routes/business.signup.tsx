@@ -50,6 +50,72 @@ function BusinessSignup() {
   const [emailLiveError, setEmailLiveError] = useState<string | null>(null);
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
 
+  // Duplicate checks state
+  const [duplicateMobileError, setDuplicateMobileError] = useState<string | null>(null);
+  const [checkingMobile, setCheckingMobile] = useState(false);
+  const [duplicateEmailError, setDuplicateEmailError] = useState<string | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
+
+  // Debounce check for mobile duplicate
+  useEffect(() => {
+    const cleanMobile = form.mobile.replace(/\D/g, "").slice(-10);
+    if (cleanMobile.length !== 10) {
+      setDuplicateMobileError(null);
+      setCheckingMobile(false);
+      return;
+    }
+
+    setCheckingMobile(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await supabaseDb.findExistingBusinessByContact({ mobile: cleanMobile });
+        if (res.exists) {
+          setDuplicateMobileError(
+            "A business account with this mobile number already exists."
+          );
+        } else {
+          setDuplicateMobileError(null);
+        }
+      } catch {
+        setDuplicateMobileError(null);
+      } finally {
+        setCheckingMobile(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [form.mobile]);
+
+  // Debounce check for email duplicate
+  useEffect(() => {
+    const cleanEmail = form.email.trim();
+    if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+      setDuplicateEmailError(null);
+      setCheckingEmail(false);
+      return;
+    }
+
+    setCheckingEmail(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await supabaseDb.findExistingBusinessByContact({ email: cleanEmail });
+        if (res.exists) {
+          setDuplicateEmailError(
+            "An account with this email address already exists."
+          );
+        } else {
+          setDuplicateEmailError(null);
+        }
+      } catch {
+        setDuplicateEmailError(null);
+      } finally {
+        setCheckingEmail(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [form.email]);
+
   const handleEmailChange = (val: string) => {
     setForm((prev) => ({ ...prev, email: val }));
     const clean = val.trim();
@@ -142,9 +208,15 @@ function BusinessSignup() {
     if (!cleanMobile || cleanMobile.length < 10) {
       return "Please enter a valid 10-digit mobile number.";
     }
+    if (duplicateMobileError) {
+      return duplicateMobileError;
+    }
     const emailCheck = validateTrustedEmail(form.email);
     if (!emailCheck.valid) {
       return emailCheck.error!;
+    }
+    if (duplicateEmailError) {
+      return duplicateEmailError;
     }
     if (form.password.length < 8) {
       return "Password must be at least 8 characters.";
@@ -166,6 +238,30 @@ function BusinessSignup() {
     setLoading(true);
 
     try {
+      // Check for duplicate mobile or email before calling signup
+      const cleanMobile = form.mobile.replace(/\D/g, "").slice(-10);
+      const cleanEmail = form.email.trim().toLowerCase();
+      const existingCheck = await supabaseDb.findExistingBusinessByContact({
+        mobile: cleanMobile,
+        email: cleanEmail,
+      });
+
+      if (existingCheck.exists) {
+        if (existingCheck.matchedField === "mobile") {
+          const msg = "A business account with this mobile number already exists. Please log in.";
+          setDuplicateMobileError(msg);
+          setError(msg);
+          setLoading(false);
+          return;
+        } else {
+          const msg = "An account with this email address already exists. Please log in.";
+          setDuplicateEmailError(msg);
+          setError(msg);
+          setLoading(false);
+          return;
+        }
+      }
+
       const result = await supabaseDb.signUpBusiness(form.email.trim(), form.password, {
         name: form.name.trim(),
         businessName: form.businessName.trim(),
@@ -391,30 +487,75 @@ function BusinessSignup() {
                 </div>
 
                 <div className="grid gap-4 sm:grid-cols-2">
-                  <Field label="Mobile number" hint="10-digit mobile number">
-                    <TextInput
-                      value={form.mobile}
-                      inputMode="numeric"
-                      maxLength={10}
-                      onChange={(e) => setForm({ ...form, mobile: e.target.value })}
-                      placeholder="9820011223"
-                    />
+                  <Field
+                    label="Mobile number"
+                    hint={duplicateMobileError ? undefined : "10-digit mobile number"}
+                    error={duplicateMobileError || undefined}
+                  >
+                    <div className="relative">
+                      <TextInput
+                        value={form.mobile}
+                        inputMode="numeric"
+                        maxLength={10}
+                        onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                        placeholder="9820011223"
+                        className={duplicateMobileError ? "border-rose focus:ring-rose" : ""}
+                      />
+                      {checkingMobile ? (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin text-primary" />
+                        </div>
+                      ) : null}
+                    </div>
+                    {duplicateMobileError ? (
+                      <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
+                        <span>{duplicateMobileError}</span>
+                        <Link
+                          to="/business/login"
+                          className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
+                        >
+                          Log in &rarr;
+                        </Link>
+                      </div>
+                    ) : null}
                   </Field>
                   <Field
                     label="Email address"
-                    hint="Trusted providers only (Gmail, Yahoo, Outlook, etc.)"
-                    error={emailLiveError || undefined}
+                    hint={duplicateEmailError ? undefined : "Trusted providers only (Gmail, Yahoo, Outlook, etc.)"}
+                    error={duplicateEmailError || emailLiveError || undefined}
                   >
-                    <TextInput
-                      value={form.email}
-                      type="email"
-                      maxLength={255}
-                      onChange={(e) => handleEmailChange(e.target.value)}
-                      onBlur={handleEmailBlur}
-                      placeholder="rahul@gmail.com"
-                      className={emailLiveError ? "ring-2 ring-rose focus:ring-rose" : ""}
-                    />
-                    {emailSuggestion && (
+                    <div className="relative">
+                      <TextInput
+                        value={form.email}
+                        type="email"
+                        maxLength={255}
+                        onChange={(e) => handleEmailChange(e.target.value)}
+                        onBlur={handleEmailBlur}
+                        placeholder="rahul@gmail.com"
+                        className={
+                          duplicateEmailError || emailLiveError
+                            ? "border-rose focus:ring-rose"
+                            : ""
+                        }
+                      />
+                      {checkingEmail ? (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin text-primary" />
+                        </div>
+                      ) : null}
+                    </div>
+                    {duplicateEmailError ? (
+                      <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
+                        <span>{duplicateEmailError}</span>
+                        <Link
+                          to="/business/login"
+                          className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
+                        >
+                          Log in &rarr;
+                        </Link>
+                      </div>
+                    ) : null}
+                    {emailSuggestion && !duplicateEmailError && (
                       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                         <span>Suggestion:</span>
                         <button

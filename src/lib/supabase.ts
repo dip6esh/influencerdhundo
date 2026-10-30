@@ -608,6 +608,80 @@ export const supabaseDb = {
     }
   },
 
+  /** Check if a business account already exists with given phone or email */
+  async findExistingBusinessByContact(params: {
+    mobile?: string | undefined;
+    email?: string | undefined;
+    excludeAuthUserId?: string | undefined;
+  }): Promise<{ exists: boolean; matchedField?: "mobile" | "email"; account?: BusinessAccount }> {
+    try {
+      const { mobile, email, excludeAuthUserId } = params;
+
+      // 1. Check mobile
+      if (mobile && mobile.trim()) {
+        const cleanMobile = mobile.replace(/\D/g, "").slice(-10);
+        if (cleanMobile.length === 10) {
+          const { data: rows } = await supabase
+            .from("business_accounts")
+            .select("*")
+            .or(`mobile.ilike.%${cleanMobile}%`)
+            .limit(5);
+
+          if (rows && rows.length > 0) {
+            const match = rows.find((r) => !excludeAuthUserId || r.auth_user_id !== excludeAuthUserId);
+            if (match) {
+              return {
+                exists: true,
+                matchedField: "mobile",
+                account: {
+                  id: match.id,
+                  authUserId: match.auth_user_id ?? undefined,
+                  name: match.name,
+                  businessName: match.business_name,
+                  mobile: match.mobile,
+                  email: match.email,
+                },
+              };
+            }
+          }
+        }
+      }
+
+      // 2. Check email
+      if (email && email.trim() && email.includes("@")) {
+        const cleanEmail = email.trim().toLowerCase();
+        const { data: rows } = await supabase
+          .from("business_accounts")
+          .select("*")
+          .ilike("email", cleanEmail)
+          .limit(5);
+
+        if (rows && rows.length > 0) {
+          const match = rows.find((r) => !excludeAuthUserId || r.auth_user_id !== excludeAuthUserId);
+          if (match) {
+            return {
+              exists: true,
+              matchedField: "email",
+              account: {
+                id: match.id,
+                authUserId: match.auth_user_id ?? undefined,
+                name: match.name,
+                businessName: match.business_name,
+                mobile: match.mobile,
+                email: match.email,
+              },
+            };
+          }
+        }
+      }
+
+      return { exists: false };
+    } catch (e) {
+      console.warn("findExistingBusinessByContact error:", e);
+      return { exists: false };
+    }
+  },
+
   async fetchAllBusinesses(): Promise<BusinessAccount[]> {
     try {
       const { data, error } = await supabase
