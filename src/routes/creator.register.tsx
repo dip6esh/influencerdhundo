@@ -524,6 +524,79 @@ function Register() {
   const [emailLiveError, setEmailLiveError] = useState<string | null>(null);
   const [emailSuggestion, setEmailSuggestion] = useState<string | null>(null);
 
+  // Duplicate checks state
+  const [duplicateInstagramError, setDuplicateInstagramError] = useState<string | null>(null);
+  const [checkingInstagram, setCheckingInstagram] = useState(false);
+  const [duplicateMobileError, setDuplicateMobileError] = useState<string | null>(null);
+  const [checkingMobile, setCheckingMobile] = useState(false);
+
+  // Debounced check for Instagram handle duplicate
+  useEffect(() => {
+    const raw = form.instagram.trim();
+    const clean = normalizeInstagramHandle(raw);
+    if (!clean || clean.length < 2) {
+      setDuplicateInstagramError(null);
+      setCheckingInstagram(false);
+      return;
+    }
+
+    setCheckingInstagram(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await supabaseDb.findExistingCreatorBySocialOrContact({
+          instagram: clean,
+          excludeCreatorId: existing?.id,
+        });
+        if (res.exists) {
+          setDuplicateInstagramError(
+            `A creator profile with Instagram @${clean} already exists. If this is you, please log in.`
+          );
+        } else {
+          setDuplicateInstagramError(null);
+        }
+      } catch {
+        setDuplicateInstagramError(null);
+      } finally {
+        setCheckingInstagram(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [form.instagram, existing?.id]);
+
+  // Debounced check for Mobile / Phone duplicate on step 0
+  useEffect(() => {
+    const cleanPhone = form.mobile.replace(/\D/g, "").slice(-10);
+    if (cleanPhone.length !== 10) {
+      setDuplicateMobileError(null);
+      setCheckingMobile(false);
+      return;
+    }
+
+    setCheckingMobile(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await supabaseDb.findExistingCreatorBySocialOrContact({
+          phone: cleanPhone,
+          excludeCreatorId: existing?.id,
+        });
+        if (res.exists) {
+          setDuplicateMobileError(
+            "An account with this mobile number already exists. Please log in instead."
+          );
+        } else {
+          setDuplicateMobileError(null);
+        }
+      } catch {
+        setDuplicateMobileError(null);
+      } finally {
+        setCheckingMobile(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [form.mobile, existing?.id]);
+
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm((f) => {
       const updated = { ...f, [key]: value };
@@ -642,6 +715,9 @@ function Register() {
       if (!cleanMobile || cleanMobile.length < 10) {
         return "Please enter a valid 10-digit WhatsApp / mobile number.";
       }
+      if (duplicateMobileError) {
+        return duplicateMobileError;
+      }
       if (authUserId || isGoogleAuth) return ""; // Google-verified account
       const emailCheck = validateTrustedEmail(form.email);
       if (!emailCheck.valid) return emailCheck.error!;
@@ -684,6 +760,9 @@ function Register() {
       const cleanHandle = normalizeInstagramHandle(form.instagram);
       if (!cleanHandle) {
         return "Please enter a valid Instagram username or profile link.";
+      }
+      if (duplicateInstagramError) {
+        return duplicateInstagramError;
       }
       if (!form.followers.trim()) {
         return "Please enter your Instagram follower count.";
@@ -1386,17 +1465,36 @@ function Register() {
                   {/* WhatsApp / Mobile Number - Captured upfront in Step 0 */}
                   <Field
                     label="WhatsApp / Mobile number"
-                    hint="10-digit number. Brands & local businesses will use this to contact you"
+                    hint={duplicateMobileError ? undefined : "10-digit number. Brands & local businesses will use this to contact you"}
+                    error={duplicateMobileError || undefined}
                   >
-                    <TextInput
-                      type="tel"
-                      value={form.mobile}
-                      maxLength={15}
-                      onChange={(e) => set("mobile", e.target.value)}
-                      placeholder="9876543210"
-                      className="font-mono"
-                      required
-                    />
+                    <div className="relative">
+                      <TextInput
+                        type="tel"
+                        value={form.mobile}
+                        maxLength={15}
+                        onChange={(e) => set("mobile", e.target.value)}
+                        placeholder="9876543210"
+                        className={`font-mono ${duplicateMobileError ? "border-rose focus:ring-rose" : ""}`}
+                        required
+                      />
+                      {checkingMobile ? (
+                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                          <Loader2 className="size-4 animate-spin text-primary" />
+                        </div>
+                      ) : null}
+                    </div>
+                    {duplicateMobileError ? (
+                      <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
+                        <span>{duplicateMobileError}</span>
+                        <Link
+                          to="/creator/login"
+                          className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
+                        >
+                          Log in &rarr;
+                        </Link>
+                      </div>
+                    ) : null}
                   </Field>
 
                   {/* Referral Code (Available for both Google & Manual) */}
@@ -1762,16 +1860,38 @@ function Register() {
                     <Field
                       label="Instagram profile (Username or Link) *"
                       hint={
-                        normalizeInstagramHandle(form.instagram)
-                          ? `Detected handle: @${normalizeInstagramHandle(form.instagram)}`
-                          : "Enter handle (e.g. @aditi.eats) or paste full profile link"
+                        duplicateInstagramError ? undefined : (
+                          normalizeInstagramHandle(form.instagram)
+                            ? `Detected handle: @${normalizeInstagramHandle(form.instagram)}`
+                            : "Enter handle (e.g. @aditi.eats) or paste full profile link"
+                        )
                       }
+                      error={duplicateInstagramError || undefined}
                     >
-                      <TextInput
-                        value={form.instagram}
-                        onChange={(e) => set("instagram", e.target.value)}
-                        placeholder="@aditi.eats or https://instagram.com/aditi.eats"
-                      />
+                      <div className="relative">
+                        <TextInput
+                          value={form.instagram}
+                          onChange={(e) => set("instagram", e.target.value)}
+                          placeholder="@aditi.eats or https://instagram.com/aditi.eats"
+                          className={duplicateInstagramError ? "border-rose focus:ring-rose" : ""}
+                        />
+                        {checkingInstagram ? (
+                          <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                            <Loader2 className="size-4 animate-spin text-primary" />
+                          </div>
+                        ) : null}
+                      </div>
+                      {duplicateInstagramError ? (
+                        <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
+                          <span>{duplicateInstagramError}</span>
+                          <Link
+                            to="/creator/login"
+                            className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
+                          >
+                            Log in &rarr;
+                          </Link>
+                        </div>
+                      ) : null}
                     </Field>
                     <Field label="Instagram followers *" hint="Min 500, max 300,000 (300K) followers">
                       <TextInput

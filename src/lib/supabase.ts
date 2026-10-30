@@ -1072,6 +1072,78 @@ export const supabaseDb = {
     }
   },
 
+  /** Check if a creator profile already exists with the given Instagram handle, phone, or email */
+  async findExistingCreatorBySocialOrContact(params: {
+    instagram?: string | undefined;
+    phone?: string | undefined;
+    email?: string | undefined;
+    excludeCreatorId?: string | undefined;
+  }): Promise<{ exists: boolean; matchedField?: "instagram" | "phone" | "email"; creator?: Creator }> {
+    try {
+      const { instagram, phone, email, excludeCreatorId } = params;
+
+      // 1. Check Instagram handle (clean normalized handle)
+      if (instagram && instagram.trim()) {
+        const cleanHandle = instagram.trim().toLowerCase().replace(/^@+/, "");
+        if (cleanHandle) {
+          const { data: rows } = await supabase
+            .from("creators")
+            .select("*")
+            .or(`instagram.ilike.@${cleanHandle},instagram.ilike.${cleanHandle}`)
+            .limit(5);
+
+          if (rows && rows.length > 0) {
+            const match = rows.find((r) => !excludeCreatorId || r.id !== excludeCreatorId);
+            if (match) {
+              return { exists: true, matchedField: "instagram", creator: rowToCreator(match as CreatorRow) };
+            }
+          }
+        }
+      }
+
+      // 2. Check phone / mobile number (10 digits)
+      if (phone && phone.trim()) {
+        const cleanPhone = phone.replace(/\D/g, "").slice(-10);
+        if (cleanPhone.length === 10) {
+          const { data: rows } = await supabase
+            .from("creators")
+            .select("*")
+            .or(`contact->>phone.ilike.%${cleanPhone}%,contact->>whatsapp.ilike.%${cleanPhone}%`)
+            .limit(5);
+
+          if (rows && rows.length > 0) {
+            const match = rows.find((r) => !excludeCreatorId || r.id !== excludeCreatorId);
+            if (match) {
+              return { exists: true, matchedField: "phone", creator: rowToCreator(match as CreatorRow) };
+            }
+          }
+        }
+      }
+
+      // 3. Check email
+      if (email && email.trim() && email.includes("@")) {
+        const cleanEmail = email.trim().toLowerCase();
+        const { data: rows } = await supabase
+          .from("creators")
+          .select("*")
+          .filter("contact->>email", "ilike", cleanEmail)
+          .limit(5);
+
+        if (rows && rows.length > 0) {
+          const match = rows.find((r) => !excludeCreatorId || r.id !== excludeCreatorId);
+          if (match) {
+            return { exists: true, matchedField: "email", creator: rowToCreator(match as CreatorRow) };
+          }
+        }
+      }
+
+      return { exists: false };
+    } catch (e) {
+      console.warn("findExistingCreatorBySocialOrContact error:", e);
+      return { exists: false };
+    }
+  },
+
   /** Save a creator profile linked to a Supabase Auth user id. Returns success status and error message if any. */
   async upsertCreatorWithAuth(
     creator: Creator,
