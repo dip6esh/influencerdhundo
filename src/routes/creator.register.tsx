@@ -529,6 +529,8 @@ function Register() {
   const [checkingInstagram, setCheckingInstagram] = useState(false);
   const [duplicateMobileError, setDuplicateMobileError] = useState<string | null>(null);
   const [checkingMobile, setCheckingMobile] = useState(false);
+  const [duplicateEmailError, setDuplicateEmailError] = useState<string | null>(null);
+  const [checkingEmail, setCheckingEmail] = useState(false);
 
   // Debounced check for Instagram handle duplicate
   useEffect(() => {
@@ -596,6 +598,45 @@ function Register() {
 
     return () => clearTimeout(timer);
   }, [form.mobile, existing?.id]);
+
+  // Debounced check for Email duplicate on step 0
+  useEffect(() => {
+    if (authUserId || isGoogleAuth) {
+      // Google users don't have a password email; skip check
+      setDuplicateEmailError(null);
+      setCheckingEmail(false);
+      return;
+    }
+    const cleanEmail = form.email.trim();
+    if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
+      setDuplicateEmailError(null);
+      setCheckingEmail(false);
+      return;
+    }
+
+    setCheckingEmail(true);
+    const timer = setTimeout(async () => {
+      try {
+        const res = await supabaseDb.findExistingCreatorBySocialOrContact({
+          email: cleanEmail,
+          excludeCreatorId: existing?.id,
+        });
+        if (res.exists) {
+          setDuplicateEmailError(
+            "An account with this email address already exists. Please log in instead."
+          );
+        } else {
+          setDuplicateEmailError(null);
+        }
+      } catch {
+        setDuplicateEmailError(null);
+      } finally {
+        setCheckingEmail(false);
+      }
+    }, 450);
+
+    return () => clearTimeout(timer);
+  }, [form.email, existing?.id, authUserId, isGoogleAuth]);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm((f) => {
@@ -721,6 +762,9 @@ function Register() {
       if (authUserId || isGoogleAuth) return ""; // Google-verified account
       const emailCheck = validateTrustedEmail(form.email);
       if (!emailCheck.valid) return emailCheck.error!;
+      if (duplicateEmailError) {
+        return duplicateEmailError;
+      }
       if (form.password.length < 8) return "Password must be at least 8 characters.";
       if (form.password !== form.confirmPassword) return "Passwords do not match.";
       return "";
@@ -883,6 +927,28 @@ function Register() {
       }
       setSigningUp(true);
       try {
+        // Final duplicate check before Supabase auth call (guards against debounce race)
+        const cleanEmail = form.email.trim().toLowerCase();
+        const cleanPhone = form.mobile.replace(/\D/g, "").slice(-10);
+        const dupCheck = await supabaseDb.findExistingCreatorBySocialOrContact({
+          email: cleanEmail,
+          phone: cleanPhone,
+          excludeCreatorId: existing?.id,
+        });
+        if (dupCheck.exists) {
+          if (dupCheck.matchedField === "email") {
+            const msg = "An account with this email address already exists. Please log in instead.";
+            setDuplicateEmailError(msg);
+            setError(msg);
+            return;
+          } else if (dupCheck.matchedField === "phone") {
+            const msg = "An account with this mobile number already exists. Please log in instead.";
+            setDuplicateMobileError(msg);
+            setError(msg);
+            return;
+          }
+        }
+
         const result = await supabaseDb.signUpCreator(form.email.trim(), form.password);
         if ("error" in result) {
           // If user already exists, try signing in with their password!
@@ -1385,20 +1451,42 @@ function Register() {
 
                       <Field
                         label="Email address"
-                        hint="Trusted providers only (Gmail, Yahoo, Outlook, etc.)"
-                        error={emailLiveError || undefined}
+                        hint={duplicateEmailError ? undefined : "Trusted providers only (Gmail, Yahoo, Outlook, etc.)"}
+                        error={duplicateEmailError || emailLiveError || undefined}
                       >
-                        <TextInput
-                          type="email"
-                          value={form.email}
-                          maxLength={255}
-                          onChange={(e) => set("email", e.target.value)}
-                          onBlur={handleEmailBlur}
-                          placeholder="you@gmail.com"
-                          className={emailLiveError ? "ring-2 ring-rose focus:ring-rose" : ""}
-                          autoFocus
-                        />
-                        {emailSuggestion && (
+                        <div className="relative">
+                          <TextInput
+                            type="email"
+                            value={form.email}
+                            maxLength={255}
+                            onChange={(e) => set("email", e.target.value)}
+                            onBlur={handleEmailBlur}
+                            placeholder="you@gmail.com"
+                            className={
+                              duplicateEmailError || emailLiveError
+                                ? "ring-2 ring-rose focus:ring-rose"
+                                : ""
+                            }
+                            autoFocus
+                          />
+                          {checkingEmail ? (
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground">
+                              <Loader2 className="size-4 animate-spin text-primary" />
+                            </div>
+                          ) : null}
+                        </div>
+                        {duplicateEmailError ? (
+                          <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
+                            <span>{duplicateEmailError}</span>
+                            <Link
+                              to="/creator/login"
+                              className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
+                            >
+                              Log in &rarr;
+                            </Link>
+                          </div>
+                        ) : null}
+                        {emailSuggestion && !duplicateEmailError && (
                           <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
                             <span>Suggestion:</span>
                             <button
