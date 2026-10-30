@@ -33,9 +33,20 @@ function AuthCallbackPage() {
 
     async function handleAuth() {
       try {
-        // Check if there is an auth code in the query params (PKCE OAuth flow)
+        // Check if there is an auth code or recovery token in query/hash
         if (typeof window !== "undefined") {
           const urlParams = new URLSearchParams(window.location.search);
+          const isRecovery =
+            urlParams.get("type") === "recovery" ||
+            window.location.hash.includes("type=recovery");
+
+          if (isRecovery) {
+            window.location.replace(
+              `/reset-password${window.location.search}${window.location.hash}`
+            );
+            return;
+          }
+
           const code = urlParams.get("code");
           if (code) {
             const { data: exchanged, error: exchangeErr } =

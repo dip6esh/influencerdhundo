@@ -962,6 +962,51 @@ export const supabaseDb = {
     await supabase.auth.signOut();
   },
 
+  /** Send a password reset email via Supabase Auth */
+  async resetPasswordForEmail(
+    email: string,
+    redirectTo?: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const redirect =
+        redirectTo ||
+        (typeof window !== "undefined"
+          ? `${window.location.origin}/reset-password`
+          : undefined);
+
+      const options: { redirectTo?: string } = {};
+      if (redirect) {
+        options.redirectTo = redirect;
+      }
+
+      const { error } = await supabase.auth.resetPasswordForEmail(email.trim(), options);
+
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  },
+
+  /** Update user password (used during recovery session or authenticated session) */
+  async updatePassword(
+    newPassword: string,
+  ): Promise<{ success: boolean; error?: string }> {
+    try {
+      const { error } = await supabase.auth.updateUser({
+        password: newPassword,
+      });
+      if (error) {
+        return { success: false, error: error.message };
+      }
+      return { success: true };
+    } catch (e) {
+      return { success: false, error: String(e) };
+    }
+  },
+
   /** Get the currently active Supabase Auth session's user id (if any). */
   async getCreatorSession(): Promise<string | null> {
     try {
