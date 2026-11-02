@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-kit";
 import { useAppState, type BusinessAccount } from "@/lib/app-state";
 import { supabase, supabaseDb } from "@/lib/supabase";
@@ -39,9 +39,9 @@ function BusinessCompleteProfile() {
     mobile: "",
   });
 
-  // Debounce check for duplicate mobile number
-  useEffect(() => {
-    const cleanMobile = form.mobile.replace(/\D/g, "").slice(-10);
+  // Reusable immediate duplicate check handler
+  const runMobileDuplicateCheck = useCallback(async (mobileToCheck: string) => {
+    const cleanMobile = (mobileToCheck || "").replace(/\D/g, "").slice(-10);
     if (cleanMobile.length !== 10) {
       setDuplicateMobileError(null);
       setCheckingMobile(false);
@@ -49,28 +49,32 @@ function BusinessCompleteProfile() {
     }
 
     setCheckingMobile(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await supabaseDb.findExistingBusinessByContact({
-          mobile: cleanMobile,
-          excludeAuthUserId: authUserId || undefined,
-        });
-        if (res.exists) {
-          setDuplicateMobileError(
-            "A business account with this mobile number already exists."
-          );
-        } else {
-          setDuplicateMobileError(null);
-        }
-      } catch {
+    try {
+      const res = await supabaseDb.findExistingBusinessByContact({
+        mobile: cleanMobile,
+        excludeAuthUserId: authUserId || undefined,
+      });
+      if (res.exists) {
+        setDuplicateMobileError(
+          "A business account with this mobile number already exists."
+        );
+      } else {
         setDuplicateMobileError(null);
-      } finally {
-        setCheckingMobile(false);
       }
-    }, 450);
+    } catch {
+      setDuplicateMobileError(null);
+    } finally {
+      setCheckingMobile(false);
+    }
+  }, [authUserId]);
 
+  // Debounce check for duplicate mobile number (fast 250ms debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runMobileDuplicateCheck(form.mobile);
+    }, 250);
     return () => clearTimeout(timer);
-  }, [form.mobile, authUserId]);
+  }, [form.mobile, runMobileDuplicateCheck]);
 
   useEffect(() => {
     async function checkAuth() {
@@ -258,7 +262,7 @@ function BusinessCompleteProfile() {
             <Field
               label="WhatsApp / Mobile Number"
               hint={duplicateMobileError ? undefined : "Creators will use this to reply to your collaboration inquiries"}
-              error={duplicateMobileError || undefined}
+              error={undefined}
             >
               <div className="relative">
                 <TextInput
@@ -266,6 +270,7 @@ function BusinessCompleteProfile() {
                   value={form.mobile}
                   maxLength={15}
                   onChange={(e) => setForm((prev) => ({ ...prev, mobile: e.target.value }))}
+                  onBlur={() => void runMobileDuplicateCheck(form.mobile)}
                   placeholder="9876543210"
                   className={`pl-9 ${duplicateMobileError ? "border-rose focus:ring-rose" : ""}`}
                   required

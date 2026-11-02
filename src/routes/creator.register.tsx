@@ -1,5 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useMemo, useRef, useState } from "react";
+import { useCallback, useEffect, useMemo, useRef, useState } from "react";
 import {
   Button,
   Card,
@@ -38,6 +38,11 @@ import {
 import { Camera, Eye, EyeOff, Gift, Loader2, Save, Sparkles, Trash2, Upload, User } from "lucide-react";
 import { GoogleAuthButton } from "@/components/google-auth-button";
 import { InstagramIcon, FacebookIcon, YouTubeIcon } from "@/components/icons";
+import {
+  DuplicateAccountPopup,
+  DuplicateAlertCard,
+  type DuplicateAccountInfo,
+} from "@/components/duplicate-account-card";
 
 export const Route = createFileRoute("/creator/register")({
   validateSearch: (
@@ -172,19 +177,9 @@ function Register() {
     useAppState();
   const existing = creators.find((c) => c.id === myCreatorId);
 
-  const [step, setStep] = useState(() => {
-    if (existing) return 1;
-    if (typeof window !== "undefined") {
-      try {
-        const savedStep = localStorage.getItem(DRAFT_STEP_KEY);
-        if (savedStep) {
-          const num = Number(savedStep);
-          if (!isNaN(num) && num >= 1 && num < STEPS.length) return num;
-        }
-      } catch {}
-    }
-    return 0;
-  });
+  // For existing creators editing their profile, start on Step 1 (skipping Step 0 credentials).
+  // For new creators signing up, ALWAYS start at Step 0 (Account Setup).
+  const [step, setStep] = useState(() => (existing ? 1 : 0));
   const [authUserId, setAuthUserId] = useState<string | null>(null);
   const [isGoogleAuth, setIsGoogleAuth] = useState(false);
   const [awaitingVerification, setAwaitingVerification] = useState(false);
@@ -327,14 +322,7 @@ function Register() {
         turnaround: existing.turnaround,
       };
     }
-    try {
-      const saved = localStorage.getItem(DRAFT_STORAGE_KEY);
-      if (saved) {
-        return { ...initialForm, ...JSON.parse(saved) };
-      }
-    } catch {
-      // ignore
-    }
+    // For brand new creator signups, always start with a clean, empty form
     return initialForm;
   });
 
@@ -379,7 +367,7 @@ function Register() {
     }
   }, [existing]);
 
-  // Save form draft to localStorage and auto-sync in-progress lead to Supabase so Admin can track abandoned registrations
+  // Save form draft to localStorage only (local client cache for convenience if browser reloads)
   useEffect(() => {
     if (existing) return;
 
@@ -390,67 +378,7 @@ function Register() {
         // ignore
       }
     }
-
-    const hasEnoughData = Boolean(
-      (form.name && form.name.trim().length >= 2) ||
-      (form.email && form.email.includes("@")) ||
-      (form.mobile && form.mobile.trim().length >= 5) ||
-      (form.instagram && form.instagram.trim().length >= 2),
-    );
-    if (!hasEnoughData) return;
-
-    const timer = setTimeout(async () => {
-      try {
-        const draftId = getOrCreateDraftId(form.name, form.email, form.mobile);
-        const cleanIg = form.instagram?.trim();
-        const fallbackDraftName = cleanIg
-          ? (cleanIg.startsWith("@") ? cleanIg : `@${cleanIg}`)
-          : "New Creator";
-        const resolvedName = form.name.trim() || form.displayName.trim() || fallbackDraftName;
-        const resolvedDisplayName = form.displayName.trim() || form.name.trim() || fallbackDraftName;
-        const currentStepName = STEPS[step] || `Step ${step + 1}`;
-
-        const draftLead: Creator = {
-          id: draftId,
-          name: resolvedName,
-          displayName: resolvedDisplayName,
-          photo: form.photo || "",
-          city: form.city || "Unassigned",
-          locality: form.locality || "",
-          state: form.state || "",
-          pincode: form.pincode || "",
-          followers: Number(form.followers) || 0,
-          instagram: form.instagram || "",
-          otherSocials: [],
-          categories: form.categories || [],
-          contentTypes: form.contentTypes || [],
-          languages: form.languages || [],
-          about: form.about || `In-progress registration started on ${new Date().toLocaleDateString("en-IN")}.`,
-          collabType: (form.collabType as any) || "Paid",
-          startingPrice: Number(form.startingPrice) || 0,
-          travels: form.travels === "Yes",
-          travelRange: form.travelRange || "",
-          acceptsProducts: (form.acceptsProducts as any) || "Depends",
-          acceptsProductsDetails: `[Abandoned Lead - Dropped at Step ${step + 1}: ${currentStepName}]`,
-          turnaround: form.turnaround || "3–5 days",
-          status: "Draft",
-          contact: {
-            phone: form.mobile || "",
-            whatsapp: form.mobile || "",
-            email: form.email || "",
-          },
-          birthDate: form.birthDate || undefined,
-          gender: form.gender || undefined,
-          referredBy: referralCode || undefined,
-        };
-        await supabaseDb.upsertCreator(draftLead);
-      } catch (err) {
-        console.debug("Draft sync error:", err);
-      }
-    }, 1500);
-
-    return () => clearTimeout(timer);
-  }, [form, step, existing, referralCode]);
+  }, [form, existing]);
 
   // Track if this form was loaded for an authenticated creator
   const wasLoggedInRef = useRef(Boolean(myCreatorId));
@@ -468,6 +396,7 @@ function Register() {
       try {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
+        localStorage.removeItem(DRAFT_STEP_KEY);
       } catch {
         // ignore
       }
@@ -531,10 +460,11 @@ function Register() {
   const [checkingMobile, setCheckingMobile] = useState(false);
   const [duplicateEmailError, setDuplicateEmailError] = useState<string | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
+  const [duplicatePopup, setDuplicatePopup] = useState<DuplicateAccountInfo | null>(null);
 
-  // Debounced check for Instagram handle duplicate
-  useEffect(() => {
-    const raw = form.instagram.trim();
+  // Reusable immediate duplicate check handlers
+  const runInstagramDuplicateCheck = useCallback(async (instagramToCheck: string) => {
+    const raw = (instagramToCheck || "").trim();
     const clean = normalizeInstagramHandle(raw);
     if (!clean || clean.length < 2) {
       setDuplicateInstagramError(null);
@@ -543,32 +473,31 @@ function Register() {
     }
 
     setCheckingInstagram(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await supabaseDb.findExistingCreatorBySocialOrContact({
-          instagram: clean,
-          excludeCreatorId: existing?.id,
+    try {
+      const res = await supabaseDb.findExistingCreatorBySocialOrContact({
+        instagram: clean,
+        excludeCreatorId: existing?.id,
+      });
+      if (res.exists) {
+        const msg = "Instagram already registered.";
+        setDuplicateInstagramError(msg);
+        setDuplicatePopup({
+          type: "instagram",
+          value: `@${clean}`,
+          loginUrl: "/creator/login",
         });
-        if (res.exists) {
-          setDuplicateInstagramError(
-            `A creator profile with Instagram @${clean} already exists. If this is you, please log in.`
-          );
-        } else {
-          setDuplicateInstagramError(null);
-        }
-      } catch {
+      } else {
         setDuplicateInstagramError(null);
-      } finally {
-        setCheckingInstagram(false);
       }
-    }, 450);
+    } catch {
+      setDuplicateInstagramError(null);
+    } finally {
+      setCheckingInstagram(false);
+    }
+  }, [existing?.id]);
 
-    return () => clearTimeout(timer);
-  }, [form.instagram, existing?.id]);
-
-  // Debounced check for Mobile / Phone duplicate on step 0
-  useEffect(() => {
-    const cleanPhone = form.mobile.replace(/\D/g, "").slice(-10);
+  const runMobileDuplicateCheck = useCallback(async (mobileToCheck: string) => {
+    const cleanPhone = (mobileToCheck || "").replace(/\D/g, "").slice(-10);
     if (cleanPhone.length !== 10) {
       setDuplicateMobileError(null);
       setCheckingMobile(false);
@@ -576,38 +505,36 @@ function Register() {
     }
 
     setCheckingMobile(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await supabaseDb.findExistingCreatorBySocialOrContact({
-          phone: cleanPhone,
-          excludeCreatorId: existing?.id,
+    try {
+      const res = await supabaseDb.findExistingCreatorBySocialOrContact({
+        phone: cleanPhone,
+        excludeCreatorId: existing?.id,
+      });
+      if (res.exists) {
+        const msg = "Mobile number already registered.";
+        setDuplicateMobileError(msg);
+        setDuplicatePopup({
+          type: "phone",
+          value: cleanPhone,
+          loginUrl: "/creator/login",
         });
-        if (res.exists) {
-          setDuplicateMobileError(
-            "An account with this mobile number already exists. Please log in instead."
-          );
-        } else {
-          setDuplicateMobileError(null);
-        }
-      } catch {
+      } else {
         setDuplicateMobileError(null);
-      } finally {
-        setCheckingMobile(false);
       }
-    }, 450);
+    } catch {
+      setDuplicateMobileError(null);
+    } finally {
+      setCheckingMobile(false);
+    }
+  }, [existing?.id]);
 
-    return () => clearTimeout(timer);
-  }, [form.mobile, existing?.id]);
-
-  // Debounced check for Email duplicate on step 0
-  useEffect(() => {
+  const runEmailDuplicateCheck = useCallback(async (emailToCheck: string) => {
     if (authUserId || isGoogleAuth) {
-      // Google users don't have a password email; skip check
       setDuplicateEmailError(null);
       setCheckingEmail(false);
       return;
     }
-    const cleanEmail = form.email.trim();
+    const cleanEmail = (emailToCheck || "").trim();
     if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
       setDuplicateEmailError(null);
       setCheckingEmail(false);
@@ -615,28 +542,52 @@ function Register() {
     }
 
     setCheckingEmail(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await supabaseDb.findExistingCreatorBySocialOrContact({
-          email: cleanEmail,
-          excludeCreatorId: existing?.id,
+    try {
+      const res = await supabaseDb.findExistingCreatorBySocialOrContact({
+        email: cleanEmail,
+        excludeCreatorId: existing?.id,
+      });
+      if (res.exists) {
+        const msg = "Email already registered.";
+        setDuplicateEmailError(msg);
+        setDuplicatePopup({
+          type: "email",
+          value: cleanEmail,
+          loginUrl: `/creator/login?email=${encodeURIComponent(cleanEmail)}`,
         });
-        if (res.exists) {
-          setDuplicateEmailError(
-            "An account with this email address already exists. Please log in instead."
-          );
-        } else {
-          setDuplicateEmailError(null);
-        }
-      } catch {
+      } else {
         setDuplicateEmailError(null);
-      } finally {
-        setCheckingEmail(false);
       }
-    }, 450);
+    } catch {
+      setDuplicateEmailError(null);
+    } finally {
+      setCheckingEmail(false);
+    }
+  }, [authUserId, isGoogleAuth, existing?.id]);
 
+  // Debounced check for Instagram handle duplicate (fast 250ms debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runInstagramDuplicateCheck(form.instagram);
+    }, 250);
     return () => clearTimeout(timer);
-  }, [form.email, existing?.id, authUserId, isGoogleAuth]);
+  }, [form.instagram, runInstagramDuplicateCheck]);
+
+  // Debounced check for Mobile / Phone duplicate on step 0 (fast 250ms debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runMobileDuplicateCheck(form.mobile);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [form.mobile, runMobileDuplicateCheck]);
+
+  // Debounced check for Email duplicate on step 0 (fast 250ms debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runEmailDuplicateCheck(form.email);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [form.email, runEmailDuplicateCheck]);
 
   const set = <K extends keyof Form>(key: K, value: Form[K]) => {
     setForm((f) => {
@@ -680,6 +631,8 @@ function Register() {
     } else {
       setEmailLiveError(null);
       setEmailSuggestion(null);
+      // Instant duplicate check on blur without waiting for debounce
+      void runEmailDuplicateCheck(form.email);
     }
   };
 
@@ -744,6 +697,12 @@ function Register() {
           whatsapp: (form.mobile || "").trim(),
           email: (form.email || "").trim(),
         },
+        specialReferralProgram: existing?.specialReferralProgram,
+        subscriptionExpiresAt: existing?.subscriptionExpiresAt,
+        trialStartedAt: existing?.trialStartedAt,
+        referralBonusDays: existing?.referralBonusDays ?? 0,
+        featured: existing?.featured ?? false,
+        createdAt: existing?.createdAt,
       };
     }, [form, existing, referrerInfo]);
 
@@ -877,49 +836,8 @@ function Register() {
     }
     setError("");
 
-    // Step 0: create Supabase Auth account & immediately capture lead
+    // Step 0: create Supabase Auth account
     if (step === 0 && !existing) {
-      // Immediately write lead to Supabase so Email and WhatsApp are 100% saved
-      try {
-        const draftId = getOrCreateDraftId(form.name, form.email, form.mobile);
-        const draftLead: Creator = {
-          id: draftId,
-          name: form.name.trim() || form.email.split("@")[0] || "New Creator Lead",
-          displayName: form.displayName.trim() || form.name.trim() || form.email.split("@")[0] || "New Creator",
-          photo: form.photo || "",
-          city: form.city || "Unassigned",
-          locality: form.locality || "",
-          state: form.state || "",
-          pincode: form.pincode || "",
-          followers: Number(form.followers) || 0,
-          instagram: form.instagram || "",
-          otherSocials: [],
-          categories: form.categories || [],
-          contentTypes: form.contentTypes || [],
-          languages: form.languages || [],
-          about: form.about || `In-progress registration started on ${new Date().toLocaleDateString("en-IN")}.`,
-          collabType: (form.collabType as any) || "Paid",
-          startingPrice: Number(form.startingPrice) || 0,
-          travels: form.travels === "Yes",
-          travelRange: form.travelRange || "",
-          acceptsProducts: (form.acceptsProducts as any) || "Depends",
-          acceptsProductsDetails: "[Initial Account Lead - Step 0 Completed]",
-          turnaround: form.turnaround || "3–5 days",
-          status: "Draft",
-          contact: {
-            phone: form.mobile.trim(),
-            whatsapp: form.mobile.trim(),
-            email: form.email.trim(),
-          },
-          birthDate: form.birthDate || undefined,
-          gender: form.gender || undefined,
-          referredBy: referralCode || undefined,
-        };
-        supabaseDb.upsertCreator(draftLead).catch(() => {});
-      } catch {
-        // non-blocking
-      }
-
       if (authUserId || isGoogleAuth) {
         // Direct advancement for Google-authenticated creators
         setStep(1);
@@ -933,18 +851,27 @@ function Register() {
         const dupCheck = await supabaseDb.findExistingCreatorBySocialOrContact({
           email: cleanEmail,
           phone: cleanPhone,
-          excludeCreatorId: existing?.id,
         });
         if (dupCheck.exists) {
           if (dupCheck.matchedField === "email") {
-            const msg = "An account with this email address already exists. Please log in instead.";
+            const msg = "Email already registered.";
             setDuplicateEmailError(msg);
-            setError(msg);
+            setDuplicatePopup({
+              type: "email",
+              value: cleanEmail,
+              loginUrl: `/creator/login?email=${encodeURIComponent(cleanEmail)}`,
+            });
+            setError("");
             return;
           } else if (dupCheck.matchedField === "phone") {
-            const msg = "An account with this mobile number already exists. Please log in instead.";
+            const msg = "Mobile number already registered.";
             setDuplicateMobileError(msg);
-            setError(msg);
+            setDuplicatePopup({
+              type: "phone",
+              value: cleanPhone,
+              loginUrl: "/creator/login",
+            });
+            setError("");
             return;
           }
         }
@@ -985,15 +912,7 @@ function Register() {
       }
     }
 
-    setStep((s) => {
-      const nextStep = Math.min(s + 1, STEPS.length - 1);
-      if (typeof window !== "undefined" && !existing) {
-        try {
-          localStorage.setItem(DRAFT_STEP_KEY, String(nextStep));
-        } catch {}
-      }
-      return nextStep;
-    });
+    setStep((s) => Math.min(s + 1, STEPS.length - 1));
   };
 
   /** Allows creator to save in-progress draft and finish later from dashboard */
@@ -1012,7 +931,6 @@ function Register() {
       if (typeof window !== "undefined") {
         try {
           localStorage.setItem(DRAFT_STORAGE_KEY, JSON.stringify(form));
-          localStorage.setItem(DRAFT_STEP_KEY, String(step));
         } catch {}
       }
 
@@ -1023,6 +941,11 @@ function Register() {
         id: draftId,
         status: existing?.status === "Active" ? "Active" : "Draft",
         acceptsProductsDetails: existing?.acceptsProductsDetails || `[In-Progress Draft - Paused at ${currentStepName}]`,
+        specialReferralProgram: existing?.specialReferralProgram ?? draft.specialReferralProgram,
+        subscriptionExpiresAt: existing?.subscriptionExpiresAt ?? draft.subscriptionExpiresAt,
+        trialStartedAt: existing?.trialStartedAt ?? draft.trialStartedAt,
+        referralBonusDays: existing?.referralBonusDays ?? draft.referralBonusDays,
+        featured: existing?.featured ?? draft.featured,
       };
 
       const uid = authUserId || (await supabaseDb.getCreatorSession());
@@ -1180,6 +1103,11 @@ function Register() {
         ...draft,
         status: isDraftOrNew ? "Active" : (existing?.status ?? "Active"),
         referredBy: finalReferredBy || undefined,
+        specialReferralProgram: existing?.specialReferralProgram ?? draft.specialReferralProgram,
+        subscriptionExpiresAt: existing?.subscriptionExpiresAt ?? draft.subscriptionExpiresAt,
+        trialStartedAt: existing?.trialStartedAt ?? draft.trialStartedAt,
+        referralBonusDays: existing?.referralBonusDays ?? draft.referralBonusDays,
+        featured: existing?.featured ?? draft.featured,
       };
 
       const uid = authUserId || (await supabaseDb.getCreatorSession());
@@ -1452,7 +1380,7 @@ function Register() {
                       <Field
                         label="Email address"
                         hint={duplicateEmailError ? undefined : "Trusted providers only (Gmail, Yahoo, Outlook, etc.)"}
-                        error={duplicateEmailError || emailLiveError || undefined}
+                        error={duplicateEmailError ? undefined : (emailLiveError || undefined)}
                       >
                         <div className="relative">
                           <TextInput
@@ -1476,15 +1404,10 @@ function Register() {
                           ) : null}
                         </div>
                         {duplicateEmailError ? (
-                          <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
-                            <span>{duplicateEmailError}</span>
-                            <Link
-                              to="/creator/login"
-                              className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
-                            >
-                              Log in &rarr;
-                            </Link>
-                          </div>
+                          <DuplicateAlertCard
+                            message={duplicateEmailError}
+                            loginUrl={`/creator/login?email=${encodeURIComponent(form.email.trim())}`}
+                          />
                         ) : null}
                         {emailSuggestion && !duplicateEmailError && (
                           <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -1554,7 +1477,7 @@ function Register() {
                   <Field
                     label="WhatsApp / Mobile number"
                     hint={duplicateMobileError ? undefined : "10-digit number. Brands & local businesses will use this to contact you"}
-                    error={duplicateMobileError || undefined}
+                    error={undefined}
                   >
                     <div className="relative">
                       <TextInput
@@ -1562,6 +1485,7 @@ function Register() {
                         value={form.mobile}
                         maxLength={15}
                         onChange={(e) => set("mobile", e.target.value)}
+                        onBlur={() => void runMobileDuplicateCheck(form.mobile)}
                         placeholder="9876543210"
                         className={`font-mono ${duplicateMobileError ? "border-rose focus:ring-rose" : ""}`}
                         required
@@ -1573,15 +1497,10 @@ function Register() {
                       ) : null}
                     </div>
                     {duplicateMobileError ? (
-                      <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
-                        <span>{duplicateMobileError}</span>
-                        <Link
-                          to="/creator/login"
-                          className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
-                        >
-                          Log in &rarr;
-                        </Link>
-                      </div>
+                      <DuplicateAlertCard
+                        message={duplicateMobileError}
+                        loginUrl="/creator/login"
+                      />
                     ) : null}
                   </Field>
 
@@ -1954,12 +1873,13 @@ function Register() {
                             : "Enter handle (e.g. @aditi.eats) or paste full profile link"
                         )
                       }
-                      error={duplicateInstagramError || undefined}
+                      error={undefined}
                     >
                       <div className="relative">
                         <TextInput
                           value={form.instagram}
                           onChange={(e) => set("instagram", e.target.value)}
+                          onBlur={() => void runInstagramDuplicateCheck(form.instagram)}
                           placeholder="@aditi.eats or https://instagram.com/aditi.eats"
                           className={duplicateInstagramError ? "border-rose focus:ring-rose" : ""}
                         />
@@ -1970,15 +1890,10 @@ function Register() {
                         ) : null}
                       </div>
                       {duplicateInstagramError ? (
-                        <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
-                          <span>{duplicateInstagramError}</span>
-                          <Link
-                            to="/creator/login"
-                            className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
-                          >
-                            Log in &rarr;
-                          </Link>
-                        </div>
+                        <DuplicateAlertCard
+                          message={duplicateInstagramError}
+                          loginUrl="/creator/login"
+                        />
                       ) : null}
                     </Field>
                     <Field label="Instagram followers *" hint="Min 500, max 300,000 (300K) followers">
@@ -2460,6 +2375,26 @@ function Register() {
           </div>
         </div>
       </section>
+
+      {/* Animated Duplicate Account Popup Card */}
+      <DuplicateAccountPopup
+        open={Boolean(duplicatePopup)}
+        onClose={() => setDuplicatePopup(null)}
+        info={duplicatePopup}
+        onUseDifferent={() => {
+          if (duplicatePopup?.type === "email") {
+            set("email", "");
+            setDuplicateEmailError(null);
+          } else if (duplicatePopup?.type === "phone") {
+            set("mobile", "");
+            setDuplicateMobileError(null);
+          } else if (duplicatePopup?.type === "instagram") {
+            set("instagram", "");
+            setDuplicateInstagramError(null);
+          }
+          setDuplicatePopup(null);
+        }}
+      />
     </div>
   );
 }

@@ -45,6 +45,7 @@ import {
   Loader2,
   Lock,
   MapPin,
+  Pencil,
   Printer,
   ReceiptText,
   Send,
@@ -147,6 +148,7 @@ function Dashboard() {
   const [applyIfsc, setApplyIfsc] = useState("");
   const [applyingSpecial, setApplyingSpecial] = useState(false);
   const [applyError, setApplyError] = useState<string | null>(null);
+  const [applySuccess, setApplySuccess] = useState<string | null>(null);
   const [showApplyHowItWorks, setShowApplyHowItWorks] = useState(false);
 
   // Withdrawal states
@@ -515,8 +517,14 @@ function Dashboard() {
     setApplyingSpecial(false);
     if (res.success) {
       setShowApplyModal(false);
+      setApplySuccess(
+        isSpecialActive
+          ? "Payout details updated successfully! Commission payouts will be sent to this destination."
+          : "Application submitted successfully! Our team will review your details.",
+      );
+      setTimeout(() => setApplySuccess(null), 6000);
     } else {
-      setApplyError(res.error || "Failed to submit application");
+      setApplyError(res.error || "Failed to save payout details");
     }
   };
 
@@ -1339,6 +1347,14 @@ function Dashboard() {
                 <div className="rounded-2xl sm:rounded-3xl border border-primary/25 bg-gradient-to-br from-primary/10 via-card to-background p-4 sm:p-5 flex flex-col justify-between shadow-xs">
                   {isSpecialActive ? (
                     <div className="space-y-4">
+                      {/* Success Feedback Banner */}
+                      {applySuccess && (
+                        <div className="rounded-xl bg-emerald-500/15 border border-emerald-500/30 p-3 text-xs text-emerald-600 dark:text-emerald-400 font-medium flex items-center gap-2 animate-in fade-in">
+                          <Check className="size-4 shrink-0" />
+                          <span>{applySuccess}</span>
+                        </div>
+                      )}
+
                       {/* Top Header */}
                       <div className="flex items-center justify-between">
                         <div className="flex items-center gap-2.5">
@@ -1352,10 +1368,22 @@ function Dashboard() {
                             <span className="text-[11px] text-muted-foreground">Direct bank / UPI transfers</span>
                           </div>
                         </div>
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-saffrondeep border border-primary/30">
-                          <span className="size-1.5 rounded-full bg-saffron animate-pulse" />
-                          Enrolled
-                        </span>
+                        <div className="flex items-center gap-1.5">
+                          <span className="inline-flex items-center gap-1 rounded-full bg-primary/15 px-2.5 py-0.5 text-[11px] font-bold text-saffrondeep border border-primary/30">
+                            <span className="size-1.5 rounded-full bg-saffron animate-pulse" />
+                            Enrolled
+                          </span>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={handleOpenApplyModal}
+                            className="h-6 px-2 text-[11px] font-semibold text-primary hover:text-primary hover:bg-primary/10 rounded-lg flex items-center gap-1"
+                            title="Update Bank or UPI Details"
+                          >
+                            <Pencil className="size-2.5" />
+                            <span>Edit</span>
+                          </Button>
+                        </div>
                       </div>
 
                       {/* Primary Focus: Available Balance (Shown ONCE here!) */}
@@ -1449,12 +1477,23 @@ function Dashboard() {
                         </button>
 
                         {showPayoutDetails && (
-                          <div className="mt-2.5 rounded-xl bg-background/60 border border-border/60 p-3 text-[11px] text-muted-foreground space-y-1.5 animate-in fade-in duration-200">
+                          <div className="mt-2.5 rounded-xl bg-background/60 border border-border/60 p-3 text-[11px] text-muted-foreground space-y-2 animate-in fade-in duration-200">
                             <p>• <strong>SLA:</strong> Deposited directly to your account within 7–10 working days.</p>
                             <p>• <strong>Frequency:</strong> Max 2 withdrawal requests per calendar month ({monthlyWithdrawalCount}/2 used).</p>
-                            <p>
-                              • <strong>Payout to:</strong> UPI (<strong>{specialProg?.payoutDetails?.upiId}</strong>) • {specialProg?.payoutDetails?.bankName}{specialProg?.payoutDetails?.branchName ? ` (${specialProg.payoutDetails.branchName})` : ""} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})
-                            </p>
+                            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-2 pt-2 border-t border-border/50">
+                              <p className="min-w-0">
+                                • <strong>Payout to:</strong> UPI (<strong>{specialProg?.payoutDetails?.upiId || "N/A"}</strong>) • {specialProg?.payoutDetails?.bankName || "Bank"}{specialProg?.payoutDetails?.branchName ? ` (${specialProg.payoutDetails.branchName})` : ""} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4) || "••••"})
+                              </p>
+                              <Button
+                                type="button"
+                                variant="outline"
+                                onClick={handleOpenApplyModal}
+                                className="shrink-0 rounded-lg text-xs font-bold gap-1 text-primary border-primary/30 hover:bg-primary/10 h-7 px-2.5"
+                              >
+                                <Pencil className="size-3" />
+                                <span>Edit Details</span>
+                              </Button>
+                            </div>
                           </div>
                         )}
                       </div>
@@ -1473,6 +1512,15 @@ function Dashboard() {
                       <p className="text-xs text-muted-foreground">
                         Your payout details were submitted on {new Date(specialProg?.appliedAt || Date.now()).toLocaleDateString("en-IN")}. Once approved, you will earn 10% cash commission directly into your wallet on each referral's first paid plan.
                       </p>
+                      <Button
+                        type="button"
+                        variant="outline"
+                        onClick={handleOpenApplyModal}
+                        className="w-full rounded-xl border border-border text-xs py-2 font-semibold hover:bg-secondary/60 flex items-center justify-center gap-1.5"
+                      >
+                        <Pencil className="size-3.5" />
+                        <span>Edit Submitted Bank Details</span>
+                      </Button>
                     </div>
                   ) : isSpecialRejected ? (
                     <div className="space-y-3.5">
@@ -2568,10 +2616,16 @@ function Dashboard() {
                 </div>
                 <div>
                   <h3 className="text-base sm:text-lg font-display font-bold text-foreground">
-                    Apply for Special Referral Program 💸
+                    {isSpecialActive
+                      ? "Update Payout & Bank Details 🏦"
+                      : isSpecialPending
+                      ? "Edit Submitted Payout Details 📝"
+                      : "Apply for Special Referral Program 💸"}
                   </h3>
                   <p className="text-xs text-muted-foreground">
-                    Earn real cash commissions instead of subscription days
+                    {isSpecialActive || isSpecialPending
+                      ? "Update your destination bank account or UPI ID for cash commission payouts"
+                      : "Earn real cash commissions instead of subscription days"}
                   </p>
                 </div>
               </div>
@@ -2734,8 +2788,12 @@ function Dashboard() {
                   {applyingSpecial ? (
                     <>
                       <Loader2 className="size-3.5 animate-spin mr-1.5" />
-                      Submitting...
+                      {isSpecialActive ? "Saving..." : "Submitting..."}
                     </>
+                  ) : isSpecialActive ? (
+                    "Save Payout Details"
+                  ) : isSpecialPending ? (
+                    "Update Application"
                   ) : (
                     "Submit Application"
                   )}
@@ -2837,10 +2895,23 @@ function Dashboard() {
 
               {/* Destination Summary */}
               <div className="rounded-xl bg-secondary/40 border border-border/80 p-3.5 text-xs space-y-1.5">
-                <span className="font-semibold text-foreground flex items-center gap-1.5">
-                  <Building2 className="size-3.5 text-primary" />
-                  Payout Destination
-                </span>
+                <div className="flex items-center justify-between">
+                  <span className="font-semibold text-foreground flex items-center gap-1.5">
+                    <Building2 className="size-3.5 text-primary" />
+                    Payout Destination
+                  </span>
+                  <button
+                    type="button"
+                    onClick={() => {
+                      setShowWithdrawModal(false);
+                      handleOpenApplyModal();
+                    }}
+                    className="text-[11px] font-semibold text-primary hover:text-primary/80 hover:underline cursor-pointer flex items-center gap-1"
+                  >
+                    <Pencil className="size-3" />
+                    <span>Change / Edit</span>
+                  </button>
+                </div>
                 <div className="font-mono text-[11px] text-muted-foreground space-y-0.5 pt-1">
                   <p>UPI: <strong className="text-foreground">{specialProg?.payoutDetails?.upiId}</strong></p>
                   <p>Bank: <strong className="text-foreground">{specialProg?.payoutDetails?.bankName}{specialProg?.payoutDetails?.branchName ? ` (${specialProg.payoutDetails.branchName})` : ""} (••••{specialProg?.payoutDetails?.accountNumber?.slice(-4)})</strong></p>

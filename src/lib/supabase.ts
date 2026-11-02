@@ -79,8 +79,26 @@ export interface CreatorRow {
 
 export function creatorToRow(c: Creator, authUserId?: string): CreatorRow {
   const cleanId = (c.id || "").trim().toLowerCase().replace(/[^a-z0-9-]+/g, "").replace(/^-+|-+$/g, "");
+  const targetId = cleanId || c.id;
+
+  let prog = c.specialReferralProgram;
+  if (!prog && typeof window !== "undefined" && targetId) {
+    try {
+      const cached = localStorage.getItem(`dhundo_special_prog_${targetId}`);
+      if (cached) prog = JSON.parse(cached);
+    } catch {
+      // ignore
+    }
+  } else if (prog && typeof window !== "undefined" && targetId) {
+    try {
+      localStorage.setItem(`dhundo_special_prog_${targetId}`, JSON.stringify(prog));
+    } catch {
+      // ignore
+    }
+  }
+
   return {
-    id: cleanId || c.id,
+    id: targetId,
     auth_user_id: authUserId ?? null,
     name: (c.name || "").trim(),
     display_name: (c.displayName || c.name || "").trim(),
@@ -117,11 +135,21 @@ export function creatorToRow(c: Creator, authUserId?: string): CreatorRow {
     trial_started_at: c.trialStartedAt ?? null,
     subscription_expires_at: c.subscriptionExpiresAt ?? null,
     referral_bonus_days: c.referralBonusDays ?? 0,
-    special_referral_program: c.specialReferralProgram ?? null,
+    special_referral_program: prog ?? null,
   };
 }
 
 export function rowToCreator(row: CreatorRow): Creator {
+  let specialProg = (row as any).special_referral_program ?? undefined;
+  if (!specialProg && typeof window !== "undefined" && row.id) {
+    try {
+      const cached = localStorage.getItem(`dhundo_special_prog_${row.id}`);
+      if (cached) specialProg = JSON.parse(cached);
+    } catch {
+      // ignore
+    }
+  }
+
   return {
     id: row.id,
     name: row.name,
@@ -158,7 +186,7 @@ export function rowToCreator(row: CreatorRow): Creator {
     trialStartedAt: row.trial_started_at ?? undefined,
     subscriptionExpiresAt: row.subscription_expires_at ?? undefined,
     referralBonusDays: row.referral_bonus_days ?? 0,
-    specialReferralProgram: (row as any).special_referral_program ?? undefined,
+    specialReferralProgram: specialProg,
   };
 }
 

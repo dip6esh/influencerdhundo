@@ -394,11 +394,41 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
 
       if (isCancelled) return;
 
-      if (fullCreator && fullCreator.specialReferralProgram) {
+      let prog = fullCreator?.specialReferralProgram;
+      if (!prog && typeof window !== "undefined") {
+        try {
+          const cached = localStorage.getItem(`dhundo_special_prog_${myCreatorId}`);
+          if (cached) {
+            prog = JSON.parse(cached);
+            // Auto-heal DB: silently restore to Supabase so it shows up in Admin Panel too
+            supabaseDb.updateSpecialReferralProgram(myCreatorId!, prog!);
+          }
+        } catch {}
+      }
+      if (prog && myEvents) {
+        const totalCashEarned = myEvents
+          .filter((e) => e.eventType === "cash_earned")
+          .reduce((sum, e) => sum + (e.cashDelta || 0), 0);
+        const totalPaidOut = (myWithdrawals || [])
+          .filter((w) => w.status === "paid")
+          .reduce((sum, w) => sum + (w.amount || 0), 0);
+        const calculatedBalance = Math.max(0, totalCashEarned - totalPaidOut);
+
+        if (totalCashEarned > 0 && (!prog.totalEarned || prog.totalEarned < totalCashEarned || (prog.walletBalance || 0) < calculatedBalance)) {
+          prog = {
+            ...prog,
+            totalEarned: Math.max(prog.totalEarned || 0, totalCashEarned),
+            walletBalance: Math.max(prog.walletBalance || 0, calculatedBalance),
+          };
+          supabaseDb.updateSpecialReferralProgram(myCreatorId!, prog);
+        }
+      }
+
+      if (prog) {
         setCreators((prev) =>
           prev.map((c) =>
-            c.id === fullCreator.id
-              ? { ...c, specialReferralProgram: fullCreator.specialReferralProgram }
+            c.id === myCreatorId
+              ? { ...c, specialReferralProgram: prog }
               : c,
           ),
         );
@@ -534,6 +564,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           localStorage.removeItem("influencer_active_role");
           localStorage.removeItem("influencer-dhundo-creator-draft-v2");
           localStorage.removeItem("influencer-dhundo-creator-draft-id-v2");
+          localStorage.removeItem("influencer-dhundo-creator-draft-step-v2");
           localStorage.removeItem("influencer_referral_code");
           const raw = localStorage.getItem(STORAGE_KEY);
           if (raw) {
@@ -579,38 +610,71 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         return null;
       },
       upsertCreator: (c, mine) => {
+        let merged = c;
         setCreators((prev) => {
           const i = prev.findIndex((x) => x.id === c.id);
           if (i === -1) return [c, ...prev];
+          const existing = prev[i]!;
+          merged = {
+            ...existing,
+            ...c,
+            specialReferralProgram: c.specialReferralProgram ?? existing.specialReferralProgram,
+            subscriptionExpiresAt: c.subscriptionExpiresAt ?? existing.subscriptionExpiresAt,
+            trialStartedAt: c.trialStartedAt ?? existing.trialStartedAt,
+            referralBonusDays: c.referralBonusDays ?? existing.referralBonusDays,
+            featured: c.featured !== undefined ? c.featured : existing.featured,
+          };
           const next = [...prev];
-          next[i] = c;
+          next[i] = merged;
           return next;
         });
         if (mine) setMyCreatorId(c.id);
-        supabaseDb.upsertCreator(c);
+        supabaseDb.upsertCreator(merged);
       },
       updateCreator: async (c: Creator) => {
+        let merged = c;
         setCreators((prev) => {
           const i = prev.findIndex((x) => x.id === c.id);
           if (i === -1) return [c, ...prev];
+          const existing = prev[i]!;
+          merged = {
+            ...existing,
+            ...c,
+            specialReferralProgram: c.specialReferralProgram ?? existing.specialReferralProgram,
+            subscriptionExpiresAt: c.subscriptionExpiresAt ?? existing.subscriptionExpiresAt,
+            trialStartedAt: c.trialStartedAt ?? existing.trialStartedAt,
+            referralBonusDays: c.referralBonusDays ?? existing.referralBonusDays,
+            featured: c.featured !== undefined ? c.featured : existing.featured,
+          };
           const next = [...prev];
-          next[i] = c;
+          next[i] = merged;
           return next;
         });
-        return await supabaseDb.upsertCreator(c);
+        return await supabaseDb.upsertCreator(merged);
       },
       upsertCreatorWithAuth: async (c, authUserId) => {
-        // Update local state first
+        let merged = c;
+        // Update local state first, defensively preserving system metadata
         setCreators((prev) => {
           const i = prev.findIndex((x) => x.id === c.id);
           if (i === -1) return [c, ...prev];
+          const existing = prev[i]!;
+          merged = {
+            ...existing,
+            ...c,
+            specialReferralProgram: c.specialReferralProgram ?? existing.specialReferralProgram,
+            subscriptionExpiresAt: c.subscriptionExpiresAt ?? existing.subscriptionExpiresAt,
+            trialStartedAt: c.trialStartedAt ?? existing.trialStartedAt,
+            referralBonusDays: c.referralBonusDays ?? existing.referralBonusDays,
+            featured: c.featured !== undefined ? c.featured : existing.featured,
+          };
           const next = [...prev];
-          next[i] = c;
+          next[i] = merged;
           return next;
         });
         setMyCreatorId(c.id);
-        // Persist to Supabase
-        return await supabaseDb.upsertCreatorWithAuth(c, authUserId);
+        // Persist to Supabase with merged properties
+        return await supabaseDb.upsertCreatorWithAuth(merged, authUserId);
       },
       updateCreatorPhoto: async (id, photoUrl) => {
         setCreators((prev) =>
@@ -985,13 +1049,18 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
         if (!creator) return { success: false, error: "Creator not found" };
 
         const currentProg = creator.specialReferralProgram;
+        const isAlreadyActive = currentProg?.status === "active";
         const newProgram: SpecialReferralProgram = {
-          status: "pending",
-          appliedAt: new Date().toISOString(),
+          status: isAlreadyActive ? "active" : "pending",
+          appliedAt: currentProg?.appliedAt || new Date().toISOString(),
+          approvedAt: currentProg?.approvedAt,
+          reviewedAt: currentProg?.reviewedAt,
           payoutDetails,
           walletBalance: currentProg?.walletBalance ?? 0,
           totalEarned: currentProg?.totalEarned ?? 0,
           totalWithdrawn: currentProg?.totalWithdrawn ?? 0,
+          rejectionReason: currentProg?.rejectionReason,
+          closedAt: currentProg?.closedAt,
         };
 
         const ok = await supabaseDb.updateSpecialReferralProgram(creatorId, newProgram);
@@ -1001,7 +1070,7 @@ export function AppStateProvider({ children }: { children: ReactNode }) {
           );
           return { success: true };
         }
-        return { success: false, error: "Failed to submit application. Please try again." };
+        return { success: false, error: "Failed to save payout details. Please try again." };
       },
 
       updateSpecialReferralStatus: async (

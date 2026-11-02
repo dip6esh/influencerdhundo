@@ -1,11 +1,16 @@
 import { createFileRoute, Link, useRouter } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { Button, Card, Field, SectionEyebrow, TextInput } from "@/components/ui-kit";
 import { useAppState } from "@/lib/app-state";
 import { supabase, supabaseDb } from "@/lib/supabase";
 import { validateTrustedEmail } from "@/lib/directory-data";
 import { Building2, Eye, EyeOff, Loader2 } from "lucide-react";
 import { GoogleAuthButton } from "@/components/google-auth-button";
+import {
+  DuplicateAccountPopup,
+  DuplicateAlertCard,
+  type DuplicateAccountInfo,
+} from "@/components/duplicate-account-card";
 
 export const Route = createFileRoute("/business/signup")({
   validateSearch: (search: Record<string, unknown>): { redirect?: string | undefined } => ({
@@ -53,12 +58,13 @@ function BusinessSignup() {
   // Duplicate checks state
   const [duplicateMobileError, setDuplicateMobileError] = useState<string | null>(null);
   const [checkingMobile, setCheckingMobile] = useState(false);
+  const [duplicatePopup, setDuplicatePopup] = useState<DuplicateAccountInfo | null>(null);
   const [duplicateEmailError, setDuplicateEmailError] = useState<string | null>(null);
   const [checkingEmail, setCheckingEmail] = useState(false);
 
-  // Debounce check for mobile duplicate
-  useEffect(() => {
-    const cleanMobile = form.mobile.replace(/\D/g, "").slice(-10);
+  // Reusable immediate duplicate check handlers
+  const runMobileDuplicateCheck = useCallback(async (mobileToCheck: string) => {
+    const cleanMobile = (mobileToCheck || "").replace(/\D/g, "").slice(-10);
     if (cleanMobile.length !== 10) {
       setDuplicateMobileError(null);
       setCheckingMobile(false);
@@ -66,29 +72,24 @@ function BusinessSignup() {
     }
 
     setCheckingMobile(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await supabaseDb.findExistingBusinessByContact({ mobile: cleanMobile });
-        if (res.exists) {
-          setDuplicateMobileError(
-            "A business account with this mobile number already exists."
-          );
-        } else {
-          setDuplicateMobileError(null);
-        }
-      } catch {
+    try {
+      const res = await supabaseDb.findExistingBusinessByContact({ mobile: cleanMobile });
+      if (res.exists) {
+        setDuplicateMobileError(
+          "A business account with this mobile number already exists."
+        );
+      } else {
         setDuplicateMobileError(null);
-      } finally {
-        setCheckingMobile(false);
       }
-    }, 450);
+    } catch {
+      setDuplicateMobileError(null);
+    } finally {
+      setCheckingMobile(false);
+    }
+  }, []);
 
-    return () => clearTimeout(timer);
-  }, [form.mobile]);
-
-  // Debounce check for email duplicate
-  useEffect(() => {
-    const cleanEmail = form.email.trim();
+  const runEmailDuplicateCheck = useCallback(async (emailToCheck: string) => {
+    const cleanEmail = (emailToCheck || "").trim();
     if (!cleanEmail.includes("@") || !cleanEmail.includes(".")) {
       setDuplicateEmailError(null);
       setCheckingEmail(false);
@@ -96,25 +97,42 @@ function BusinessSignup() {
     }
 
     setCheckingEmail(true);
-    const timer = setTimeout(async () => {
-      try {
-        const res = await supabaseDb.findExistingBusinessByContact({ email: cleanEmail });
-        if (res.exists) {
-          setDuplicateEmailError(
-            "An account with this email address already exists."
-          );
-        } else {
-          setDuplicateEmailError(null);
-        }
-      } catch {
+    try {
+      const res = await supabaseDb.findExistingBusinessByContact({ email: cleanEmail });
+      if (res.exists) {
+        const msg = "Email already registered.";
+        setDuplicateEmailError(msg);
+        setDuplicatePopup({
+          type: "email",
+          value: cleanEmail,
+          loginUrl: "/business/login",
+          role: "business",
+        });
+      } else {
         setDuplicateEmailError(null);
-      } finally {
-        setCheckingEmail(false);
       }
-    }, 450);
+    } catch {
+      setDuplicateEmailError(null);
+    } finally {
+      setCheckingEmail(false);
+    }
+  }, []);
 
+  // Debounce check for mobile duplicate (fast 250ms debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runMobileDuplicateCheck(form.mobile);
+    }, 250);
     return () => clearTimeout(timer);
-  }, [form.email]);
+  }, [form.mobile, runMobileDuplicateCheck]);
+
+  // Debounce check for email duplicate (fast 250ms debounce)
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      void runEmailDuplicateCheck(form.email);
+    }, 250);
+    return () => clearTimeout(timer);
+  }, [form.email, runEmailDuplicateCheck]);
 
   const handleEmailChange = (val: string) => {
     setForm((prev) => ({ ...prev, email: val }));
@@ -152,6 +170,8 @@ function BusinessSignup() {
     } else {
       setEmailLiveError(null);
       setEmailSuggestion(null);
+      // Instant duplicate check on blur without waiting for debounce
+      void runEmailDuplicateCheck(form.email);
     }
   };
 
@@ -248,14 +268,26 @@ function BusinessSignup() {
 
       if (existingCheck.exists) {
         if (existingCheck.matchedField === "mobile") {
-          const msg = "A business account with this mobile number already exists. Please log in.";
+          const msg = "Mobile number already registered.";
           setDuplicateMobileError(msg);
+          setDuplicatePopup({
+            type: "phone",
+            value: cleanMobile,
+            loginUrl: "/business/login",
+            role: "business",
+          });
           setError(msg);
           setLoading(false);
           return;
         } else {
-          const msg = "An account with this email address already exists. Please log in.";
+          const msg = "Email already registered.";
           setDuplicateEmailError(msg);
+          setDuplicatePopup({
+            type: "email",
+            value: cleanEmail,
+            loginUrl: "/business/login",
+            role: "business",
+          });
           setError(msg);
           setLoading(false);
           return;
@@ -490,7 +522,7 @@ function BusinessSignup() {
                   <Field
                     label="Mobile number"
                     hint={duplicateMobileError ? undefined : "10-digit mobile number"}
-                    error={duplicateMobileError || undefined}
+                    error={undefined}
                   >
                     <div className="relative">
                       <TextInput
@@ -498,6 +530,7 @@ function BusinessSignup() {
                         inputMode="numeric"
                         maxLength={10}
                         onChange={(e) => setForm({ ...form, mobile: e.target.value })}
+                        onBlur={() => void runMobileDuplicateCheck(form.mobile)}
                         placeholder="9820011223"
                         className={duplicateMobileError ? "border-rose focus:ring-rose" : ""}
                       />
@@ -508,21 +541,16 @@ function BusinessSignup() {
                       ) : null}
                     </div>
                     {duplicateMobileError ? (
-                      <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
-                        <span>{duplicateMobileError}</span>
-                        <Link
-                          to="/business/login"
-                          className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
-                        >
-                          Log in &rarr;
-                        </Link>
-                      </div>
+                      <DuplicateAlertCard
+                        message={duplicateMobileError}
+                        loginUrl="/business/login"
+                      />
                     ) : null}
                   </Field>
                   <Field
                     label="Email address"
                     hint={duplicateEmailError ? undefined : "Trusted providers only (Gmail, Yahoo, Outlook, etc.)"}
-                    error={duplicateEmailError || emailLiveError || undefined}
+                    error={duplicateEmailError ? undefined : (emailLiveError || undefined)}
                   >
                     <div className="relative">
                       <TextInput
@@ -545,15 +573,10 @@ function BusinessSignup() {
                       ) : null}
                     </div>
                     {duplicateEmailError ? (
-                      <div className="mt-2 flex items-center justify-between rounded-xl bg-rose/10 p-2.5 text-xs text-rose">
-                        <span>{duplicateEmailError}</span>
-                        <Link
-                          to="/business/login"
-                          className="font-semibold underline underline-offset-2 hover:text-foreground shrink-0 ml-2"
-                        >
-                          Log in &rarr;
-                        </Link>
-                      </div>
+                      <DuplicateAlertCard
+                        message={duplicateEmailError}
+                        loginUrl="/business/login"
+                      />
                     ) : null}
                     {emailSuggestion && !duplicateEmailError && (
                       <div className="mt-1.5 flex items-center gap-1.5 text-xs text-muted-foreground">
@@ -668,6 +691,23 @@ function BusinessSignup() {
           </div>
         </div>
       </section>
+
+      {/* Animated Duplicate Account Popup Card */}
+      <DuplicateAccountPopup
+        open={Boolean(duplicatePopup)}
+        onClose={() => setDuplicatePopup(null)}
+        info={duplicatePopup}
+        onUseDifferent={() => {
+          if (duplicatePopup?.type === "email") {
+            setForm((f) => ({ ...f, email: "" }));
+            setDuplicateEmailError(null);
+          } else if (duplicatePopup?.type === "phone") {
+            setForm((f) => ({ ...f, mobile: "" }));
+            setDuplicateMobileError(null);
+          }
+          setDuplicatePopup(null);
+        }}
+      />
     </div>
   );
 }
