@@ -30,6 +30,7 @@ import {
   type SpecialReferralProgram,
   type SpecialReferralStatus,
 } from "@/lib/directory-data";
+import { sendCreatorEmailFn } from "@/lib/email";
 import {
   ShieldCheck,
   Eye,
@@ -2772,6 +2773,8 @@ function AdminDashboard() {
   >("all");
   const [actionFeedback, setActionFeedback] = useState<{ id: string; msg: string; type: "success" | "error" } | null>(null);
   const [expiringWindow, setExpiringWindow] = useState<"48h" | "7d" | "30d">("48h");
+  const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
+  const [reminderSentMap, setReminderSentMap] = useState<Record<string, boolean>>({});
 
   const filteredCreators = useMemo(() => {
     const now = Date.now();
@@ -2914,6 +2917,51 @@ function AdminDashboard() {
       setActionFeedback({ id: creator.id, msg: `Error: ${String(err)}`, type: "error" });
     }
     clearActionFeedback();
+  };
+
+  const handleSendReminder = async (creator: Creator) => {
+    if (!creator.contact?.email) {
+      setActionFeedback({
+        id: creator.id,
+        msg: "Cannot send reminder: No contact email found on this profile draft.",
+        type: "error",
+      });
+      clearActionFeedback();
+      return;
+    }
+    setSendingReminderId(creator.id);
+    try {
+      const res = await sendCreatorEmailFn({
+        data: {
+          type: "draft_reminder",
+          to: creator.contact.email,
+          name: creator.name || creator.displayName || "Creator",
+        },
+      });
+      if (res.success) {
+        setReminderSentMap((prev) => ({ ...prev, [creator.id]: true }));
+        setActionFeedback({
+          id: creator.id,
+          msg: `✉️ Reminder email sent to ${creator.contact.email}!`,
+          type: "success",
+        });
+      } else {
+        setActionFeedback({
+          id: creator.id,
+          msg: `Failed to send email: ${res.error || "Unknown error"}`,
+          type: "error",
+        });
+      }
+    } catch (err) {
+      setActionFeedback({
+        id: creator.id,
+        msg: `Failed to send email: ${String(err)}`,
+        type: "error",
+      });
+    } finally {
+      setSendingReminderId(null);
+      clearActionFeedback();
+    }
   };
 
   const handleExtendExpiry = async (creator: Creator, extraDays: number) => {
@@ -4577,6 +4625,36 @@ function AdminDashboard() {
                                     Call
                                   </a>
                                 )}
+
+                                {isDraft && c.contact?.email && (
+                                  <button
+                                    type="button"
+                                    onClick={() => handleSendReminder(c)}
+                                    disabled={sendingReminderId === c.id || Boolean(reminderSentMap[c.id])}
+                                    className={`inline-flex items-center gap-1 rounded-lg px-2 py-0.5 text-[11px] font-bold transition-colors cursor-pointer ${
+                                      reminderSentMap[c.id]
+                                        ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300"
+                                        : "bg-amber-500/15 text-amber-800 dark:text-amber-300 hover:bg-amber-500/25"
+                                    }`}
+                                  >
+                                    {sendingReminderId === c.id ? (
+                                      <>
+                                        <Loader2 className="size-3 animate-spin" />
+                                        <span>Sending...</span>
+                                      </>
+                                    ) : reminderSentMap[c.id] ? (
+                                      <>
+                                        <Check className="size-3 text-emerald-600" />
+                                        <span>Reminder Sent</span>
+                                      </>
+                                    ) : (
+                                      <>
+                                        <Mail className="size-3" />
+                                        <span>Send Reminder Email</span>
+                                      </>
+                                    )}
+                                  </button>
+                                )}
                               </div>
                             </div>
                           </div>
@@ -4615,6 +4693,38 @@ function AdminDashboard() {
                             >
                               {c.featured ? "★ Unfeature" : "☆ Feature"}
                             </Button>
+
+                            {isDraft && c.contact?.email && (
+                              <Button
+                                type="button"
+                                variant="outline"
+                                className={`px-2.5 py-1.5 text-xs font-semibold ring-1 transition-all flex items-center gap-1.5 cursor-pointer ${
+                                  reminderSentMap[c.id]
+                                    ? "bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 ring-emerald-500/40"
+                                    : "bg-amber-500/15 hover:bg-amber-500/25 text-amber-800 dark:text-amber-300 ring-amber-500/40"
+                                }`}
+                                disabled={sendingReminderId === c.id || Boolean(reminderSentMap[c.id])}
+                                onClick={() => handleSendReminder(c)}
+                                title="Send reminder email to finish incomplete profile setup"
+                              >
+                                {sendingReminderId === c.id ? (
+                                  <>
+                                    <Loader2 className="size-3 animate-spin" />
+                                    <span>Sending...</span>
+                                  </>
+                                ) : reminderSentMap[c.id] ? (
+                                  <>
+                                    <Check className="size-3 text-emerald-500" />
+                                    <span>Reminder Sent</span>
+                                  </>
+                                ) : (
+                                  <>
+                                    <Mail className="size-3 text-amber-600 dark:text-amber-400" />
+                                    <span>Send Reminder</span>
+                                  </>
+                                )}
+                              </Button>
+                            )}
 
                             {!isDraft && (
                               <Link

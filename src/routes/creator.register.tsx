@@ -43,6 +43,7 @@ import {
   DuplicateAlertCard,
   type DuplicateAccountInfo,
 } from "@/components/duplicate-account-card";
+import { sendCreatorEmailFn } from "@/lib/email";
 
 export const Route = createFileRoute("/creator/register")({
   validateSearch: (
@@ -1006,6 +1007,20 @@ function Register() {
         return;
       }
 
+      // Email Trigger 1: Send welcome & draft onboarding email
+      if (form.email?.trim()) {
+        sendCreatorEmailFn({
+          data: {
+            type: "welcome_draft",
+            to: form.email.trim(),
+            name: form.name.trim() || "Creator",
+            city: form.city || undefined,
+            instagram: form.instagram || undefined,
+            baseUrl: typeof window !== "undefined" ? window.location.origin : undefined,
+          },
+        }).catch((e) => console.warn("Failed to send welcome draft email:", e));
+      }
+
       try {
         localStorage.removeItem(DRAFT_STORAGE_KEY);
         localStorage.removeItem(DRAFT_ID_KEY);
@@ -1124,6 +1139,22 @@ function Register() {
       // Automatically start 3-day free trial once profile setup is fully completed
       if (isDraftOrNew && !hasUsedTrial(finalDraft.id) && !existing?.trialStartedAt) {
         await startFreeTrial(finalDraft.id);
+      }
+
+      // Email Trigger 2: Send congratulations & profile active for discovery email
+      const recipientEmail = finalDraft.contact?.email?.trim() || form.email?.trim();
+      if (isDraftOrNew && recipientEmail) {
+        sendCreatorEmailFn({
+          data: {
+            type: "profile_live",
+            to: recipientEmail,
+            name: finalDraft.name?.trim() || "Creator",
+            profileSlug: finalDraft.id,
+            city: finalDraft.city || undefined,
+            instagram: finalDraft.instagram || undefined,
+            baseUrl: typeof window !== "undefined" ? window.location.origin : undefined,
+          },
+        }).catch((e) => console.warn("Failed to send profile live email:", e));
       }
 
       // Success! Clear local draft cache & temporary draft ID

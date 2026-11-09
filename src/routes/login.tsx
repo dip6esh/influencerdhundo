@@ -150,6 +150,7 @@ function LoginPage() {
                   <>
                     <GoogleAuthButton
                       role="creator"
+                      redirectTarget="/creator/dashboard"
                       label="Continue with Google"
                     />
                     <Link

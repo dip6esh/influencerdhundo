@@ -878,12 +878,17 @@ export const supabaseDb = {
         try {
           sessionStorage.setItem("influencer_oauth_role", role);
           localStorage.setItem("influencer_oauth_role", role);
+          localStorage.setItem("influencer_active_role", role);
+          document.cookie = `influencer_oauth_role=${encodeURIComponent(role)}; path=/; max-age=3600; SameSite=Lax`;
+
           if (redirectTarget) {
             sessionStorage.setItem("influencer_oauth_redirect", redirectTarget);
             localStorage.setItem("influencer_oauth_redirect", redirectTarget);
+            document.cookie = `influencer_oauth_redirect=${encodeURIComponent(redirectTarget)}; path=/; max-age=3600; SameSite=Lax`;
           } else {
             sessionStorage.removeItem("influencer_oauth_redirect");
             localStorage.removeItem("influencer_oauth_redirect");
+            document.cookie = `influencer_oauth_redirect=; path=/; max-age=0; SameSite=Lax`;
           }
         } catch (_) {}
       }

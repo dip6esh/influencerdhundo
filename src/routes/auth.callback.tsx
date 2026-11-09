@@ -1,9 +1,15 @@
 import { createFileRoute, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useRef } from "react";
 import { supabase, supabaseDb } from "@/lib/supabase";
 import { useAppState, type BusinessAccount } from "@/lib/app-state";
 import { Loader2, Sparkles, CheckCircle2 } from "lucide-react";
 import { Card } from "@/components/ui-kit";
+
+function getCookie(name: string): string | null {
+  if (typeof document === "undefined") return null;
+  const match = document.cookie.match(new RegExp(`(?:^|;\\s*)${name}=([^;]*)`));
+  return match && typeof match[1] === "string" ? decodeURIComponent(match[1]) : null;
+}
 
 export const Route = createFileRoute("/auth/callback")({
   validateSearch: (
@@ -27,6 +33,7 @@ function AuthCallbackPage() {
   const { signUpBusiness, loginCreator, upsertCreator } = useAppState();
   const [statusMessage, setStatusMessage] = useState("Verifying your Google account...");
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
+  const processingRef = useRef(false);
 
   useEffect(() => {
     let active = true;
@@ -79,7 +86,7 @@ function AuthCallbackPage() {
 
           // Timeout fallback
           setTimeout(() => {
-            if (active && !currentSession) {
+            if (active && !currentSession && !processingRef.current) {
               authListener.subscription.unsubscribe();
               setErrorMessage("Authentication session timed out. Please try logging in again.");
             }
@@ -99,26 +106,41 @@ function AuthCallbackPage() {
         return;
       }
 
+      if (processingRef.current) return;
+      processingRef.current = true;
+
       const user = sess.user;
       setStatusMessage("Loading your profile...");
 
+      const cookieRole = getCookie("influencer_oauth_role");
+      const cookieRedirect = getCookie("influencer_oauth_redirect");
+
       const storedRole =
-        typeof window !== "undefined"
+        role ||
+        cookieRole ||
+        (typeof window !== "undefined"
           ? sessionStorage.getItem("influencer_oauth_role") ||
             localStorage.getItem("influencer_oauth_role") ||
             localStorage.getItem("influencer_active_role")
-          : null;
+          : null);
+
       const storedRedirect =
-        typeof window !== "undefined"
+        redirect ||
+        cookieRedirect ||
+        (typeof window !== "undefined"
           ? sessionStorage.getItem("influencer_oauth_redirect") ||
             localStorage.getItem("influencer_oauth_redirect")
-          : null;
+          : null);
+
+      // Clean up temporary OAuth items once read
       if (typeof window !== "undefined") {
         try {
           sessionStorage.removeItem("influencer_oauth_role");
           sessionStorage.removeItem("influencer_oauth_redirect");
           localStorage.removeItem("influencer_oauth_role");
           localStorage.removeItem("influencer_oauth_redirect");
+          document.cookie = "influencer_oauth_role=; path=/; max-age=0; SameSite=Lax";
+          document.cookie = "influencer_oauth_redirect=; path=/; max-age=0; SameSite=Lax";
         } catch (_) {}
       }
 
@@ -128,28 +150,34 @@ function AuthCallbackPage() {
         supabaseDb.getBusinessProfileForAuthUser(user.id, user.email),
       ]);
 
-      // Explicit role requested from the login screen they clicked
-      const explicitRole = role || storedRole;
+      // Determine intent:
+      // 1. Explicit role 'creator'
+      // 2. OR redirect path containing 'creator' (e.g. /creator/register or /creator/dashboard)
+      // 3. OR creator profile already exists in database
+      const hasCreatorRedirect = Boolean(
+        storedRedirect &&
+          (storedRedirect.toLowerCase().includes("creator") ||
+           storedRedirect.toLowerCase().includes("/creator/register"))
+      );
 
-      let isCreatorIntent: boolean;
-      if (explicitRole === "creator") {
-        isCreatorIntent = true;
-      } else if (explicitRole === "business") {
-        isCreatorIntent = false;
-      } else {
-        // Fallback when general /login is used without an explicit role:
-        // Prioritize creator if a creator profile exists, otherwise business
-        isCreatorIntent = Boolean(creatorProfile);
-      }
+      const isCreatorIntent =
+        storedRole === "creator" ||
+        hasCreatorRedirect ||
+        Boolean(creatorProfile && !businessProfile);
 
       if (isCreatorIntent) {
         try {
           localStorage.setItem("influencer_active_role", "creator");
         } catch (_) {}
+
         if (creatorProfile) {
           upsertCreator(creatorProfile, true);
           loginCreator(creatorProfile.id);
-          navigate({ to: "/creator/dashboard", replace: true });
+          const dest =
+            storedRedirect && !storedRedirect.includes("/creator/register")
+              ? storedRedirect
+              : "/creator/dashboard";
+          navigate({ to: dest as any, replace: true });
         } else {
           // New creator: prefill registration wizard with Google info
           navigate({
@@ -165,7 +193,7 @@ function AuthCallbackPage() {
         try {
           localStorage.setItem("influencer_active_role", "business");
         } catch (_) {}
-        // Business path (default)
+        // Business path
         if (businessProfile && businessProfile.mobile) {
           signUpBusiness(businessProfile, user.id);
           const destination = redirect || storedRedirect || "/discover";

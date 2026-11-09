@@ -99,6 +99,7 @@ function CreatorLogin() {
               <div className="space-y-4">
                 <GoogleAuthButton
                   role="creator"
+                  redirectTarget="/creator/dashboard"
                   label="Sign in with Google"
                 />
 
