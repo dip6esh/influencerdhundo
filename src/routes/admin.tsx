@@ -2893,11 +2893,45 @@ function AdminDashboard() {
   };
 
   // Funnel Quick Actions
-  const handleGrantTrial = async (creatorId: string) => {
+  const handleGrantTrial = async (creatorOrId: Creator | string) => {
+    const creator = typeof creatorOrId === "string" ? creators.find((c) => c.id === creatorOrId) : creatorOrId;
+    const creatorId = typeof creatorOrId === "string" ? creatorOrId : creatorOrId.id;
+
     try {
       await startFreeTrial(creatorId);
       setCreatorStatus(creatorId, "Active");
-      setActionFeedback({ id: creatorId, msg: "⚡ 3-Day Free Trial activated successfully!", type: "success" });
+
+      const now = new Date();
+      const expDate = new Date(now.getTime() + 3 * 24 * 60 * 60 * 1000);
+      let emailSent = false;
+      if (creator?.contact?.email) {
+        try {
+          const emailRes = await sendCreatorEmailFn({
+            data: {
+              type: "subscription_activated",
+              to: creator.contact.email,
+              name: creator.name || creator.displayName || "Influencer",
+              planName: "3 Days Free Trial",
+              expiresAt: expDate.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              }),
+              amountPaid: 0,
+              upgradeSource: "admin_extension",
+            },
+          });
+          emailSent = emailRes.success;
+        } catch (e) {
+          console.warn("Failed to send trial grant email:", e);
+        }
+      }
+
+      setActionFeedback({
+        id: creatorId,
+        msg: `⚡ 3-Day Free Trial activated!${emailSent ? " (Email sent)" : ""}`,
+        type: "success",
+      });
       await refreshFromSupabase(true);
     } catch (err) {
       setActionFeedback({ id: creatorId, msg: `Error: ${String(err)}`, type: "error" });
@@ -4298,19 +4332,19 @@ function AdminDashboard() {
                               )}
                               <button
                                 type="button"
-                                onClick={() => handleExtendExpiry(c, 7)}
-                                className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
-                                title="Extend pass by 7 days"
+                                onClick={() => handleActivatePass(c, "1m", "1 Month")}
+                                className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border cursor-pointer"
+                                title="Renew with 1 Month subscription"
                               >
-                                +7 Days
+                                +1M
                               </button>
                               <button
                                 type="button"
-                                onClick={() => handleExtendExpiry(c, 30)}
-                                className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
-                                title="Extend pass by 30 days"
+                                onClick={() => handleActivatePass(c, "3m", "3 Months")}
+                                className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border cursor-pointer"
+                                title="Renew with 3 Months subscription"
                               >
-                                +30 Days
+                                +3M
                               </button>
                             </div>
                           </div>
@@ -4936,7 +4970,7 @@ function AdminDashboard() {
                             <span className="text-[11px] text-muted-foreground font-semibold mr-0.5">Quick Plan:</span>
                             <button
                               type="button"
-                              onClick={() => handleGrantTrial(c.id)}
+                              onClick={() => handleGrantTrial(c)}
                               className="px-2.5 py-1 rounded-lg bg-sky-500/15 hover:bg-sky-500/25 text-sky-800 dark:text-sky-300 text-xs font-bold border border-sky-500/30 transition-colors cursor-pointer"
                               title="Grant 3-day free trial"
                             >
@@ -4946,7 +4980,7 @@ function AdminDashboard() {
                               type="button"
                               onClick={() => handleActivatePass(c, "1m", "1 Month")}
                               className="px-2.5 py-1 rounded-lg bg-tealdeep/15 hover:bg-tealdeep/25 text-tealdeep text-xs font-bold border border-tealdeep/30 transition-colors cursor-pointer"
-                              title="Activate 1-month paid pass"
+                              title="Activate 1 Month subscription"
                             >
                               +1M
                             </button>
@@ -4954,25 +4988,25 @@ function AdminDashboard() {
                               type="button"
                               onClick={() => handleActivatePass(c, "3m", "3 Months")}
                               className="px-2.5 py-1 rounded-lg bg-primary/15 hover:bg-primary/25 text-saffrondeep text-xs font-bold border border-primary/30 transition-colors cursor-pointer"
-                              title="Activate 3-months paid pass"
+                              title="Activate 3 Months subscription"
                             >
                               +3M
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleExtendExpiry(c, 7)}
-                              className="px-2 py-1 rounded-lg bg-background hover:bg-secondary text-foreground text-xs font-semibold border border-border transition-colors cursor-pointer"
-                              title="Extend expiration by 7 days"
+                              onClick={() => handleActivatePass(c, "6m", "6 Months")}
+                              className="px-2.5 py-1 rounded-lg bg-purple-500/15 hover:bg-purple-500/25 text-purple-700 dark:text-purple-300 text-xs font-bold border border-purple-500/30 transition-colors cursor-pointer"
+                              title="Activate 6 Months subscription"
                             >
-                              +7d
+                              +6M
                             </button>
                             <button
                               type="button"
-                              onClick={() => handleExtendExpiry(c, 30)}
-                              className="px-2 py-1 rounded-lg bg-background hover:bg-secondary text-foreground text-xs font-semibold border border-border transition-colors cursor-pointer"
-                              title="Extend expiration by 30 days"
+                              onClick={() => handleActivatePass(c, "1y", "1 Year")}
+                              className="px-2.5 py-1 rounded-lg bg-emerald-500/15 hover:bg-emerald-500/25 text-emerald-700 dark:text-emerald-300 text-xs font-bold border border-emerald-500/30 transition-colors cursor-pointer"
+                              title="Activate 1 Year subscription"
                             >
-                              +30d
+                              +1Y
                             </button>
                           </div>
                         </div>
@@ -6654,21 +6688,23 @@ function AdminDashboard() {
                             <Button
                               type="button"
                               variant="ghost"
-                              className="px-2.5 py-1.5 text-xs ring-1 ring-border bg-background hover:bg-secondary flex items-center gap-1 cursor-pointer"
-                              onClick={() => handleExtendExpiry(matchedCreator, 7)}
+                              className="px-2.5 py-1.5 text-xs text-tealdeep bg-tealdeep/10 hover:bg-tealdeep/20 ring-1 ring-tealdeep/30 flex items-center gap-1 cursor-pointer"
+                              onClick={() => handleActivatePass(matchedCreator, "1m", "1 Month")}
+                              title="Add 1 Month subscription"
                             >
                               <Plus className="size-3" />
-                              <span>+7d</span>
+                              <span>+1M</span>
                             </Button>
 
                             <Button
                               type="button"
                               variant="ghost"
-                              className="px-2.5 py-1.5 text-xs text-tealdeep bg-tealdeep/10 hover:bg-tealdeep/20 ring-1 ring-tealdeep/30 flex items-center gap-1 cursor-pointer"
-                              onClick={() => handleActivatePass(matchedCreator, "1m", "1 Month")}
+                              className="px-2.5 py-1.5 text-xs text-saffrondeep bg-primary/10 hover:bg-primary/20 ring-1 ring-primary/30 flex items-center gap-1 cursor-pointer"
+                              onClick={() => handleActivatePass(matchedCreator, "3m", "3 Months")}
+                              title="Add 3 Months subscription"
                             >
                               <Award className="size-3" />
-                              <span>+1M</span>
+                              <span>+3M</span>
                             </Button>
                           </div>
                         )}
