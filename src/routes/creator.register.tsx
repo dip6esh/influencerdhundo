@@ -952,6 +952,25 @@ function Register() {
       const uid = authUserId || (await supabaseDb.getCreatorSession());
       await upsertCreatorWithAuth(draftCreator, uid).catch(() => {});
 
+      // Send welcome draft email if this is a newly saved draft
+      const draftEmail = form.email?.trim() || draftCreator.contact?.email?.trim();
+      if (draftEmail && (!existing || existing.status === "Draft")) {
+        sendCreatorEmailFn({
+          data: {
+            type: "welcome_draft",
+            to: draftEmail,
+            name: form.name?.trim() || draftCreator.name?.trim() || "Creator",
+            city: form.city || draftCreator.city || undefined,
+            instagram: form.instagram || draftCreator.instagram || undefined,
+            baseUrl: typeof window !== "undefined" ? window.location.origin : undefined,
+          },
+        })
+          .then((res) => {
+            if (!res?.success) console.warn("[Email Service] Welcome email dispatch:", res?.error);
+          })
+          .catch((e) => console.warn("Failed to send welcome draft email:", e));
+      }
+
       loginCreator(draftId);
       navigate({ to: "/creator/dashboard" });
     } catch {
@@ -1018,7 +1037,11 @@ function Register() {
             instagram: form.instagram || undefined,
             baseUrl: typeof window !== "undefined" ? window.location.origin : undefined,
           },
-        }).catch((e) => console.warn("Failed to send welcome draft email:", e));
+        })
+          .then((r) => {
+            if (!r?.success) console.warn("[Email Service] Welcome email dispatch warning:", r?.error);
+          })
+          .catch((e) => console.warn("Failed to send welcome draft email:", e));
       }
 
       try {
@@ -1154,7 +1177,11 @@ function Register() {
             instagram: finalDraft.instagram || undefined,
             baseUrl: typeof window !== "undefined" ? window.location.origin : undefined,
           },
-        }).catch((e) => console.warn("Failed to send profile live email:", e));
+        })
+          .then((r) => {
+            if (!r?.success) console.warn("[Email Service] Live email dispatch warning:", r?.error);
+          })
+          .catch((e) => console.warn("Failed to send profile live email:", e));
       }
 
       // Success! Clear local draft cache & temporary draft ID

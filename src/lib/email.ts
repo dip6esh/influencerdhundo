@@ -413,15 +413,20 @@ export const sendCreatorEmailFn = createServerFn({ method: "POST" })
   .handler(async ({ data }): Promise<EmailSendResult> => {
     try {
       const apiKey =
-        process.env["RESEND_API_KEY"]?.trim() ||
-        (globalThis as any)?.RESEND_API_KEY ||
+        ((import.meta as any)?.env?.["VITE_RESEND_API_KEY"] as string | undefined)?.trim() ||
+        ((import.meta as any)?.env?.["RESEND_API_KEY"] as string | undefined)?.trim() ||
         process.env["VITE_RESEND_API_KEY"]?.trim() ||
+        process.env["RESEND_API_KEY"]?.trim() ||
+        (globalThis as any)?.VITE_RESEND_API_KEY ||
+        (globalThis as any)?.RESEND_API_KEY ||
         "";
       const from =
+        ((import.meta as any)?.env?.["EMAIL_FROM"] as string | undefined)?.trim() ||
         process.env["EMAIL_FROM"]?.trim() ||
         (globalThis as any)?.EMAIL_FROM ||
         "Influencer Dhundo <support@influencerdhundo.com>";
       const replyTo =
+        ((import.meta as any)?.env?.["EMAIL_REPLY_TO"] as string | undefined)?.trim() ||
         process.env["EMAIL_REPLY_TO"]?.trim() ||
         (globalThis as any)?.EMAIL_REPLY_TO ||
         "support.influencerdhundo@gmail.com";
@@ -445,12 +450,13 @@ export const sendCreatorEmailFn = createServerFn({ method: "POST" })
 
       // If no Resend API key is configured yet, simulate safely in dev without failing
       if (!apiKey || apiKey === "re_placeholder" || apiKey.length < 10) {
-        console.log(
-          `[Email Service (Simulated)] '${data.type}' email for ${data.name} <${data.to}> | Subject: "${subject}"`,
+        console.warn(
+          `[Email Service Warning] No valid Resend API key detected. Email '${data.type}' to ${data.to} was simulated, not sent over network. Check RESEND_API_KEY/VITE_RESEND_API_KEY in environment settings.`,
         );
         return {
-          success: true,
+          success: false,
           simulated: true,
+          error: "Resend API key missing or invalid in environment settings.",
           messageId: `sim_${Date.now()}`,
         };
       }
