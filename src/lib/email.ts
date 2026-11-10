@@ -322,11 +322,11 @@ function renderDraftReminderHtml(name: string, baseUrl: string): string {
                 </a>
               </div>
 
-              <!-- Soft Reassurance / Note Box -->
+              <!-- Soft Reassurance / Support Box -->
               <table width="100%" border="0" cellspacing="0" cellpadding="0" style="background-color: #fffaf5; border: 1px solid #fed7aa; border-radius: 8px;">
                 <tr>
                   <td style="padding: 14px 18px; font-size: 13px; color: #9a3412; line-height: 1.55;">
-                    ℹ️ If you ran into any issues or have questions, feel free to reply directly to this email.
+                    ℹ️ <strong>Need help or have questions?</strong> Reach out to our team anytime at <a href="mailto:support.influencerdhundo@gmail.com" style="color: #9a3412; font-weight: 700; text-decoration: underline;">support.influencerdhundo@gmail.com</a>.
                   </td>
                 </tr>
               </table>
@@ -421,6 +421,10 @@ export const sendCreatorEmailFn = createServerFn({ method: "POST" })
         process.env["EMAIL_FROM"]?.trim() ||
         (globalThis as any)?.EMAIL_FROM ||
         "Influencer Dhundo <support@influencerdhundo.com>";
+      const replyTo =
+        process.env["EMAIL_REPLY_TO"]?.trim() ||
+        (globalThis as any)?.EMAIL_REPLY_TO ||
+        "support.influencerdhundo@gmail.com";
       const baseUrl = getBaseUrl(data.baseUrl);
 
       let subject = "";
@@ -461,6 +465,7 @@ export const sendCreatorEmailFn = createServerFn({ method: "POST" })
         body: JSON.stringify({
           from,
           to: [data.to],
+          reply_to: replyTo,
           subject,
           html,
         }),
