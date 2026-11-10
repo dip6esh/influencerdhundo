@@ -88,6 +88,8 @@ import {
   Menu,
   ChevronRight,
   ChevronLeft,
+  ChevronDown,
+  ChevronUp,
 } from "lucide-react";
 
 export const Route = createFileRoute("/admin")({
@@ -2775,6 +2777,7 @@ function AdminDashboard() {
   const [expiringWindow, setExpiringWindow] = useState<"48h" | "7d" | "30d">("48h");
   const [sendingReminderId, setSendingReminderId] = useState<string | null>(null);
   const [reminderSentMap, setReminderSentMap] = useState<Record<string, boolean>>({});
+  const [showRenewalWatch, setShowRenewalWatch] = useState(false);
 
   const filteredCreators = useMemo(() => {
     const now = Date.now();
@@ -3300,6 +3303,77 @@ function AdminDashboard() {
     ),
   ).length;
 
+  const funnelCounts = useMemo(() => {
+    const currentTime = Date.now();
+    const total = creators.length;
+    const paid = creators.filter((c) =>
+      subscriptions.some(
+        (s) =>
+          s.creatorId === c.id &&
+          !s.isTrial &&
+          s.planId !== "trial-3d" &&
+          (s.price ?? 0) > 0 &&
+          new Date(s.expiresAt || s.startedAt).getTime() > currentTime,
+      ),
+    ).length;
+    const promo100 = creators.filter((c) => {
+      if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
+      const hasRealPaid = subscriptions.some(
+        (s) =>
+          s.creatorId === c.id &&
+          !s.isTrial &&
+          s.planId !== "trial-3d" &&
+          (s.price ?? 0) > 0 &&
+          new Date(s.expiresAt || s.startedAt).getTime() > currentTime,
+      );
+      if (hasRealPaid) return false;
+      return subscriptions.some(
+        (s) =>
+          s.creatorId === c.id &&
+          !s.isTrial &&
+          s.planId !== "trial-3d" &&
+          (s.price === 0 || s.price == null) &&
+          new Date(s.expiresAt || s.startedAt).getTime() > currentTime,
+      );
+    }).length;
+    const trial = creators.filter((c) => {
+      if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
+      const hasPaidOrPromo = subscriptions.some(
+        (s) =>
+          s.creatorId === c.id &&
+          !s.isTrial &&
+          s.planId !== "trial-3d" &&
+          new Date(s.expiresAt || s.startedAt).getTime() > currentTime,
+      );
+      if (hasPaidOrPromo) return false;
+      const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+      return (Boolean(c.trialStartedAt) && expTime > currentTime) || (c.status === "Active" && expTime > currentTime);
+    }).length;
+    const draft = creators.filter(
+      (c) => c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-")),
+    ).length;
+    const expired = creators.filter((c) => {
+      if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
+      const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
+      return c.status === "Expired" || (expTime > 0 && expTime <= currentTime);
+    }).length;
+    const inactive = creators.filter(
+      (c) => c.status === "Inactive" || c.status === "Suspended",
+    ).length;
+
+    return { total, paid, promo100, trial, draft, expired, inactive };
+  }, [creators, subscriptions]);
+
+  const CREATOR_FUNNEL_ITEMS = [
+    { id: "all" as const, label: "All Profiles", icon: Users, count: funnelCounts.total, color: "text-foreground" },
+    { id: "paid" as const, label: "Paid Plans (₹)", icon: CreditCard, count: funnelCounts.paid, color: "text-emerald-600 dark:text-emerald-400" },
+    { id: "trial" as const, label: "Free Trials", icon: Zap, count: funnelCounts.trial, color: "text-sky-600 dark:text-sky-400" },
+    { id: "draft" as const, label: "Backed Out Drafts", icon: Clock, count: funnelCounts.draft, color: "text-amber-600 dark:text-amber-400" },
+    { id: "promo100" as const, label: "100% OFF Pass", icon: Tag, count: funnelCounts.promo100, color: "text-purple-600 dark:text-purple-400" },
+    { id: "expired" as const, label: "Expired", icon: AlertTriangle, count: funnelCounts.expired, color: "text-rose" },
+    { id: "inactive" as const, label: "Inactive / Hold", icon: LogOut, count: funnelCounts.inactive, color: "text-muted-foreground" },
+  ];
+
   type NavItem = {
     id: (typeof TABS)[number];
     label: string;
@@ -3427,48 +3501,86 @@ function AdminDashboard() {
                         const Icon = item.icon;
                         const isActive = tab === item.id;
                         return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => {
-                              setTab(item.id);
-                              setSidebarVisible(false);
-                            }}
-                            className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
-                              isActive
-                                ? "bg-foreground text-background shadow-xs font-bold"
-                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2.5">
-                              <Icon className={`size-4 shrink-0 ${isActive ? "text-background" : "text-muted-foreground"}`} />
-                              <span>{item.label}</span>
-                            </span>
-
-                            {typeof item.count === "number" && (
-                              <span
-                                className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
-                                  isActive
-                                    ? "bg-background/20 text-background"
-                                    : "bg-secondary text-muted-foreground"
-                                }`}
-                              >
-                                {item.count}
+                          <div key={item.id} className="space-y-0.5">
+                            <button
+                              type="button"
+                              onClick={() => {
+                                setTab(item.id);
+                                if (item.id !== "Creators") {
+                                  setSidebarVisible(false);
+                                }
+                              }}
+                              className={`w-full flex items-center justify-between px-3 py-2 rounded-xl text-xs font-semibold transition-all cursor-pointer ${
+                                isActive
+                                  ? "bg-foreground text-background shadow-xs font-bold"
+                                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                              }`}
+                            >
+                              <span className="flex items-center gap-2.5">
+                                <Icon className={`size-4 shrink-0 ${isActive ? "text-background" : "text-muted-foreground"}`} />
+                                <span>{item.label}</span>
                               </span>
-                            )}
 
-                            {Boolean(item.badge && item.badge > 0) && (
-                              <span
-                                className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                  item.badgeType === "danger"
-                                    ? "bg-rose-500 text-white animate-pulse"
-                                    : "bg-amber-500 text-white"
-                                }`}
-                              >
-                                {item.badge}
-                              </span>
+                              {typeof item.count === "number" && (
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                                    isActive
+                                      ? "bg-background/20 text-background"
+                                      : "bg-secondary text-muted-foreground"
+                                  }`}
+                                >
+                                  {item.count}
+                                </span>
+                              )}
+
+                              {Boolean(item.badge && item.badge > 0) && (
+                                <span
+                                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                    item.badgeType === "danger"
+                                      ? "bg-rose-500 text-white animate-pulse"
+                                      : "bg-amber-500 text-white"
+                                  }`}
+                                >
+                                  {item.badge}
+                                </span>
+                              )}
+                            </button>
+
+                            {/* Nested Creator Funnel Sub-navigation */}
+                            {item.id === "Creators" && tab === "Creators" && (
+                              <div className="pl-6 pr-1 pt-0.5 pb-1 space-y-0.5">
+                                {CREATOR_FUNNEL_ITEMS.map((sub) => {
+                                  const isSubActive = creatorFunnelFilter === sub.id;
+                                  const SubIcon = sub.icon;
+                                  return (
+                                    <button
+                                      key={sub.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setTab("Creators");
+                                        setCreatorFunnelFilter(sub.id);
+                                        setCreatorStatusFilter("All");
+                                        setSidebarVisible(false);
+                                      }}
+                                      className={`w-full flex items-center justify-between px-2.5 py-1.5 rounded-lg text-xs font-medium transition-colors cursor-pointer ${
+                                        isSubActive
+                                          ? "bg-secondary text-foreground font-bold"
+                                          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                                      }`}
+                                    >
+                                      <span className="flex items-center gap-2 truncate">
+                                        <SubIcon className={`size-3.5 shrink-0 ${isSubActive ? "text-primary" : sub.color}`} />
+                                        <span className="truncate">{sub.label}</span>
+                                      </span>
+                                      <span className="text-[10px] font-mono text-muted-foreground px-1.5 py-0.2 rounded bg-background/80">
+                                        {sub.count}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
                             )}
-                          </button>
+                          </div>
                         );
                       })}
                     </div>
@@ -3645,47 +3757,82 @@ function AdminDashboard() {
 
                         // Full Expanded Row Button (monolithic mouse target, snappy duration-75, no gap strobing)
                         return (
-                          <button
-                            key={item.id}
-                            type="button"
-                            onClick={() => setTab(item.id)}
-                            className={`group w-full h-9 flex items-center justify-between px-2.5 rounded-xl text-xs font-semibold transition-colors duration-75 ease-out cursor-pointer whitespace-nowrap select-none ${
-                              isActive
-                                ? "bg-foreground text-background shadow-xs font-bold"
-                                : "text-muted-foreground hover:bg-secondary hover:text-foreground"
-                            }`}
-                          >
-                            <span className="flex items-center gap-2.5 truncate pointer-events-none">
-                              <Icon className={`size-4 shrink-0 transition-colors duration-75 ${isActive ? "text-background" : "text-muted-foreground group-hover:text-foreground"}`} />
-                              <span className="truncate whitespace-nowrap">{item.label}</span>
-                            </span>
+                          <div key={item.id} className="space-y-0.5 w-full">
+                            <button
+                              type="button"
+                              onClick={() => setTab(item.id)}
+                              className={`group w-full h-9 flex items-center justify-between px-2.5 rounded-xl text-xs font-semibold transition-colors duration-75 ease-out cursor-pointer whitespace-nowrap select-none ${
+                                isActive
+                                  ? "bg-foreground text-background shadow-xs font-bold"
+                                  : "text-muted-foreground hover:bg-secondary hover:text-foreground"
+                              }`}
+                            >
+                              <span className="flex items-center gap-2.5 truncate pointer-events-none">
+                                <Icon className={`size-4 shrink-0 transition-colors duration-75 ${isActive ? "text-background" : "text-muted-foreground group-hover:text-foreground"}`} />
+                                <span className="truncate whitespace-nowrap">{item.label}</span>
+                              </span>
 
-                            <div className="flex items-center gap-1 shrink-0 ml-2 pointer-events-none">
-                              {typeof item.count === "number" && (
-                                <span
-                                  className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
-                                    isActive
-                                      ? "bg-background/20 text-background"
-                                      : "bg-secondary text-muted-foreground"
-                                  }`}
-                                >
-                                  {item.count}
-                                </span>
-                              )}
+                              <div className="flex items-center gap-1 shrink-0 ml-2 pointer-events-none">
+                                {typeof item.count === "number" && (
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.5 rounded-md font-mono ${
+                                      isActive
+                                        ? "bg-background/20 text-background"
+                                        : "bg-secondary text-muted-foreground"
+                                    }`}
+                                  >
+                                    {item.count}
+                                  </span>
+                                )}
 
-                              {Boolean(item.badge && item.badge > 0) && (
-                                <span
-                                  className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
-                                    item.badgeType === "danger"
-                                      ? "bg-rose-500 text-white"
-                                      : "bg-amber-500 text-white"
-                                  }`}
-                                >
-                                  {item.badge}
-                                </span>
-                              )}
-                            </div>
-                          </button>
+                                {Boolean(item.badge && item.badge > 0) && (
+                                  <span
+                                    className={`text-[10px] px-1.5 py-0.2 rounded-full font-bold ${
+                                      item.badgeType === "danger"
+                                        ? "bg-rose-500 text-white"
+                                        : "bg-amber-500 text-white"
+                                    }`}
+                                  >
+                                    {item.badge}
+                                  </span>
+                                )}
+                              </div>
+                            </button>
+
+                            {/* Nested Creator Funnel Sub-navigation */}
+                            {item.id === "Creators" && sidebarExpanded && tab === "Creators" && (
+                              <div className="pl-6 pr-1 pt-0.5 pb-1 space-y-0.5 animate-in fade-in duration-150">
+                                {CREATOR_FUNNEL_ITEMS.map((sub) => {
+                                  const isSubActive = creatorFunnelFilter === sub.id;
+                                  const SubIcon = sub.icon;
+                                  return (
+                                    <button
+                                      key={sub.id}
+                                      type="button"
+                                      onClick={() => {
+                                        setTab("Creators");
+                                        setCreatorFunnelFilter(sub.id);
+                                        setCreatorStatusFilter("All");
+                                      }}
+                                      className={`w-full h-7 flex items-center justify-between px-2 rounded-lg text-[11px] font-medium transition-colors cursor-pointer select-none ${
+                                        isSubActive
+                                          ? "bg-secondary text-foreground font-bold shadow-2xs"
+                                          : "text-muted-foreground hover:bg-secondary/60 hover:text-foreground"
+                                      }`}
+                                    >
+                                      <span className="flex items-center gap-2 truncate">
+                                        <SubIcon className={`size-3 shrink-0 ${isSubActive ? "text-primary" : sub.color}`} />
+                                        <span className="truncate">{sub.label}</span>
+                                      </span>
+                                      <span className={`text-[10px] font-mono px-1 rounded ${isSubActive ? "bg-background text-foreground font-bold" : "text-muted-foreground"}`}>
+                                        {sub.count}
+                                      </span>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+                            )}
+                          </div>
                         );
                       })}
                     </div>
@@ -3785,28 +3932,6 @@ function AdminDashboard() {
                   <span>{totalPendingAction} Action{totalPendingAction === 1 ? "" : "s"} Needed</span>
                 </button>
               )}
-
-              <Button
-                variant="ghost"
-                className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-amber-600 dark:hover:text-amber-400"
-                title="Lock and cloak the admin portal on this device (reverts to 404)"
-                onClick={async () => {
-                  await signOutAdmin();
-                  lockAndCloakAdminPortal();
-                }}
-              >
-                <Lock className="size-3.5" />
-                <span className="hidden sm:inline">Lock &amp; Cloak</span>
-              </Button>
-              <Button
-                variant="ghost"
-                className="flex items-center gap-1.5 px-3 py-2 text-xs text-muted-foreground hover:text-rose"
-                onClick={() => signOutAdmin()}
-                title="Sign out"
-              >
-                <LogOut className="size-3.5" />
-                <span className="hidden sm:inline">Sign out</span>
-              </Button>
             </div>
           </div>
 
@@ -3815,8 +3940,8 @@ function AdminDashboard() {
           {currentTabMeta.subtitle}
         </p>
 
-        {/* Compact Top KPI strip (Shown on Analytics & Creators view) */}
-        {(tab === "Analytics" || tab === "Creators") && (
+        {/* Compact Top KPI strip (Shown on Analytics view) */}
+        {tab === "Analytics" && (
           <div className="grid grid-cols-2 sm:grid-cols-4 gap-2.5">
             <div
               onClick={() => setTab("Creators")}
@@ -3937,247 +4062,42 @@ function AdminDashboard() {
             </div>
           )}
 
-          {/* ── INTERACTIVE FUNNEL / LIFECYCLE STATS CARDS ── */}
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 xl:grid-cols-7 gap-2.5">
-            {/* 1. ALL PROFILES */}
-            <button
-              type="button"
-              onClick={() => {
-                setCreatorFunnelFilter("all");
-                setCreatorStatusFilter("All");
-              }}
-              className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                creatorFunnelFilter === "all"
-                  ? "bg-card border-primary ring-2 ring-primary/20 shadow-sm"
-                  : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
-              }`}
-            >
-              <div className="flex items-center justify-between text-muted-foreground mb-1">
-                <span className="text-[11px] font-semibold">All Profiles</span>
-                <User className="size-3.5" />
-              </div>
-              <p className="text-xl font-bold text-foreground">{creators.length}</p>
-              <p className="text-[10px] text-muted-foreground mt-0.5">Total database</p>
-            </button>
-
-            {/* 2. REAL PAID SUBSCRIBERS */}
-            {(() => {
-              const now = Date.now();
-              const paidCount = creators.filter((c) =>
-                subscriptions.some(
-                  (s) =>
-                    s.creatorId === c.id &&
-                    !s.isTrial &&
-                    s.planId !== "trial-3d" &&
-                    (s.price ?? 0) > 0 &&
-                    new Date(s.expiresAt || s.startedAt).getTime() > now,
-                ),
-              ).length;
+          {/* ── COMPACT CREATOR FUNNEL PILLS ── */}
+          <div className="flex items-center gap-1.5 overflow-x-auto pb-1 scrollbar-none">
+            {CREATOR_FUNNEL_ITEMS.map((f) => {
+              const isActive = creatorFunnelFilter === f.id;
+              const Icon = f.icon;
               return (
                 <button
+                  key={f.id}
                   type="button"
                   onClick={() => {
-                    setCreatorFunnelFilter("paid");
+                    setCreatorFunnelFilter(f.id);
                     setCreatorStatusFilter("All");
                   }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                    creatorFunnelFilter === "paid"
-                      ? "bg-emerald-500/10 border-emerald-500 ring-2 ring-emerald-500/20 shadow-sm"
-                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
+                  className={`px-3 py-1.5 rounded-xl text-xs font-semibold shrink-0 flex items-center gap-1.5 border transition-all cursor-pointer ${
+                    isActive
+                      ? "bg-foreground text-background border-foreground shadow-xs font-bold"
+                      : "bg-secondary/40 border-border/70 text-muted-foreground hover:bg-secondary hover:text-foreground"
                   }`}
                 >
-                  <div className="flex items-center justify-between text-emerald-600 dark:text-emerald-400 mb-1">
-                    <span className="text-[11px] font-bold">Paid Plans (₹)</span>
-                    <CreditCard className="size-3.5" />
-                  </div>
-                  <p className="text-xl font-bold text-emerald-600 dark:text-emerald-400">
-                    {paidCount}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Real money paid</p>
+                  <Icon className={`size-3.5 ${isActive ? "text-background" : f.color}`} />
+                  <span>{f.label}</span>
+                  <span
+                    className={`text-[10px] font-mono px-1.5 py-0.2 rounded-md ${
+                      isActive
+                        ? "bg-background/25 text-background"
+                        : "bg-secondary text-muted-foreground"
+                    }`}
+                  >
+                    {f.count}
+                  </span>
                 </button>
               );
-            })()}
-
-            {/* 3. 100% OFF PROMO PASSES */}
-            {(() => {
-              const now = Date.now();
-              const promo100Count = creators.filter((c) => {
-                if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
-                const hasRealPaid = subscriptions.some(
-                  (s) =>
-                    s.creatorId === c.id &&
-                    !s.isTrial &&
-                    s.planId !== "trial-3d" &&
-                    (s.price ?? 0) > 0 &&
-                    new Date(s.expiresAt || s.startedAt).getTime() > now,
-                );
-                if (hasRealPaid) return false;
-                return subscriptions.some(
-                  (s) =>
-                    s.creatorId === c.id &&
-                    !s.isTrial &&
-                    s.planId !== "trial-3d" &&
-                    (s.price === 0 || s.price == null) &&
-                    new Date(s.expiresAt || s.startedAt).getTime() > now,
-                );
-              }).length;
-              return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatorFunnelFilter("promo100");
-                    setCreatorStatusFilter("All");
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                    creatorFunnelFilter === "promo100"
-                      ? "bg-purple-500/10 border-purple-500 ring-2 ring-purple-500/20 shadow-sm"
-                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-purple-600 dark:text-purple-400 mb-1">
-                    <span className="text-[11px] font-bold">100% OFF Pass</span>
-                    <Tag className="size-3.5" />
-                  </div>
-                  <p className="text-xl font-bold text-purple-600 dark:text-purple-400">
-                    {promo100Count}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">₹0 promo pass</p>
-                </button>
-              );
-            })()}
-
-            {/* 4. FREE TRIAL */}
-            {(() => {
-              const now = Date.now();
-              const trialCount = creators.filter((c) => {
-                if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
-                const hasPaidOrPromo = subscriptions.some(
-                  (s) =>
-                    s.creatorId === c.id &&
-                    !s.isTrial &&
-                    s.planId !== "trial-3d" &&
-                    new Date(s.expiresAt || s.startedAt).getTime() > now,
-                );
-                if (hasPaidOrPromo) return false;
-                const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
-                return (Boolean(c.trialStartedAt) && expTime > now) || (c.status === "Active" && expTime > now);
-              }).length;
-              return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatorFunnelFilter("trial");
-                    setCreatorStatusFilter("All");
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                    creatorFunnelFilter === "trial"
-                      ? "bg-sky-500/10 border-sky-500 ring-2 ring-sky-500/20 shadow-sm"
-                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-sky-600 dark:text-sky-400 mb-1">
-                    <span className="text-[11px] font-bold">Free Trial</span>
-                    <Zap className="size-3.5" />
-                  </div>
-                  <p className="text-xl font-bold text-sky-600 dark:text-sky-400">
-                    {trialCount}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">3-day trial active</p>
-                </button>
-              );
-            })()}
-
-            {/* 5. ABANDONED / INCOMPLETE DRAFTS */}
-            {(() => {
-              const draftCount = creators.filter(
-                (c) => c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-")),
-              ).length;
-              return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatorFunnelFilter("draft");
-                    setCreatorStatusFilter("All");
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                    creatorFunnelFilter === "draft"
-                      ? "bg-amber-500/10 border-amber-500 ring-2 ring-amber-500/20 shadow-sm"
-                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-amber-600 dark:text-amber-400 mb-1">
-                    <span className="text-[11px] font-bold">Backed Out</span>
-                    <Clock className="size-3.5" />
-                  </div>
-                  <p className="text-xl font-bold text-amber-600 dark:text-amber-400">
-                    {draftCount}
-                  </p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Incomplete leads</p>
-                </button>
-              );
-            })()}
-
-            {/* 6. EXPIRED PLANS */}
-            {(() => {
-              const now = Date.now();
-              const expiredCount = creators.filter((c) => {
-                if (c.status === "Draft" || (c.status !== "Active" && c.id.startsWith("draft-"))) return false;
-                const expTime = c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).getTime() : 0;
-                return c.status === "Expired" || (expTime > 0 && expTime <= now);
-              }).length;
-              return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatorFunnelFilter("expired");
-                    setCreatorStatusFilter("All");
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                    creatorFunnelFilter === "expired"
-                      ? "bg-rose/10 border-rose ring-2 ring-rose/20 shadow-sm"
-                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-rose mb-1">
-                    <span className="text-[11px] font-bold">Expired</span>
-                    <AlertTriangle className="size-3.5" />
-                  </div>
-                  <p className="text-xl font-bold text-rose">{expiredCount}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Need renewal</p>
-                </button>
-              );
-            })()}
-
-            {/* 7. INACTIVE / SUSPENDED */}
-            {(() => {
-              const inactiveCount = creators.filter(
-                (c) => c.status === "Inactive" || c.status === "Suspended",
-              ).length;
-              return (
-                <button
-                  type="button"
-                  onClick={() => {
-                    setCreatorFunnelFilter("inactive");
-                    setCreatorStatusFilter("All");
-                  }}
-                  className={`p-3.5 rounded-2xl border text-left transition-all cursor-pointer ${
-                    creatorFunnelFilter === "inactive"
-                      ? "bg-foreground/10 border-foreground ring-2 ring-foreground/20 shadow-sm"
-                      : "bg-secondary/40 border-border/70 hover:bg-secondary/80"
-                  }`}
-                >
-                  <div className="flex items-center justify-between text-muted-foreground mb-1">
-                    <span className="text-[11px] font-semibold">Inactive / Hold</span>
-                    <LogOut className="size-3.5" />
-                  </div>
-                  <p className="text-xl font-bold text-foreground">{inactiveCount}</p>
-                  <p className="text-[10px] text-muted-foreground mt-0.5">Paused / Suspended</p>
-                </button>
-              );
-            })()}
+            })}
           </div>
 
-          {/* ── ⚡ UPCOMING EXPIRATIONS & RENEWAL WATCH (PROACTIVE RETENTION) ── */}
+          {/* ── ⚡ UPCOMING EXPIRATIONS & RENEWAL WATCH (COLLAPSIBLE RETENTION BAR) ── */}
           {(() => {
             const now = Date.now();
             const limit = expiringWindow === "48h"
@@ -4196,135 +4116,147 @@ function AdminDashboard() {
               return tA - tB;
             });
 
+            if (expiringList.length === 0) return null;
+
             return (
-              <Card className="p-4 bg-amber-500/[0.04] border border-amber-500/30 rounded-2xl shadow-xs">
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-500/20">
-                  <div className="flex items-center gap-2.5">
-                    <div className="flex size-8 items-center justify-center rounded-xl bg-amber-500/15 text-amber-600 dark:text-amber-400 font-bold shrink-0">
-                      <Clock className="size-4" />
+              <div className="space-y-3">
+                <div className="p-3 rounded-xl bg-amber-500/10 border border-amber-500/30 flex flex-wrap items-center justify-between gap-2 shadow-2xs">
+                  <div className="flex items-center gap-2.5 min-w-0">
+                    <div className="flex size-7 items-center justify-center rounded-lg bg-amber-500/20 text-amber-700 dark:text-amber-300 shrink-0">
+                      <Clock className="size-3.5 animate-pulse" />
                     </div>
-                    <div>
-                      <div className="flex items-center gap-2">
+                    <div className="min-w-0">
+                      <span className="text-xs font-bold text-foreground">
+                        ⚡ Renewal Watch:{" "}
+                        <span className="text-amber-700 dark:text-amber-300">
+                          {expiringList.length} creator{expiringList.length === 1 ? "" : "s"} expiring soon
+                        </span>
+                      </span>
+                      <span className="hidden md:inline text-[11px] text-muted-foreground ml-2">
+                        (WhatsApp reminder &amp; extension actions available)
+                      </span>
+                    </div>
+                  </div>
+                  <button
+                    type="button"
+                    onClick={() => setShowRenewalWatch((prev) => !prev)}
+                    className="px-2.5 py-1 rounded-lg bg-amber-500 text-white text-xs font-semibold hover:bg-amber-600 transition-colors cursor-pointer flex items-center gap-1.5 shadow-2xs"
+                  >
+                    <span>{showRenewalWatch ? "Hide Cards" : "Review & Extend Expiries"}</span>
+                    {showRenewalWatch ? <ChevronUp className="size-3.5" /> : <ChevronDown className="size-3.5" />}
+                  </button>
+                </div>
+
+                {showRenewalWatch && (
+                  <Card className="p-4 bg-amber-500/[0.04] border border-amber-500/30 rounded-2xl shadow-xs">
+                    <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-3 pb-3 border-b border-amber-500/20">
+                      <div>
                         <h3 className="text-sm font-bold text-foreground">
                           ⚡ Subscriptions &amp; Trials Expiring Soon
                         </h3>
-                        <span className="rounded-full bg-amber-500/15 text-amber-700 dark:text-amber-300 px-2 py-0.5 text-[10px] font-bold">
-                          {expiringList.length} creator{expiringList.length === 1 ? "" : "s"}
-                        </span>
+                        <p className="text-[11px] text-muted-foreground mt-0.5">
+                          Proactive renewal watch — reach out via 1-click WhatsApp before passes expire to keep creator retention high.
+                        </p>
                       </div>
-                      <p className="text-[11px] text-muted-foreground mt-0.5">
-                        Proactive renewal watch — reach out via 1-click WhatsApp before passes expire to keep creator retention high.
-                      </p>
+
+                      {/* Window selector */}
+                      <div className="flex items-center gap-1.5 self-start sm:self-center">
+                        <div className="flex rounded-xl bg-background p-0.5 ring-1 ring-border text-xs">
+                          {(
+                            [
+                              { id: "48h", label: "Next 48 Hours" },
+                              { id: "7d", label: "Next 7 Days" },
+                              { id: "30d", label: "Next 30 Days" },
+                            ] as const
+                          ).map((w) => (
+                            <button
+                              key={w.id}
+                              type="button"
+                              onClick={() => setExpiringWindow(w.id)}
+                              className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
+                                expiringWindow === w.id
+                                  ? "bg-amber-500 text-white shadow-xs"
+                                  : "text-muted-foreground hover:text-foreground"
+                              }`}
+                            >
+                              {w.label}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
                     </div>
-                  </div>
 
-                  {/* Window selector */}
-                  <div className="flex items-center gap-1.5 self-start sm:self-center">
-                    <div className="flex rounded-xl bg-background p-0.5 ring-1 ring-border text-xs">
-                      {(
-                        [
-                          { id: "48h", label: "Next 48 Hours" },
-                          { id: "7d", label: "Next 7 Days" },
-                          { id: "30d", label: "Next 30 Days" },
-                        ] as const
-                      ).map((w) => (
-                        <button
-                          key={w.id}
-                          type="button"
-                          onClick={() => setExpiringWindow(w.id)}
-                          className={`px-2.5 py-1 rounded-lg text-[11px] font-semibold transition-all ${
-                            expiringWindow === w.id
-                              ? "bg-amber-500 text-white shadow-xs"
-                              : "text-muted-foreground hover:text-foreground"
-                          }`}
-                        >
-                          {w.label}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
-                </div>
+                    <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                      {expiringList.map((c) => {
+                        const timeLeft = getTimeRemainingText(c.subscriptionExpiresAt);
+                        const isTrial = Boolean(c.trialStartedAt);
+                        const phoneClean = (c.contact?.whatsapp || c.contact?.phone || "").replace(/\D/g, "");
+                        const waNumber = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
+                        const renewalMsg = `Hi ${c.name}, your Influencer Dhundo creator pass is expiring in ${timeLeft}! Renew today to keep receiving brand sponsorships and client deal inquiries: https://influencerdhundo.com/creator/plans`;
+                        const waRenewalUrl = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(renewalMsg)}` : null;
 
-                {/* List or empty state */}
-                {expiringList.length === 0 ? (
-                  <div className="py-4 text-center text-xs text-muted-foreground flex items-center justify-center gap-2">
-                    <CheckCircle2 className="size-4 text-emerald-500 shrink-0" />
-                    <span>
-                      No creator passes expiring in the selected time window (
-                      {expiringWindow === "48h" ? "next 48 hours" : expiringWindow === "7d" ? "next 7 days" : "next 30 days"}). All active profiles are healthy.
-                    </span>
-                  </div>
-                ) : (
-                  <div className="mt-3 grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
-                    {expiringList.map((c) => {
-                      const timeLeft = getTimeRemainingText(c.subscriptionExpiresAt);
-                      const isTrial = Boolean(c.trialStartedAt);
-                      const phoneClean = (c.contact?.whatsapp || c.contact?.phone || "").replace(/\D/g, "");
-                      const waNumber = phoneClean.length === 10 ? `91${phoneClean}` : phoneClean;
-                      const renewalMsg = `Hi ${c.name}, your Influencer Dhundo creator pass is expiring in ${timeLeft}! Renew today to keep receiving brand sponsorships and client deal inquiries: https://influencerdhundo.com/creator/plans`;
-                      const waRenewalUrl = waNumber ? `https://wa.me/${waNumber}?text=${encodeURIComponent(renewalMsg)}` : null;
-
-                      return (
-                        <div
-                          key={c.id}
-                          className="p-3 rounded-xl bg-background border border-amber-500/30 flex flex-col justify-between gap-2.5 shadow-2xs hover:border-amber-500/60 transition-all"
-                        >
-                          <div>
-                            <div className="flex items-start justify-between gap-2">
-                              <div className="min-w-0">
-                                <span className="font-bold text-foreground text-xs truncate block">{c.name}</span>
-                                <span className="text-[11px] text-muted-foreground truncate block">
-                                  {c.instagram || c.city || "Creator"}
+                        return (
+                          <div
+                            key={c.id}
+                            className="p-3 rounded-xl bg-background border border-amber-500/30 flex flex-col justify-between gap-2.5 shadow-2xs hover:border-amber-500/60 transition-all"
+                          >
+                            <div>
+                              <div className="flex items-start justify-between gap-2">
+                                <div className="min-w-0">
+                                  <span className="font-bold text-foreground text-xs truncate block">{c.name}</span>
+                                  <span className="text-[11px] text-muted-foreground truncate block">
+                                    {c.instagram || c.city || "Creator"}
+                                  </span>
+                                </div>
+                                <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 flex items-center gap-1">
+                                  <Clock className="size-3" />
+                                  {timeLeft}
                                 </span>
                               </div>
-                              <span className="shrink-0 rounded-full px-2 py-0.5 text-[10px] font-bold bg-amber-500/15 text-amber-700 dark:text-amber-300 flex items-center gap-1">
-                                <Clock className="size-3" />
-                                {timeLeft}
-                              </span>
+
+                              <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
+                                <span>Expires: {c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
+                                <span>·</span>
+                                <span className="font-semibold text-foreground">{isTrial ? "3-Day Trial" : "Paid Pass"}</span>
+                              </div>
                             </div>
 
-                            <div className="mt-2 flex items-center gap-2 text-[11px] text-muted-foreground font-mono">
-                              <span>Expires: {c.subscriptionExpiresAt ? new Date(c.subscriptionExpiresAt).toLocaleDateString("en-IN", { day: "numeric", month: "short", hour: "2-digit", minute: "2-digit" }) : "—"}</span>
-                              <span>·</span>
-                              <span className="font-semibold text-foreground">{isTrial ? "3-Day Trial" : "Paid Pass"}</span>
-                            </div>
-                          </div>
-
-                          <div className="flex items-center gap-1.5 pt-2 border-t border-border/50">
-                            {waRenewalUrl && (
-                              <a
-                                href={waRenewalUrl}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors shadow-2xs"
+                            <div className="flex items-center gap-1.5 pt-2 border-t border-border/50">
+                              {waRenewalUrl && (
+                                <a
+                                  href={waRenewalUrl}
+                                  target="_blank"
+                                  rel="noreferrer"
+                                  className="flex-1 inline-flex items-center justify-center gap-1.5 py-1.5 px-2 rounded-lg bg-emerald-500 text-white text-[11px] font-bold hover:bg-emerald-600 transition-colors shadow-2xs"
+                                >
+                                  <MessageSquare className="size-3" />
+                                  <span>WhatsApp Reminder</span>
+                                </a>
+                              )}
+                              <button
+                                type="button"
+                                onClick={() => handleExtendExpiry(c, 7)}
+                                className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
+                                title="Extend pass by 7 days"
                               >
-                                <MessageSquare className="size-3" />
-                                <span>WhatsApp Reminder</span>
-                              </a>
-                            )}
-                            <button
-                              type="button"
-                              onClick={() => handleExtendExpiry(c, 7)}
-                              className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
-                              title="Extend pass by 7 days"
-                            >
-                              +7 Days
-                            </button>
-                            <button
-                              type="button"
-                              onClick={() => handleExtendExpiry(c, 30)}
-                              className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
-                              title="Extend pass by 30 days"
-                            >
-                              +30 Days
-                            </button>
+                                +7 Days
+                              </button>
+                              <button
+                                type="button"
+                                onClick={() => handleExtendExpiry(c, 30)}
+                                className="py-1.5 px-2 rounded-lg bg-secondary text-foreground text-[11px] font-semibold hover:bg-secondary/80 transition-colors border border-border"
+                                title="Extend pass by 30 days"
+                              >
+                                +30 Days
+                              </button>
+                            </div>
                           </div>
-                        </div>
-                      );
-                    })}
-                  </div>
+                        );
+                      })}
+                    </div>
+                  </Card>
                 )}
-              </Card>
+              </div>
             );
           })()}
 
