@@ -8,6 +8,7 @@ import {
   formatPrice,
   getActiveSubscription,
   getQueuedSubscriptions,
+  getSubscriptionDurationMs,
   getSubscriptionExpiry,
   isSubscriptionActive,
 } from "@/lib/directory-data";
@@ -31,6 +32,7 @@ import {
   openRazorpayCheckout,
 } from "@/lib/razorpay";
 import { supabaseDb } from "@/lib/supabase";
+import { sendCreatorEmailFn } from "@/lib/email";
 
 export const Route = createFileRoute("/creator/plans")({
   validateSearch: (
@@ -355,6 +357,38 @@ function Plans() {
             planId: planIdToActivate,
             promoCode: appliedDiscount.code,
           });
+
+          // Send subscription confirmation email
+          if (mine.contact?.email) {
+            try {
+              const durationMs = getSubscriptionDurationMs(planIdToActivate, durationToActivate);
+              const baseDate =
+                queueStartTime && queueStartTime.getTime() > Date.now()
+                  ? queueStartTime
+                  : new Date();
+              const expDate = new Date(baseDate.getTime() + durationMs);
+              const formattedExp = expDate.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              });
+
+              await sendCreatorEmailFn({
+                data: {
+                  type: "subscription_activated",
+                  to: mine.contact.email,
+                  name: mine.name || mine.displayName || "Influencer",
+                  planName: `${selectedPlan.duration} Influencer Subscription`,
+                  expiresAt: formattedExp,
+                  amountPaid: 0,
+                  discountCode: appliedDiscount.code,
+                  upgradeSource: "promo100",
+                },
+              });
+            } catch (emailErr) {
+              console.warn("Failed to send 100% promo subscription email:", emailErr);
+            }
+          }
         }
 
         setSuccess(true);
@@ -438,6 +472,41 @@ function Plans() {
               appliedDiscount?.code,
               appliedDiscount?.percent,
             );
+
+            // Send payment receipt confirmation email
+            if (mine.contact?.email) {
+              try {
+                const durationMs = getSubscriptionDurationMs(selectedPlan.id, selectedPlan.duration);
+                const baseDate =
+                  queueStartTime && queueStartTime.getTime() > Date.now()
+                    ? queueStartTime
+                    : new Date();
+                const expDate = new Date(baseDate.getTime() + durationMs);
+                const formattedExp = expDate.toLocaleDateString("en-IN", {
+                  day: "numeric",
+                  month: "short",
+                  year: "numeric",
+                });
+                const discountAmt = appliedDiscount ? basePrice - finalPrice : undefined;
+
+                await sendCreatorEmailFn({
+                  data: {
+                    type: "subscription_activated",
+                    to: mine.contact.email,
+                    name: mine.name || mine.displayName || "Influencer",
+                    planName: `${selectedPlan.duration} Influencer Subscription`,
+                    expiresAt: formattedExp,
+                    amountPaid: finalPrice,
+                    discountCode: appliedDiscount?.code,
+                    discountAmount: discountAmt && discountAmt > 0 ? discountAmt : undefined,
+                    paymentId: response.razorpay_payment_id,
+                    upgradeSource: "paid",
+                  },
+                });
+              } catch (emailErr) {
+                console.warn("Failed to send paid subscription email:", emailErr);
+              }
+            }
 
             setSuccess(true);
             setTimeout(() => {

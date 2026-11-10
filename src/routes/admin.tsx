@@ -2914,7 +2914,44 @@ function AdminDashboard() {
         price: 0,
       });
       setCreatorStatus(creator.id, "Active");
-      setActionFeedback({ id: creator.id, msg: `💎 ${duration} plan activated successfully!`, type: "success" });
+
+      const now = new Date();
+      const base =
+        creator.subscriptionExpiresAt && new Date(creator.subscriptionExpiresAt).getTime() > now.getTime()
+          ? new Date(creator.subscriptionExpiresAt)
+          : now;
+      const durationDays = planId === "1m" ? 30 : planId === "3m" ? 90 : planId === "6m" ? 180 : 365;
+      const newExpiry = new Date(base.getTime() + durationDays * 24 * 60 * 60 * 1000);
+
+      let emailSent = false;
+      if (creator.contact?.email) {
+        try {
+          const emailRes = await sendCreatorEmailFn({
+            data: {
+              type: "subscription_activated",
+              to: creator.contact.email,
+              name: creator.name || creator.displayName || "Influencer",
+              planName: `${duration} Influencer Subscription`,
+              expiresAt: newExpiry.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              }),
+              amountPaid: 0,
+              upgradeSource: "admin_extension",
+            },
+          });
+          emailSent = emailRes.success;
+        } catch (e) {
+          console.warn("Failed to send admin activation email:", e);
+        }
+      }
+
+      setActionFeedback({
+        id: creator.id,
+        msg: `💎 ${duration} subscription activated!${emailSent ? " (Email sent)" : ""}`,
+        type: "success",
+      });
       await refreshFromSupabase(true);
     } catch (err) {
       setActionFeedback({ id: creator.id, msg: `Error: ${String(err)}`, type: "error" });
@@ -2977,9 +3014,35 @@ function AdminDashboard() {
       await supabaseDb.updateSubscriptionExpiry(creator.id, newExpiry, creator.referralBonusDays ?? 0);
       await supabaseDb.updateCreatorStatus(creator.id, "Active");
       setCreatorStatus(creator.id, "Active");
+
+      let emailSent = false;
+      if (creator.contact?.email) {
+        try {
+          const emailRes = await sendCreatorEmailFn({
+            data: {
+              type: "subscription_activated",
+              to: creator.contact.email,
+              name: creator.name || creator.displayName || "Influencer",
+              planName: `+${extraDays} Days Extension`,
+              extensionDays: extraDays,
+              expiresAt: newExpiry.toLocaleDateString("en-IN", {
+                day: "numeric",
+                month: "short",
+                year: "numeric",
+              }),
+              amountPaid: 0,
+              upgradeSource: "admin_extension",
+            },
+          });
+          emailSent = emailRes.success;
+        } catch (e) {
+          console.warn("Failed to send extension email:", e);
+        }
+      }
+
       setActionFeedback({
         id: creator.id,
-        msg: `⏳ Extended by +${extraDays} days! New expiry: ${newExpiry.toLocaleDateString("en-IN")}`,
+        msg: `⏳ Extended by +${extraDays} days! New expiry: ${newExpiry.toLocaleDateString("en-IN")}${emailSent ? " (Email sent)" : ""}`,
         type: "success",
       });
       await refreshFromSupabase(true);
